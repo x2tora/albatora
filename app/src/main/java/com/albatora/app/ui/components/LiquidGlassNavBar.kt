@@ -38,16 +38,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.ImageShader
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -56,6 +59,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints as ComposeConstraints
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -66,6 +70,7 @@ import org.intellij.lang.annotations.Language
 import top.yukonga.miuix.kmp.basic.Badge
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.blur.Backdrop
 import top.yukonga.miuix.kmp.blur.BackdropEffectScope
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.blur.blur
@@ -218,8 +223,39 @@ private fun BackdropEffectScope.liquidLensEffect(
 }
 
 @Composable
+private fun rememberCombinedBackdrop(vararg backdrops: Backdrop?): Backdrop? {
+    val active = backdrops.filterNotNull()
+    if (active.isEmpty()) return null
+    if (active.size == 1) return active.first()
+    return remember(active) {
+        object : Backdrop {
+            override val isCoordinatesDependent: Boolean
+                get() = active.any { it.isCoordinatesDependent }
+
+            override fun DrawScope.drawBackdrop(
+                density: Density,
+                coordinates: LayoutCoordinates?,
+                layerBlock: (GraphicsLayerScope.() -> Unit)?,
+                downscaleFactor: Int
+            ) {
+                active.forEach { backdrop ->
+                    with(backdrop) {
+                        drawBackdrop(
+                            density = density,
+                            coordinates = coordinates,
+                            layerBlock = layerBlock,
+                            downscaleFactor = downscaleFactor
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun Modifier.liquidGlassSurface(
-    backdrop: LayerBackdrop?,
+    backdrop: Backdrop?,
     shape: Shape,
     cornerRadius: Dp = 0.dp,
     blurRadius: Dp = DockBlurRadius,
@@ -297,7 +333,8 @@ fun FloatingLiquidGlassNavBar(
     unpaidCount: Int,
     onSelectTab: (Int) -> Unit,
     onCenterAddClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    useLensTint: Boolean = true
 ) {
     var barPressed by remember { mutableStateOf(false) }
     val barScale by animateFloatAsState(
@@ -340,6 +377,7 @@ fun FloatingLiquidGlassNavBar(
             onCenterAddClick = onCenterAddClick,
             pageBackdrop = backdrop,
             contentHeight = DockHeight,
+            useLensTint = useLensTint,
             onBarPressedChange = { barPressed = it },
             modifier = Modifier.matchParentSize()
         )
@@ -356,11 +394,13 @@ private fun LiquidGlassNavBarContent(
     onCenterAddClick: () -> Unit,
     pageBackdrop: LayerBackdrop?,
     contentHeight: Dp,
+    useLensTint: Boolean,
     onBarPressedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val isDark = LocalIsDarkTheme.current
     val dockBackdrop = rememberLayerBackdrop()
+    val lensBackdrop = rememberCombinedBackdrop(pageBackdrop, dockBackdrop)
     val density = LocalDensity.current
     val haptic = LocalHapticFeedback.current
     val slotCount = slots.size
@@ -657,16 +697,24 @@ private fun LiquidGlassNavBarContent(
                         scaleX = 1f + SliderStretchMax * stretch
                     }
                     .liquidGlassSurface(
-                        backdrop = dockBackdrop,
+                        backdrop = lensBackdrop,
                         shape = RoundedCornerShape(50),
                         blurRadius = if (draggingState.value) 1.5.dp else 0.8.dp,
                         refractionHeight = SliderRefractionHeight,
                         refractionAmount = SliderRefractionAmount,
                         chromaticAberration = SliderChromaticAberration,
                         refraction = true,
-                        surfaceTint = MiuixTheme.colorScheme.primary.copy(alpha = if (isDark) 0.14f else 0.08f),
+                        surfaceTint = if (useLensTint) {
+                            MiuixTheme.colorScheme.primary.copy(alpha = if (isDark) 0.14f else 0.08f)
+                        } else {
+                            Color.Transparent
+                        },
                         grainAlpha = 0.04f,
-                        fallbackColor = MiuixTheme.colorScheme.primary.copy(alpha = if (isDark) 0.22f else 0.16f)
+                        fallbackColor = if (useLensTint) {
+                            MiuixTheme.colorScheme.primary.copy(alpha = if (isDark) 0.22f else 0.16f)
+                        } else {
+                            if (isDark) Color.White.copy(alpha = 0.14f) else Color.Black.copy(alpha = 0.07f)
+                        }
                     )
             )
         }

@@ -26,6 +26,8 @@ class AppUpdaterTest {
         assertTrue(AppUpdater.isNewerVersion("1.1.5", "1.1.4_hotfix"))
         assertTrue(AppUpdater.isNewerVersion("v1.1.4_hotfix2", "1.1.4_hotfix"))
         assertTrue(AppUpdater.isNewerVersion("v1.1.4.2_hotfix", "1.1.4_hotfix"))
+        assertTrue(AppUpdater.isNewerVersion("v1.1.4.2_hotfix", "1.1.4.1_hotfix"))
+        assertTrue(AppUpdater.isNewerVersion("v1.1.4.2_hotfix", "1.1.4"))
         assertFalse(AppUpdater.isNewerVersion("v1.1.4_hotfix", "1.1.4_hotfix"))
         assertFalse(AppUpdater.isNewerVersion("v1.1.4.1_hotfix", "1.1.4_hotfix"))
         assertFalse(AppUpdater.isNewerVersion("v1.1.4", "1.1.4_hotfix"))

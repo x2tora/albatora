@@ -29,6 +29,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.albatora.app.domain.PayrollCalculator
+import com.albatora.app.model.ThemeColorStyle
 import com.albatora.app.ui.components.AppUpdateDialog
 import com.albatora.app.ui.components.FloatingLiquidGlassNavBar
 import com.albatora.app.ui.components.StackedToastHost
@@ -522,6 +523,7 @@ private fun MainTabsHost(
                         selectedTab = tab
                     },
                     onCenterAddClick = { showHomeQuickMenu = true },
+                    useLensTint = state.settings.resolvedColorStyle() != ThemeColorStyle.DEFAULT,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .widthIn(max = 384.dp)
