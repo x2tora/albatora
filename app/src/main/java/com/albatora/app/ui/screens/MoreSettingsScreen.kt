@@ -1,0 +1,421 @@
+package com.albatora.app.ui.screens
+
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import com.albatora.app.domain.PayrollCalculator
+import com.albatora.app.model.*
+import com.albatora.app.ui.components.MiuixGlassIcon
+import top.yukonga.miuix.kmp.basic.*
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.*
+import top.yukonga.miuix.kmp.overlay.OverlayDialog
+import top.yukonga.miuix.kmp.preference.ArrowPreference
+import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
+import top.yukonga.miuix.kmp.preference.SwitchPreference
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.utils.overScrollVertical
+import java.time.LocalDate
+
+@Composable
+fun MoreSettingsScreen(
+    state: AlbaToraDataState,
+    scrollBehavior: ScrollBehavior,
+    onUpdateTheme: (ThemeOption) -> Unit,
+    onUpdateMonet: (Boolean) -> Unit,
+    onUpdateOngoingNotification: (Boolean) -> Unit,
+    onUpdateDefaultMinWage: (Long) -> Unit,
+    onDeleteTemplate: (String) -> Unit,
+    onExportJson: () -> String,
+    onImportJson: (String) -> Result<Unit>,
+    onResetAllData: () -> Unit,
+    onAddRegularJob: () -> Unit,
+    onAddShortTerm: () -> Unit,
+    onNotify: (String) -> Unit
+) {
+    val context = LocalContext.current
+    @Suppress("DEPRECATION")
+    val clipboardManager = LocalClipboardManager.current
+
+    var showMinWageDialog by remember { mutableStateOf(false) }
+    var showTemplatesDialog by remember { mutableStateOf(false) }
+    var showPasteRestoreDialog by remember { mutableStateOf(false) }
+    var showResetConfirm by remember { mutableStateOf(false) }
+
+    val exportFileLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.openOutputStream(uri)?.use { out ->
+                    out.write(onExportJson().toByteArray(Charsets.UTF_8))
+                }
+            }.onSuccess {
+                onNotify("JSON 백업 파일을 저장했습니다.")
+            }.onFailure {
+                onNotify("백업 파일 저장에 실패했습니다.")
+            }
+        }
+    }
+
+    val importFileLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            runCatching {
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    input.bufferedReader(Charsets.UTF_8).readText()
+                } ?: error("파일을 읽을 수 없습니다.")
+            }.fold(
+                onSuccess = { jsonText ->
+                    onImportJson(jsonText).onSuccess {
+                        onNotify("백업 데이터를 복원했습니다.")
+                    }.onFailure {
+                        onNotify("올바른 알바토라 백업 파일이 아닙니다.")
+                    }
+                },
+                onFailure = {
+                    onNotify("백업 파일 읽기에 실패했습니다.")
+                }
+            )
+        }
+    }
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .overScrollVertical()
+            .nestedScroll(scrollBehavior.nestedScrollConnection),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 110.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            SmallTitle(text = "화면 · 테마 설정")
+            Card(modifier = Modifier.fillMaxWidth()) {
+                val options = ThemeOption.entries
+                OverlayDropdownPreference(
+                    title = "테마 모드",
+                    summary = state.settings.themeOption.label,
+                    items = options.map { it.label },
+                    selectedIndex = options.indexOf(state.settings.themeOption),
+                    onSelectedIndexChange = { onUpdateTheme(options[it]) },
+                    startAction = {
+                        MiuixGlassIcon(
+                            icon = MiuixIcons.Theme,
+                            contentDescription = null,
+                            accentColor = MiuixTheme.colorScheme.primary
+                        )
+                    }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                SwitchPreference(
+                    title = "다이나믹 컬러 (Monet)",
+                    summary = "안드로이드 배경화면 색상에 맞춰 UI 포인트를 자동 조율합니다",
+                    checked = state.settings.monetEnabled,
+                    onCheckedChange = onUpdateMonet,
+                    startAction = {
+                        MiuixGlassIcon(
+                            icon = MiuixIcons.Favorites,
+                            contentDescription = null,
+                            accentColor = Color(0xFF7C5CFF)
+                        )
+                    }
+                )
+            }
+        }
+
+        item {
+            SmallTitle(text = "실시간 알림 · 급여 기본값")
+            Card(modifier = Modifier.fillMaxWidth()) {
+                SwitchPreference(
+                    title = "상단바 실시간 수익 알림",
+                    summary = "근무 중 실시간 누적 금액과 [휴게] / [퇴근] 빠른 버튼 표시",
+                    checked = state.settings.ongoingNotificationEnabled,
+                    onCheckedChange = onUpdateOngoingNotification,
+                    startAction = {
+                        MiuixGlassIcon(
+                            icon = MiuixIcons.Alarm,
+                            contentDescription = null,
+                            accentColor = Color(0xFFFF6B4A)
+                        )
+                    }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                ArrowPreference(
+                    title = "기본 최저시급 설정",
+                    summary = "현재 기본값: ${PayrollCalculator.formatWon(state.settings.defaultMinWage)} (2026 기준)",
+                    onClick = { showMinWageDialog = true },
+                    startAction = {
+                        MiuixGlassIcon(
+                            icon = MiuixIcons.BankCards,
+                            contentDescription = null,
+                            accentColor = Color(0xFF10B981)
+                        )
+                    }
+                )
+            }
+        }
+
+        item {
+            SmallTitle(text = "알바 · 단기 프리셋 관리")
+            Card(modifier = Modifier.fillMaxWidth()) {
+                ArrowPreference(
+                    title = "새 정규/고정 알바 추가",
+                    summary = "현재 등록된 알바 ${state.jobs.size}개 (무제한 등록 가능)",
+                    onClick = onAddRegularJob
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                ArrowPreference(
+                    title = "단기/일용직 10초 퀵 등록",
+                    summary = "총 기록 ${state.records.size}건",
+                    onClick = onAddShortTerm
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                ArrowPreference(
+                    title = "단기 알바 프리셋(템플릿) 관리",
+                    summary = "저장된 프리셋 ${state.templates.size}개",
+                    onClick = { showTemplatesDialog = true }
+                )
+            }
+        }
+
+        item {
+            SmallTitle(text = "로컬 데이터 JSON 백업 및 복원")
+            Card(modifier = Modifier.fillMaxWidth()) {
+                ArrowPreference(
+                    title = "JSON 파일로 내보내기 (백업)",
+                    summary = "모든 알바, 근무 기록, 프리셋, 설정을 JSON 파일로 저장",
+                    onClick = {
+                        val today = PayrollCalculator.formatDate(LocalDate.now()).replace("-", "")
+                        exportFileLauncher.launch("albatora-backup-$today.json")
+                    },
+                    startAction = {
+                        MiuixGlassIcon(
+                            icon = MiuixIcons.Backup,
+                            contentDescription = null,
+                            accentColor = Color(0xFF3482FF)
+                        )
+                    }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                ArrowPreference(
+                    title = "JSON 파일에서 가져오기 (복원)",
+                    summary = "저장해 둔 JSON 백업 파일을 불러와 데이터를 복원합니다",
+                    onClick = {
+                        importFileLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
+                    },
+                    startAction = {
+                        MiuixGlassIcon(
+                            icon = MiuixIcons.Import,
+                            contentDescription = null,
+                            accentColor = Color(0xFF10B981)
+                        )
+                    }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                ArrowPreference(
+                    title = "클립보드 백업 텍스트 복사 / 붙여넣기 복원",
+                    summary = "파일 없이 JSON 텍스트로 바로 백업하거나 복원합니다",
+                    onClick = { showPasteRestoreDialog = true },
+                    startAction = {
+                        MiuixGlassIcon(
+                            icon = MiuixIcons.Copy,
+                            contentDescription = null,
+                            accentColor = Color(0xFF06B6D4)
+                        )
+                    }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                ArrowPreference(
+                    title = "모든 데이터 초기화",
+                    summary = "등록된 모든 알바와 기록을 비웁니다 (테마/기본 설정 유지)",
+                    onClick = { showResetConfirm = true },
+                    startAction = {
+                        MiuixGlassIcon(
+                            icon = MiuixIcons.Reset,
+                            contentDescription = null,
+                            accentColor = MiuixTheme.colorScheme.error
+                        )
+                    }
+                )
+            }
+        }
+
+        item {
+            SmallTitle(text = "앱 정보")
+            Card(modifier = Modifier.fillMaxWidth(), insideMargin = PaddingValues(16.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        "알바토라 (AlbaTora) v1.0.0",
+                        style = MiuixTheme.textStyles.body1
+                    )
+                    Text(
+                        "실시간 하이브리드 수익 트래커 · 정규/단기 일용직 올인원 급여 관리",
+                        style = MiuixTheme.textStyles.footnote2,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                    )
+                }
+            }
+        }
+    }
+
+    // Default minimum wage editor
+    if (showMinWageDialog) {
+        var wageText by remember { mutableStateOf(state.settings.defaultMinWage.toString()) }
+        OverlayDialog(
+            show = true,
+            title = "기본 최저시급 설정",
+            summary = "2026년 대한민국 법정 최저시급은 10,320원입니다.",
+            onDismissRequest = { showMinWageDialog = false }
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                TextField(
+                    value = wageText,
+                    onValueChange = { wageText = it.filter(Char::isDigit) },
+                    label = "시급 (원)",
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    TextButton(text = "취소", onClick = { showMinWageDialog = false }, modifier = Modifier.weight(1f))
+                    TextButton(
+                        text = "저장",
+                        onClick = {
+                            val w = wageText.toLongOrNull() ?: DEFAULT_2026_MIN_WAGE
+                            onUpdateDefaultMinWage(w)
+                            showMinWageDialog = false
+                            onNotify("기본 최저시급이 ${PayrollCalculator.formatWon(w)}으로 저장되었습니다.")
+                        },
+                        colors = ButtonDefaults.textButtonColorsPrimary(),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+    }
+
+    // Saved short-term templates list
+    if (showTemplatesDialog) {
+        OverlayDialog(
+            show = true,
+            title = "단기 알바 프리셋 관리",
+            onDismissRequest = { showTemplatesDialog = false }
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (state.templates.isEmpty()) {
+                    Text(
+                        "저장된 프리셋이 없습니다. [단기/일용직 10초 퀵 등록]에서 '프리셋으로 저장'을 켜고 등록해 보세요.",
+                        style = MiuixTheme.textStyles.body2,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                    )
+                } else {
+                    state.templates.forEach { tpl ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(tpl.name, style = MiuixTheme.textStyles.body2)
+                                Text(
+                                    "${tpl.payType.label} ${PayrollCalculator.formatWon(tpl.unitAmount)} · ${tpl.taxMode.shortLabel}",
+                                    style = MiuixTheme.textStyles.footnote2,
+                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                                )
+                            }
+                            IconButton(onClick = { onDeleteTemplate(tpl.id) }) {
+                                Icon(MiuixIcons.Delete, contentDescription = "프리셋 삭제")
+                            }
+                        }
+                    }
+                }
+                TextButton(
+                    text = "닫기",
+                    onClick = { showTemplatesDialog = false },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    }
+
+    // Clipboard JSON export/restore
+    if (showPasteRestoreDialog) {
+        var pasteJson by remember { mutableStateOf("") }
+        OverlayDialog(
+            show = true,
+            title = "클립보드 JSON 백업 / 복원",
+            onDismissRequest = { showPasteRestoreDialog = false }
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                TextButton(
+                    text = "현재 데이터 JSON 클립보드로 복사",
+                    onClick = {
+                        clipboardManager.setText(AnnotatedString(onExportJson()))
+                        onNotify("백업 JSON을 클립보드에 복사했습니다.")
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                HorizontalDivider()
+                TextField(
+                    value = pasteJson,
+                    onValueChange = { pasteJson = it },
+                    label = "복원할 JSON 텍스트 붙여넣기",
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    TextButton(text = "취소", onClick = { showPasteRestoreDialog = false }, modifier = Modifier.weight(1f))
+                    TextButton(
+                        text = "복원 실행",
+                        onClick = {
+                            onImportJson(pasteJson).onSuccess {
+                                showPasteRestoreDialog = false
+                                onNotify("클립보드 데이터로 복원을 완료했습니다.")
+                            }.onFailure {
+                                onNotify("유효한 JSON 형식이 아닙니다.")
+                            }
+                        },
+                        colors = ButtonDefaults.textButtonColorsPrimary(),
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
+    }
+
+    if (showResetConfirm) {
+        OverlayDialog(
+            show = true,
+            title = "전체 데이터 초기화",
+            summary = "모든 알바와 근무 기록, 프리셋, 목표 금액이 영구 삭제됩니다. 계속할까요?",
+            onDismissRequest = { showResetConfirm = false }
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                TextButton(text = "취소", onClick = { showResetConfirm = false }, modifier = Modifier.weight(1f))
+                TextButton(
+                    text = "초기화",
+                    onClick = {
+                        onResetAllData()
+                        showResetConfirm = false
+                        onNotify("모든 데이터가 초기화되었습니다.")
+                    },
+                    colors = ButtonDefaults.textButtonColors(
+                        color = MiuixTheme.colorScheme.error,
+                        textColor = Color.White
+                    ),
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
