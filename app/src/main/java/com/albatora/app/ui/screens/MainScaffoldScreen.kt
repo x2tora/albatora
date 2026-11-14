@@ -405,6 +405,7 @@ private fun MainTabsHost(
                                 isFullscreenFocus = isFullscreenFocus,
                                 onToggleFullscreenFocus = { isFullscreenFocus = it },
                                 openStopwatchTrigger = openStopwatchTrigger,
+                                onConsumeStopwatchTrigger = { openStopwatchTrigger = 0 },
                                 onAddRegularJob = { onOpenAddRegularJob(null, null) },
                                 onEditRegularJob = { jobId -> onOpenAddRegularJob(jobId, null) },
                                 onQuickAddShortTerm = {

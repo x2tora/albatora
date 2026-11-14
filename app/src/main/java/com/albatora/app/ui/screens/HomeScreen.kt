@@ -48,6 +48,7 @@ fun HomeScreen(
     isFullscreenFocus: Boolean,
     onToggleFullscreenFocus: (Boolean) -> Unit,
     openStopwatchTrigger: Int,
+    onConsumeStopwatchTrigger: () -> Unit,
     onAddRegularJob: () -> Unit,
     onEditRegularJob: (String) -> Unit,
     onQuickAddShortTerm: () -> Unit,
@@ -100,6 +101,7 @@ fun HomeScreen(
     LaunchedEffect(openStopwatchTrigger) {
         if (openStopwatchTrigger > 0) {
             showStopwatchSheet = true
+            onConsumeStopwatchTrigger()
         }
     }
 
