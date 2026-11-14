@@ -63,6 +63,10 @@ fun RecordsScreen(
         PayrollCalculator.calculateGlobalUnpaidSummary(state)
     }
 
+    val scheduledPending = remember(state.records, state.jobs) {
+        PayrollCalculator.calculateScheduledPendingUnpaidSummary(state)
+    }
+
     val summary = remember(state, periodRange, selectedJobId, onlyUnpaid) {
         PayrollCalculator.calculateSettlementSummary(
             state = state,
@@ -339,13 +343,25 @@ fun RecordsScreen(
                                 EmptyDataBanner(
                                     icon = MiuixIcons.Ok,
                                     title = "미수금이 없습니다",
-                                    subtitle = "모든 단기/일용직 급여가 정산 완료 상태입니다",
+                                    subtitle = "정산일이 지난 미수금이 없습니다",
                                     accentColor = Color(0xFF16A34A)
                                 )
                             }
                         } else {
                             item { SmallTitle(text = "미수금 목록 (${globalUnpaid.second.size}건)") }
                             items(globalUnpaid.second, key = { it.record.id }) { item ->
+                                RecordDetailCard(
+                                    item = item,
+                                    onEdit = { onEditRecord(item.record) },
+                                    onTogglePayment = { onTogglePaymentStatus(item.record.id) }
+                                )
+                            }
+                        }
+                        if (scheduledPending.second.isNotEmpty()) {
+                            item {
+                                SmallTitle(text = "정산일 예정 (${scheduledPending.second.size}건 · ${PayrollCalculator.formatWon(scheduledPending.first)})")
+                            }
+                            items(scheduledPending.second, key = { "sched_${it.record.id}" }) { item ->
                                 RecordDetailCard(
                                     item = item,
                                     onEdit = { onEditRecord(item.record) },
@@ -401,12 +417,24 @@ fun RecordsScreen(
                             EmptyDataBanner(
                                 icon = MiuixIcons.Ok,
                                 title = "미수금이 없습니다",
-                                subtitle = "모든 단기/일용직 급여가 정산 완료 상태입니다",
+                                subtitle = "정산일이 지난 미수금이 없습니다",
                                 accentColor = Color(0xFF16A34A)
                             )
                         }
                     } else {
                         items(globalUnpaid.second, key = { it.record.id }) { item ->
+                            RecordDetailCard(
+                                item = item,
+                                onEdit = { onEditRecord(item.record) },
+                                onTogglePayment = { onTogglePaymentStatus(item.record.id) }
+                            )
+                        }
+                    }
+                    if (scheduledPending.second.isNotEmpty()) {
+                        item {
+                            SmallTitle(text = "정산일 예정 (${scheduledPending.second.size}건 · ${PayrollCalculator.formatWon(scheduledPending.first)})")
+                        }
+                        items(scheduledPending.second, key = { "sched_${it.record.id}" }) { item ->
                             RecordDetailCard(
                                 item = item,
                                 onEdit = { onEditRecord(item.record) },

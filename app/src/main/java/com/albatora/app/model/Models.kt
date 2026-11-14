@@ -316,7 +316,7 @@ data class AlbaToraDataState(
     val jobs: List<Job> = emptyList(),
     val records: List<WorkRecord> = emptyList(),
     val templates: List<ShortTermTemplate> = emptyList(),
-    val tangibleItems: List<TangibleItem> = defaultTangibleItems(),
+    val tangibleItems: List<TangibleItem> = emptyList(),
     val wishlistGoals: List<WishlistGoal> = emptyList(),
     val activeStopwatches: List<ActiveStopwatchSession> = emptyList(),
     val scheduledRuntimes: List<ScheduledShiftRuntime> = emptyList(),
@@ -324,35 +324,11 @@ data class AlbaToraDataState(
     val schemaVersion: Int = 1
 ) {
     companion object {
-        fun defaultTangibleItems(): List<TangibleItem> = listOf(
-            TangibleItem(
-                id = "tangible_americano",
-                name = "아메리카노",
-                emoji = "store",
-                unitPrice = 4500L,
-                isDefault = true
-            ),
-            TangibleItem(
-                id = "tangible_gukbap",
-                name = "국밥",
-                emoji = "promotions",
-                unitPrice = 10000L,
-                isDefault = true
-            ),
-            TangibleItem(
-                id = "tangible_chicken",
-                name = "치킨",
-                emoji = "favorites_fill",
-                unitPrice = 22000L,
-                isDefault = true
-            )
-        )
-
         fun initialEmptyState(): AlbaToraDataState = AlbaToraDataState(
             jobs = emptyList(),
             records = emptyList(),
             templates = emptyList(),
-            tangibleItems = defaultTangibleItems(),
+            tangibleItems = emptyList(),
             wishlistGoals = emptyList(),
             activeStopwatches = emptyList(),
             scheduledRuntimes = emptyList(),

@@ -484,17 +484,28 @@ class AlbaToraStateHolder private constructor(context: Context) {
             } else {
                 st.tangibleItems + item
             }
-            st.copy(tangibleItems = next)
+            val selectedId = if (next.any { it.id == st.settings.selectedTangibleItemId }) {
+                st.settings.selectedTangibleItemId
+            } else {
+                item.id
+            }
+            st.copy(
+                tangibleItems = next,
+                settings = st.settings.copy(selectedTangibleItemId = selectedId)
+            )
         }
     }
 
     fun deleteTangibleItem(itemId: String) {
         updateAndPersist { st ->
             val filtered = st.tangibleItems.filterNot { it.id == itemId }
-            val finalItems = if (filtered.isEmpty()) AlbaToraDataState.defaultTangibleItems() else filtered
-            val selectedId = if (st.settings.selectedTangibleItemId == itemId) finalItems.first().id else st.settings.selectedTangibleItemId
+            val selectedId = if (st.settings.selectedTangibleItemId == itemId) {
+                filtered.firstOrNull()?.id.orEmpty()
+            } else {
+                st.settings.selectedTangibleItemId
+            }
             st.copy(
-                tangibleItems = finalItems,
+                tangibleItems = filtered,
                 settings = st.settings.copy(selectedTangibleItemId = selectedId)
             )
         }

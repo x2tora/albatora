@@ -104,7 +104,7 @@ fun HomeScreen(
     }
 
     val selectedTangible = state.tangibleItems.find { it.id == state.settings.selectedTangibleItemId }
-        ?: state.tangibleItems.first()
+        ?: state.tangibleItems.firstOrNull()
 
     val completelyEmpty = state.jobs.isEmpty() &&
         state.records.isEmpty() &&
@@ -301,11 +301,15 @@ fun HomeScreen(
                                     )
                                 }
                             }
-                            if (selectedTangible.unitPrice > 0L && livePlusMonth > 0L) {
+                            if (selectedTangible != null && selectedTangible.unitPrice > 0L && livePlusMonth > 0L) {
                                 val count = livePlusMonth.toDouble() / selectedTangible.unitPrice.toDouble()
                                 Row(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .squircleClip(8.dp)
+                                        .clickable { showTangibleManager = true }
+                                        .padding(vertical = 2.dp)
                                 ) {
                                     MiuixEntityBadge(
                                         emoji = selectedTangible.emoji,
@@ -320,6 +324,14 @@ fun HomeScreen(
                                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                                     )
                                 }
+                            } else if (selectedTangible == null) {
+                                SquirclePillBadge(
+                                    text = "체감 항목 추가",
+                                    backgroundColor = MiuixTheme.colorScheme.primary.copy(alpha = 0.12f),
+                                    contentColor = MiuixTheme.colorScheme.primary,
+                                    leadingIcon = MiuixIcons.Add,
+                                    onClick = { showTangibleManager = true }
+                                )
                             }
                         }
                     }
@@ -1232,7 +1244,7 @@ private fun FocusTimerStage(
     snapshot: LiveDashboardSnapshot,
     selectedTab: Int,
     onSelectTab: (Int) -> Unit,
-    selectedTangible: TangibleItem,
+    selectedTangible: TangibleItem?,
     allTangibles: List<TangibleItem>,
     onSelectTangible: (String) -> Unit,
     onManageTangibles: () -> Unit,
@@ -1424,54 +1436,75 @@ private fun FocusTimerStage(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                val qty = if (selectedTangible.unitPrice > 0L) displayEarned / selectedTangible.unitPrice else 0.0
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (selectedTangible != null) {
+                    val qty = if (selectedTangible.unitPrice > 0L) displayEarned / selectedTangible.unitPrice else 0.0
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                MiuixEntityBadge(
+                                    emoji = selectedTangible.emoji,
+                                    fallbackIcon = MiuixIcons.Store,
+                                    accentColor = accentColor,
+                                    size = 24.dp,
+                                    cornerRadius = 7.dp
+                                )
+                                Text(
+                                    text = "${selectedTangible.name} ${String.format(Locale.US, "%.2f", qty)}개",
+                                    style = MiuixTheme.textStyles.body2.copy(
+                                        fontWeight = FontWeight.Medium,
+                                        fontFeatureSettings = "tnum"
+                                    ),
+                                    color = MiuixTheme.colorScheme.onSurface
+                                )
+                            }
+                            Text(
+                                text = "체감 항목 관리",
+                                style = MiuixTheme.textStyles.footnote1.copy(fontWeight = FontWeight.Medium),
+                                color = MiuixTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .squircleClip(8.dp)
+                                    .clickable(onClick = onManageTangibles)
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(allTangibles, key = { it.id }) { item ->
+                                val active = item.id == selectedTangible.id
+                                SquirclePillBadge(
+                                    text = item.name,
+                                    backgroundColor = if (active) accentColor else MiuixTheme.colorScheme.secondaryContainer,
+                                    contentColor = if (active) Color.White else MiuixTheme.colorScheme.onSecondaryContainer,
+                                    leadingIcon = AlbaIconCatalog.resolveIcon(item.emoji, MiuixIcons.Store),
+                                    onClick = { onSelectTangible(item.id) }
+                                )
+                            }
+                        }
+                    }
+                } else {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            MiuixEntityBadge(
-                                emoji = selectedTangible.emoji,
-                                fallbackIcon = MiuixIcons.Store,
-                                accentColor = accentColor,
-                                size = 24.dp,
-                                cornerRadius = 7.dp
-                            )
-                            Text(
-                                text = "${selectedTangible.name} ${String.format(Locale.US, "%.2f", qty)}개",
-                                style = MiuixTheme.textStyles.body2.copy(
-                                    fontWeight = FontWeight.Medium,
-                                    fontFeatureSettings = "tnum"
-                                ),
-                                color = MiuixTheme.colorScheme.onSurface
-                            )
-                        }
-                        Text(
-                            text = "체감 항목 관리",
-                            style = MiuixTheme.textStyles.footnote1.copy(fontWeight = FontWeight.Medium),
-                            color = MiuixTheme.colorScheme.primary,
-                            modifier = Modifier
-                                .squircleClip(8.dp)
-                                .clickable(onClick = onManageTangibles)
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        SquirclePillBadge(
+                            text = "체감 항목 추가",
+                            backgroundColor = accentColor.copy(alpha = 0.14f),
+                            contentColor = accentColor,
+                            leadingIcon = MiuixIcons.Add,
+                            onClick = onManageTangibles
                         )
-                    }
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        items(allTangibles, key = { it.id }) { item ->
-                            val active = item.id == selectedTangible.id
-                            SquirclePillBadge(
-                                text = item.name,
-                                backgroundColor = if (active) accentColor else MiuixTheme.colorScheme.secondaryContainer,
-                                contentColor = if (active) Color.White else MiuixTheme.colorScheme.onSecondaryContainer,
-                                leadingIcon = AlbaIconCatalog.resolveIcon(item.emoji, MiuixIcons.Store),
-                                onClick = { onSelectTangible(item.id) }
-                            )
-                        }
+                        Text(
+                            text = "시급 체감 환산",
+                            style = MiuixTheme.textStyles.footnote1,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                        )
                     }
                 }
 
@@ -1689,6 +1722,13 @@ private fun TangibleItemsManagerSheet(
                 .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
+            if (items.isEmpty()) {
+                Text(
+                    text = "등록된 체감 항목이 없습니다. 아래에서 자주 사는 항목을 추가해 보세요.",
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                )
+            }
             items.forEach { item ->
                 val isSelected = item.id == selectedId
                 Row(
@@ -1737,10 +1777,8 @@ private fun TangibleItemsManagerSheet(
                         }) {
                             Icon(MiuixIcons.Edit, contentDescription = "수정")
                         }
-                        if (items.size > 1) {
-                            IconButton(onClick = { onDelete(item.id) }) {
-                                Icon(MiuixIcons.Delete, contentDescription = "삭제")
-                            }
+                        IconButton(onClick = { onDelete(item.id) }) {
+                            Icon(MiuixIcons.Delete, contentDescription = "삭제")
                         }
                     }
                 }

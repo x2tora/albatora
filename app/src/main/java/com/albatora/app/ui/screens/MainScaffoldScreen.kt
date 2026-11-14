@@ -305,7 +305,7 @@ private fun MainTabsHost(
         toastState.show(msg)
     }
 
-    val unpaidCount = remember(state.records) {
+    val unpaidCount = remember(state.records, state.jobs) {
         PayrollCalculator.calculateGlobalUnpaidSummary(state).second.size
     }
 

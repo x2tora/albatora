@@ -489,6 +489,41 @@ object PayrollCalculator {
         return month.atDay(day)
     }
 
+    fun expectedPaydayForRecord(job: Job, shiftDate: LocalDate): LocalDate {
+        val shiftYm = YearMonth.from(shiftDate)
+        val anchorCandidates = listOf(shiftYm, shiftYm.plusMonths(1), shiftYm.plusMonths(2))
+        val matchedAnchor = anchorCandidates.firstOrNull { candidate ->
+            val (pStart, pEnd) = getSettlementPeriod(job, candidate)
+            !shiftDate.isBefore(pStart) && !shiftDate.isAfter(pEnd)
+        } ?: if (job.settlementPrevMonthCycle) shiftYm.plusMonths(1) else shiftYm
+
+        val (_, periodEnd) = getSettlementPeriod(job, matchedAnchor)
+        val nominalInAnchor = nominalPaydayForMonth(job, matchedAnchor)
+        val paydayMonth = if (nominalInAnchor.isBefore(shiftDate) || nominalInAnchor.isBefore(periodEnd.minusDays(5))) {
+            matchedAnchor.plusMonths(1)
+        } else {
+            matchedAnchor
+        }
+        return adjustPayday(nominalPaydayForMonth(job, paydayMonth), job.paydayHolidayRule)
+    }
+
+    fun isUnpaidRecordDue(
+        state: AlbaToraDataState,
+        rec: WorkRecord,
+        today: LocalDate = LocalDate.now()
+    ): Boolean {
+        if (rec.paymentStatus != PaymentStatus.UNPAID) return false
+        val shiftDate = parseDate(rec.date, today)
+        if (shiftDate.isAfter(today)) return false
+
+        val linkedJob = rec.jobId?.let { id -> state.jobs.find { it.id == id } }
+            ?: state.jobs.find { !it.isArchived && it.name == rec.title }
+            ?: return true
+
+        val payday = expectedPaydayForRecord(linkedJob, shiftDate)
+        return today.isAfter(payday)
+    }
+
     fun resolveEarnedRecords(
         state: AlbaToraDataState,
         fromDate: LocalDate,
@@ -578,12 +613,13 @@ object PayrollCalculator {
         onlyUnpaid: Boolean = false,
         now: LocalDateTime = LocalDateTime.now()
     ): SettlementSummary {
+        val today = now.toLocalDate()
         var resolved = resolveEarnedRecords(state, fromDate, toDate, now)
         if (filterJobId != null) {
             resolved = resolved.filter { it.record.jobId == filterJobId }
         }
         if (onlyUnpaid) {
-            resolved = resolved.filter { it.record.paymentStatus == PaymentStatus.UNPAID }
+            resolved = resolved.filter { isUnpaidRecordDue(state, it.record, today) }
         }
 
         val jobsById = state.jobs.associateBy { it.id }
@@ -622,7 +658,7 @@ object PayrollCalculator {
         val expenseSum = resolved.sumOf { it.breakdown.transportExpense + it.breakdown.mealExpense }
         val netSum = resolved.sumOf { it.breakdown.netPay } + weeklyHolidayTotal - taxOnWeeklyHoliday
         val workMinutesSum = resolved.sumOf { it.breakdown.paidWorkMinutes }
-        val unpaidItems = resolved.filter { it.record.paymentStatus == PaymentStatus.UNPAID }
+        val unpaidItems = resolved.filter { isUnpaidRecordDue(state, it.record, today) }
 
         return SettlementSummary(
             periodStart = fromDate,
@@ -645,9 +681,12 @@ object PayrollCalculator {
         )
     }
 
-    fun calculateGlobalUnpaidSummary(state: AlbaToraDataState): Pair<Long, List<ResolvedRecordItem>> {
+    fun calculateGlobalUnpaidSummary(
+        state: AlbaToraDataState,
+        today: LocalDate = LocalDate.now()
+    ): Pair<Long, List<ResolvedRecordItem>> {
         val unpaid = state.records
-            .filter { it.paymentStatus == PaymentStatus.UNPAID }
+            .filter { isUnpaidRecordDue(state, it, today) }
             .map { rec ->
                 ResolvedRecordItem(
                     record = rec,
@@ -658,6 +697,24 @@ object PayrollCalculator {
             }
             .sortedByDescending { it.record.date }
         return unpaid.sumOf { it.breakdown.netPay } to unpaid
+    }
+
+    fun calculateScheduledPendingUnpaidSummary(
+        state: AlbaToraDataState,
+        today: LocalDate = LocalDate.now()
+    ): Pair<Long, List<ResolvedRecordItem>> {
+        val pending = state.records
+            .filter { it.paymentStatus == PaymentStatus.UNPAID && !isUnpaidRecordDue(state, it, today) }
+            .map { rec ->
+                ResolvedRecordItem(
+                    record = rec,
+                    job = rec.jobId?.let { id -> state.jobs.find { it.id == id } },
+                    isVirtualSchedule = false,
+                    breakdown = calculateShiftFinancials(rec)
+                )
+            }
+            .sortedByDescending { it.record.date }
+        return pending.sumOf { it.breakdown.netPay } to pending
     }
 
     fun calculateNextPaydays(state: AlbaToraDataState, today: LocalDate = LocalDate.now()): List<PaydayCountdownInfo> {

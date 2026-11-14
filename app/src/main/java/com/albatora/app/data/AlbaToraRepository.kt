@@ -22,13 +22,7 @@ class AlbaToraRepository(context: Context) {
         }
         return runCatching {
             val raw = dataFile.readText(Charsets.UTF_8)
-            val decoded = json.decodeFromString<AlbaToraDataState>(raw)
-            // Keep default tangible items only if tangible list was somehow emptied completely
-            if (decoded.tangibleItems.isEmpty()) {
-                decoded.copy(tangibleItems = AlbaToraDataState.defaultTangibleItems())
-            } else {
-                decoded
-            }
+            json.decodeFromString<AlbaToraDataState>(raw)
         }.getOrElse {
             AlbaToraDataState.initialEmptyState()
         }
@@ -45,11 +39,6 @@ class AlbaToraRepository(context: Context) {
     fun exportToJson(state: AlbaToraDataState): String = json.encodeToString(state)
 
     fun importFromJson(rawJson: String): Result<AlbaToraDataState> = runCatching {
-        val parsed = json.decodeFromString<AlbaToraDataState>(rawJson.trim())
-        if (parsed.tangibleItems.isEmpty()) {
-            parsed.copy(tangibleItems = AlbaToraDataState.defaultTangibleItems())
-        } else {
-            parsed
-        }
+        json.decodeFromString<AlbaToraDataState>(rawJson.trim())
     }
 }

@@ -103,19 +103,22 @@ private val GlassSurfaceTint = Color(0xFF6E7D96).copy(alpha = 0.03f)
 private const val GlassGrainAlpha = 0.10f
 private const val GRAIN_TILE = 96
 
-private val SliderInset = 5.dp
+private val SliderHorizontalOverhang = 5.dp
+private val SliderVerticalOverhang = 7.dp
+private val SliderCornerRadius = 28.dp
 private val SliderDragStartSlop = 4.dp
-private val SliderRefractionHeight = 10.dp
-private val SliderRefractionAmount = 6.dp
-private val SliderChromaticAberration = 1.8.dp
-private val SliderPressedOverhang = 4.dp
-private const val SliderStretchMax = 0.22f
+private val SliderRefractionHeight = 6.dp
+private val SliderRefractionAmount = 4.0.dp
+private val SliderChromaticAberration = 0.8.dp
+private val SliderPressedOverhang = 3.dp
+private const val SliderStretchMax = 0.18f
 
 @Language("AGSL")
 private const val LIQUID_LENS_SHADER = """
     uniform shader content;
     uniform float2 uPad;
     uniform float2 uSize;
+    uniform float uRadius;
     uniform float uHeight;
     uniform float uAmount;
     uniform float uChromatic;
@@ -127,7 +130,8 @@ private const val LIQUID_LENS_SHADER = """
 
     half4 main(float2 fragCoord) {
         float2 halfSize = max(uSize * 0.5, float2(1.0));
-        float r = min(halfSize.x, halfSize.y);
+        float maxR = min(halfSize.x, halfSize.y);
+        float r = (uRadius > 0.0) ? min(uRadius, maxR) : maxR;
         float2 local = (fragCoord - uPad) - halfSize;
 
         float sd = sdPill(local, halfSize, r);
@@ -192,6 +196,7 @@ private fun BackdropEffectScope.vibrancySaturation(saturation: Float = 1.5f) {
 }
 
 private fun BackdropEffectScope.liquidLensEffect(
+    cornerRadiusPx: Float,
     refractionHeightPx: Float,
     refractionAmountPx: Float,
     chromaticPx: Float
@@ -201,6 +206,7 @@ private fun BackdropEffectScope.liquidLensEffect(
     val shader = obtainRuntimeShader("AlbaLiquidLens", LIQUID_LENS_SHADER)
     shader.setFloatUniform("uPad", padding / scale, padding / scale)
     shader.setFloatUniform("uSize", size.width / scale, size.height / scale)
+    shader.setFloatUniform("uRadius", (cornerRadiusPx / scale).coerceAtLeast(0f))
     shader.setFloatUniform("uHeight", (refractionHeightPx / scale).coerceAtLeast(1f))
     shader.setFloatUniform("uAmount", refractionAmountPx / scale)
     shader.setFloatUniform("uChromatic", chromaticPx / scale)
@@ -216,6 +222,7 @@ private fun BackdropEffectScope.liquidLensEffect(
 fun Modifier.liquidGlassSurface(
     backdrop: LayerBackdrop?,
     shape: Shape,
+    cornerRadius: Dp = 0.dp,
     blurRadius: Dp = DockBlurRadius,
     refractionHeight: Dp = DockRefractionHeight,
     refractionAmount: Dp = DockRefractionAmount,
@@ -246,6 +253,7 @@ fun Modifier.liquidGlassSurface(
             blur(blurRadius.toPx())
             if (refraction) {
                 liquidLensEffect(
+                    cornerRadiusPx = cornerRadius.toPx(),
                     refractionHeightPx = refractionHeight.toPx(),
                     refractionAmountPx = refractionAmount.toPx(),
                     chromaticPx = chromaticAberration.toPx()
@@ -268,11 +276,11 @@ private fun slotToTab(slotIndex: Int): Int = if (slotIndex < 2) slotIndex else s
 
 private fun nearestAllSlot(
     leftPx: Float,
-    insetPx: Float,
+    baseOffsetPx: Float,
     itemWidthPx: Float
 ): Int {
     if (itemWidthPx <= 0f) return 0
-    val approxSlot = ((leftPx - insetPx) / itemWidthPx).roundToInt()
+    val approxSlot = ((leftPx - baseOffsetPx) / itemWidthPx).roundToInt()
     return approxSlot.coerceIn(0, 4)
 }
 
@@ -360,13 +368,14 @@ private fun LiquidGlassNavBarContent(
     var barWidthPx by remember { mutableIntStateOf(0) }
 
     val itemWidthPx = if (barWidthPx == 0) 0f else barWidthPx.toFloat() / slotCount
-    val insetPx = with(density) { SliderInset.toPx() }
-    val sliderHeight = (contentHeight - SliderInset * 2).coerceAtLeast(0.dp)
-    val sliderWidthPx = (itemWidthPx - insetPx * 2f).coerceAtLeast(0f)
-    val sliderHeightPx = with(density) { sliderHeight.toPx() }
+    val horizontalOverhangPx = with(density) { SliderHorizontalOverhang.toPx() }
+    val verticalOverhangPx = with(density) { SliderVerticalOverhang.toPx() }
+    val baseOffsetPx = -horizontalOverhangPx
+    val sliderWidthPx = if (itemWidthPx > 0f) itemWidthPx + horizontalOverhangPx * 2f else 0f
+    val sliderHeightPx = (with(density) { contentHeight.toPx() } + verticalOverhangPx * 2f).coerceAtLeast(0f)
 
     val targetSlot = tabToSlot(selectedTab.coerceIn(0, 3))
-    val targetOffsetPx = itemWidthPx * targetSlot + insetPx
+    val targetOffsetPx = itemWidthPx * targetSlot + baseOffsetPx
 
     val interactionSources = remember(slotCount) { List(slotCount) { MutableInteractionSource() } }
     var pressedCount by remember { mutableIntStateOf(0) }
@@ -401,7 +410,7 @@ private fun LiquidGlassNavBarContent(
 
     var dragHighlightSlot by remember { mutableStateOf<Int?>(null) }
     val anchorSlot = dragHighlightSlot ?: targetSlot
-    val anchorPx = itemWidthPx * anchorSlot + insetPx
+    val anchorPx = itemWidthPx * anchorSlot + baseOffsetPx
 
     val pressProgress by animateFloatAsState(
         targetValue = if (pressed) 1f else 0f,
@@ -411,7 +420,7 @@ private fun LiquidGlassNavBarContent(
         ),
         label = "sliderPress"
     )
-    val pressOutsetPx = (insetPx + with(density) { SliderPressedOverhang.toPx() }) * pressProgress
+    val pressOutsetPx = with(density) { SliderPressedOverhang.toPx() } * pressProgress
 
     LaunchedEffect(itemWidthPx) {
         if (itemWidthPx <= 0f) return@LaunchedEffect
@@ -446,8 +455,8 @@ private fun LiquidGlassNavBarContent(
             .onSizeChanged { barWidthPx = it.width }
             .pointerInput(itemWidthPx) {
                 if (itemWidthPx <= 0f) return@pointerInput
-                val minLeft = insetPx
-                val maxLeft = itemWidthPx * (slotCount - 1) + insetPx
+                val minLeft = baseOffsetPx
+                val maxLeft = itemWidthPx * (slotCount - 1) + baseOffsetPx
                 val slopPx = with(density) { SliderDragStartSlop.toPx() }
 
                 awaitEachGesture {
@@ -465,7 +474,7 @@ private fun LiquidGlassNavBarContent(
                                 dragHighlightSlot = null
                                 val snapSlot = nearestAllSlot(
                                     leftPx = fingerTargetState.floatValue,
-                                    insetPx = insetPx,
+                                    baseOffsetPx = baseOffsetPx,
                                     itemWidthPx = itemWidthPx
                                 )
                                 if (snapSlot == 2) {
@@ -491,14 +500,14 @@ private fun LiquidGlassNavBarContent(
                             draggingState.value = true
                             val initialTarget = (change.position.x - sliderWidthPx / 2f).coerceIn(minLeft, maxLeft)
                             fingerTargetState.floatValue = initialTarget
-                            dragHighlightSlot = nearestAllSlot(initialTarget, insetPx, itemWidthPx)
+                            dragHighlightSlot = nearestAllSlot(initialTarget, baseOffsetPx, itemWidthPx)
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         }
                         change.consume()
 
                         val next = (change.position.x - sliderWidthPx / 2f).coerceIn(minLeft, maxLeft)
                         fingerTargetState.floatValue = next
-                        val nearest = nearestAllSlot(next, insetPx, itemWidthPx)
+                        val nearest = nearestAllSlot(next, baseOffsetPx, itemWidthPx)
                         if (nearest != dragHighlightSlot) {
                             dragHighlightSlot = nearest
                             haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
@@ -600,6 +609,15 @@ private fun LiquidGlassNavBarContent(
                                     modifier = Modifier.size(22.dp),
                                     tint = tint
                                 )
+                                if (slot.tabIndex == 0 && hasActiveShift) {
+                                    Box(modifier = Modifier.offset(x = 5.dp, y = (-3).dp)) {
+                                        Badge()
+                                    }
+                                } else if (slot.tabIndex == 2 && unpaidCount > 0) {
+                                    Box(modifier = Modifier.offset(x = 9.dp, y = (-5).dp)) {
+                                        Badge { Text(unpaidCount.toString()) }
+                                    }
+                                }
                             }
                             Text(
                                 text = slot.label,
@@ -617,7 +635,8 @@ private fun LiquidGlassNavBarContent(
         }
 
         // Layer 2 (on top of nav items, sibling of dockBackdrop):
-        // Sliding Liquid Glass Selector Lens that refracts the dock icons/labels underneath
+        // Oversized Liquid Glass Selector Lens extending smoothly beyond the dock bar so icons, labels,
+        // and notification badges remain inside the distortion-free center zone.
         if (sliderWidthPx > 0f && sliderHeightPx > 0f) {
             Box(
                 modifier = Modifier
@@ -630,7 +649,7 @@ private fun LiquidGlassNavBarContent(
                         layout(reportW, reportH) {
                             placeable.place(
                                 x = (sliderLeftPx - pressOutsetPx).roundToInt(),
-                                y = (insetPx - pressOutsetPx).roundToInt()
+                                y = (-verticalOverhangPx - pressOutsetPx).roundToInt()
                             )
                         }
                     }
@@ -640,7 +659,8 @@ private fun LiquidGlassNavBarContent(
                     }
                     .liquidGlassSurface(
                         backdrop = dockBackdrop,
-                        shape = RoundedCornerShape(50),
+                        shape = RoundedCornerShape(SliderCornerRadius),
+                        cornerRadius = SliderCornerRadius,
                         blurRadius = if (draggingState.value) 1.5.dp else 0.8.dp,
                         refractionHeight = SliderRefractionHeight,
                         refractionAmount = SliderRefractionAmount,
@@ -651,50 +671,6 @@ private fun LiquidGlassNavBarContent(
                         fallbackColor = MiuixTheme.colorScheme.primary.copy(alpha = if (isDark) 0.22f else 0.16f)
                     )
             )
-        }
-
-        // Layer 3 (unrefracted badge overlay above the glass lens so red badges never distort):
-        if (hasActiveShift || unpaidCount > 0) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(contentHeight),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceEvenly
-            ) {
-                slots.forEach { slot ->
-                    if (slot.tabIndex == null) {
-                        Box(modifier = Modifier.weight(1f).fillMaxHeight())
-                    } else {
-                        Column(
-                            modifier = Modifier.weight(1f).fillMaxHeight(),
-                            verticalArrangement = Arrangement.Center,
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Box(contentAlignment = Alignment.TopEnd) {
-                                Box(modifier = Modifier.size(22.dp))
-                                if (slot.tabIndex == 0 && hasActiveShift) {
-                                    Box(modifier = Modifier.offset(x = 5.dp, y = (-3).dp)) {
-                                        Badge()
-                                    }
-                                } else if (slot.tabIndex == 2 && unpaidCount > 0) {
-                                    Box(modifier = Modifier.offset(x = 9.dp, y = (-5).dp)) {
-                                        Badge { Text(unpaidCount.toString()) }
-                                    }
-                                }
-                            }
-                            Text(
-                                text = slot.label,
-                                color = Color.Transparent,
-                                fontSize = 11.sp,
-                                fontWeight = if (slot.slotIndex == anchorSlot) FontWeight.SemiBold else FontWeight.Normal,
-                                maxLines = 1,
-                                modifier = Modifier.padding(top = 2.dp)
-                            )
-                        }
-                    }
-                }
-            }
         }
     }
 }

@@ -11,17 +11,14 @@ import java.time.ZoneId
 class PayrollCalculatorTest {
 
     @Test
-    fun `initial empty state has zero jobs and 2026 minimum wage`() {
+    fun `initial empty state has zero jobs, empty tangibles, and 2026 minimum wage`() {
         val empty = AlbaToraDataState.initialEmptyState()
         assertTrue(empty.jobs.isEmpty())
         assertTrue(empty.records.isEmpty())
         assertTrue(empty.templates.isEmpty())
         assertTrue(empty.wishlistGoals.isEmpty())
+        assertTrue(empty.tangibleItems.isEmpty())
         assertEquals(10320L, empty.settings.defaultMinWage)
-        assertEquals(3, empty.tangibleItems.size)
-        assertEquals(4500L, empty.tangibleItems.first { it.name == "아메리카노" }.unitPrice)
-        assertEquals(10000L, empty.tangibleItems.first { it.name == "국밥" }.unitPrice)
-        assertEquals(22000L, empty.tangibleItems.first { it.name == "치킨" }.unitPrice)
     }
 
     @Test
@@ -223,5 +220,74 @@ class PayrollCalculatorTest {
         val manualLive = live.activeShifts.first { it.isManualStopwatch }
         assertFalse(manualLive.isBoostActive)
         assertTrue(live.totalEarnedWon > regularLive.liveEarnedWon)
+    }
+
+    @Test
+    fun `unpaid alerts wait until scheduled payday on Dec 10 for Nov 14 shift`() {
+        val job = Job(
+            id = "j_cafe",
+            name = "카페",
+            kind = JobKind.REGULAR,
+            payType = PayType.HOURLY,
+            baseAmount = 10_320L,
+            scheduleStartDate = "2026-11-14",
+            settlementMode = SettlementPeriodMode.FIRST_TO_END,
+            settlementPrevMonthCycle = true,
+            paydayDay = 10,
+            paydayHolidayRule = PaydayHolidayRule.PREV_BUSINESS_DAY
+        )
+        val nov14Record = WorkRecord(
+            id = "rec_nov14",
+            jobId = "j_cafe",
+            title = "카페",
+            kind = JobKind.REGULAR,
+            date = "2026-11-14",
+            startMinute = 9 * 60,
+            endMinute = 14 * 60,
+            payType = PayType.HOURLY,
+            unitAmount = 10_320L,
+            paymentStatus = PaymentStatus.UNPAID
+        )
+        val standaloneDayLabor = WorkRecord(
+            id = "rec_daily",
+            jobId = null,
+            title = "단기 물류",
+            kind = JobKind.SHORT_TERM,
+            date = "2026-11-14",
+            startMinute = 9 * 60,
+            endMinute = 18 * 60,
+            payType = PayType.DAILY,
+            unitAmount = 120_000L,
+            paymentStatus = PaymentStatus.UNPAID
+        )
+
+        assertEquals(
+            LocalDate.of(2026, 12, 10),
+            PayrollCalculator.expectedPaydayForRecord(job, LocalDate.of(2026, 11, 14))
+        )
+        // Even if settlementPrevMonthCycle was false on FIRST_TO_END with payday 10th, Nov 14 cannot be due on Nov 10
+        assertEquals(
+            LocalDate.of(2026, 12, 10),
+            PayrollCalculator.expectedPaydayForRecord(
+                job.copy(settlementPrevMonthCycle = false),
+                LocalDate.of(2026, 11, 14)
+            )
+        )
+
+        val stateWithJobOnly = AlbaToraDataState.initialEmptyState().copy(
+            jobs = listOf(job),
+            records = listOf(nov14Record)
+        )
+        assertTrue(PayrollCalculator.calculateGlobalUnpaidSummary(stateWithJobOnly, LocalDate.of(2026, 11, 15)).second.isEmpty())
+        assertTrue(PayrollCalculator.calculateGlobalUnpaidSummary(stateWithJobOnly, LocalDate.of(2026, 12, 10)).second.isEmpty())
+        assertEquals(1, PayrollCalculator.calculateGlobalUnpaidSummary(stateWithJobOnly, LocalDate.of(2026, 12, 11)).second.size)
+
+        val stateWithStandalone = AlbaToraDataState.initialEmptyState().copy(
+            jobs = listOf(job),
+            records = listOf(nov14Record, standaloneDayLabor)
+        )
+        val nov15Unpaid = PayrollCalculator.calculateGlobalUnpaidSummary(stateWithStandalone, LocalDate.of(2026, 11, 15)).second
+        assertEquals(1, nov15Unpaid.size)
+        assertEquals("rec_daily", nov15Unpaid.first().record.id)
     }
 }
