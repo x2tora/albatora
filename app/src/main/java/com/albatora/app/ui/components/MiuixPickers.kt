@@ -206,7 +206,9 @@ fun MiuixColorPickerDialog(
     title: String = "색상 직접 지정",
     initialColorHex: Long,
     onDismiss: () -> Unit,
-    onConfirm: (Long) -> Unit
+    onConfirm: (Long) -> Unit,
+    onResetDynamic: (() -> Unit)? = null,
+    resetDynamicLabel: String = "시스템 배경화면 다이나믹으로 되돌리기"
 ) {
     val initHsv = remember(show, initialColorHex) {
         FloatArray(3).also {
@@ -395,6 +397,17 @@ fun MiuixColorPickerDialog(
                             }
                     )
                 }
+            }
+
+            if (onResetDynamic != null) {
+                TextButton(
+                    text = resetDynamicLabel,
+                    onClick = {
+                        onResetDynamic()
+                        onDismiss()
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
 
             Row(

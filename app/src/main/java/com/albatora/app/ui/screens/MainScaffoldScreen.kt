@@ -18,6 +18,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.albatora.app.domain.PayrollCalculator
 import com.albatora.app.model.JobKind
 import com.albatora.app.model.WorkRecord
+import com.albatora.app.ui.components.AppUpdateDialog
+import com.albatora.app.ui.components.AppUpdateUiState
 import com.albatora.app.ui.theme.LocalAppBackdrop
 import com.albatora.app.ui.theme.LocalIsDarkTheme
 import com.albatora.app.viewmodel.AlbaToraViewModel
@@ -180,6 +182,7 @@ private fun MainTabsHost(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val liveDashboard by viewModel.liveDashboard.collectAsStateWithLifecycle()
+    val updateUiState by viewModel.updateUiState.collectAsStateWithLifecycle()
     val isDark = LocalIsDarkTheme.current
 
     var selectedTab by remember { mutableIntStateOf(0) } // 0=홈, 1=달력, 2=기록, 3=계산기, 4=더보기
@@ -435,6 +438,7 @@ private fun MainTabsHost(
                 4 -> MoreSettingsScreen(
                     state = state,
                     scrollBehavior = scrollBehavior,
+                    updateUiState = updateUiState,
                     onUpdateTheme = viewModel::updateTheme,
                     onUpdateMonet = viewModel::updateMonet,
                     onUpdateCustomKeyColor = viewModel::updateCustomKeyColor,
@@ -444,45 +448,53 @@ private fun MainTabsHost(
                     onExportJson = viewModel::exportBackupJson,
                     onImportJson = viewModel::importBackupJson,
                     onResetAllData = viewModel::resetAllData,
+                    onCheckForUpdate = { viewModel.checkForUpdate(manual = true, onFeedback = notify) },
                     onNotify = notify
                 )
             }
-        }
-    }
 
-    if (showHomeQuickMenu) {
-        OverlayDialog(
-            show = true,
-            title = "빠른 등록 · 즉시 출근",
-            onDismissRequest = { showHomeQuickMenu = false }
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(
-                    text = "정규/고정 알바 추가",
-                    onClick = {
-                        showHomeQuickMenu = false
-                        onOpenAddRegularJob(null)
-                    },
-                    colors = ButtonDefaults.textButtonColorsPrimary(),
-                    modifier = Modifier.fillMaxWidth()
-                )
-                TextButton(
-                    text = "단기/일용직 10초 등록",
-                    onClick = {
-                        showHomeQuickMenu = false
-                        onOpenQuickShortTerm(null, PayrollCalculator.formatDate(LocalDate.now()))
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                )
-                TextButton(
-                    text = "즉시 출근 스톱워치 시작",
-                    onClick = {
-                        showHomeQuickMenu = false
-                        openStopwatchTrigger++
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                )
+            // Mount Miuix OverlayDialogs directly inside Scaffold scope so PopupHost is always active
+            OverlayDialog(
+                show = showHomeQuickMenu,
+                title = "빠른 등록 · 즉시 출근",
+                onDismissRequest = { showHomeQuickMenu = false }
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(
+                        text = "정규/고정 알바 추가",
+                        onClick = {
+                            showHomeQuickMenu = false
+                            onOpenAddRegularJob(null)
+                        },
+                        colors = ButtonDefaults.textButtonColorsPrimary(),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    TextButton(
+                        text = "단기/일용직 10초 등록",
+                        onClick = {
+                            showHomeQuickMenu = false
+                            onOpenQuickShortTerm(null, PayrollCalculator.formatDate(LocalDate.now()))
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    TextButton(
+                        text = "즉시 출근 스톱워치 시작",
+                        onClick = {
+                            showHomeQuickMenu = false
+                            openStopwatchTrigger++
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
+
+            AppUpdateDialog(
+                uiState = updateUiState,
+                onDismiss = viewModel::dismissUpdateDialog,
+                onStartDownload = viewModel::startUpdateDownloadAndInstall,
+                onRetryInstall = viewModel::retryApkInstall,
+                onOpenPermissionSettings = viewModel::openInstallUnknownSourcesSettings
+            )
         }
     }
 }

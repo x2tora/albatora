@@ -48,7 +48,7 @@ fun AlbaToraTheme(
         ThemeOption.DARK -> if (monetEnabled) ColorSchemeMode.MonetDark else ColorSchemeMode.Dark
     }
 
-    val resolvedKeyColor = customKeyColorHex?.let { Color(it) } ?: Color(0xFF3482FF)
+    val resolvedKeyColor: Color? = customKeyColorHex?.let { Color(it) }
     val controller = remember(colorSchemeMode, customKeyColorHex) {
         ThemeController(
             colorSchemeMode = colorSchemeMode,

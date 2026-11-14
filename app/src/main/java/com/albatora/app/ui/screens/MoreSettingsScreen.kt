@@ -18,8 +18,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.albatora.app.BuildConfig
 import com.albatora.app.domain.PayrollCalculator
 import com.albatora.app.model.*
+import com.albatora.app.ui.components.AppUpdateUiState
 import com.albatora.app.ui.components.MiuixColorPickerDialog
 import com.albatora.app.ui.components.MiuixGlassIcon
 import com.albatora.app.ui.components.formatRgbHex
@@ -38,6 +40,7 @@ import java.time.LocalDate
 fun MoreSettingsScreen(
     state: AlbaToraDataState,
     scrollBehavior: ScrollBehavior,
+    updateUiState: AppUpdateUiState,
     onUpdateTheme: (ThemeOption) -> Unit,
     onUpdateMonet: (Boolean) -> Unit,
     onUpdateCustomKeyColor: (Long?) -> Unit,
@@ -47,6 +50,7 @@ fun MoreSettingsScreen(
     onExportJson: () -> String,
     onImportJson: (String) -> Result<Unit>,
     onResetAllData: () -> Unit,
+    onCheckForUpdate: () -> Unit,
     onNotify: (String) -> Unit
 ) {
     val context = LocalContext.current
@@ -127,7 +131,7 @@ fun MoreSettingsScreen(
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 SwitchPreference(
                     title = "다이나믹 컬러 (Monet)",
-                    summary = "안드로이드 배경화면 색상에 맞춰 UI 포인트를 자동 조율합니다",
+                    summary = "켜면 배경화면 다이나믹 컬러 또는 아래에서 지정한 테마 색상이 적용됩니다 (끄면 기본 테마)",
                     checked = state.settings.monetEnabled,
                     onCheckedChange = onUpdateMonet,
                     startAction = {
@@ -139,24 +143,54 @@ fun MoreSettingsScreen(
                     }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                val activeAppColor = state.settings.customKeyColorHex ?: 0xFF3482FF
+                val customHex = state.settings.customKeyColorHex
+                val previewHex = customHex ?: 0xFF3482FF
                 ArrowPreference(
-                    title = "앱 포인트 색상 직접 지정",
-                    summary = if (state.settings.monetEnabled) {
-                        "다이나믹 컬러 꺼짐 시 적용 · 현재 ${formatRgbHex(activeAppColor)}"
-                    } else {
-                        "현재 포인트 색상 ${formatRgbHex(activeAppColor)}"
+                    title = "테마 포인트 색상 직접 지정",
+                    summary = when {
+                        !state.settings.monetEnabled -> "다이나믹 컬러 꺼짐 상태 · 색상 지정 시 자동으로 켜집니다"
+                        customHex == null -> "시스템 배경화면 다이나믹 컬러 적용 중 · 탭하여 직접 지정"
+                        else -> "직접 지정 색상 ${formatRgbHex(customHex)} 적용 중 · 탭하여 변경"
                     },
                     onClick = { showAppColorDialog = true },
                     startAction = {
-                        Box(
-                            modifier = Modifier
-                                .size(38.dp)
-                                .clip(CircleShape)
-                                .background(Color(activeAppColor))
-                        )
+                        if (state.settings.monetEnabled && customHex == null) {
+                            MiuixGlassIcon(
+                                icon = MiuixIcons.Theme,
+                                contentDescription = null,
+                                accentColor = MiuixTheme.colorScheme.primary
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .size(38.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(previewHex))
+                            )
+                        }
                     }
                 )
+                if (customHex != null || !state.settings.monetEnabled) {
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                    ArrowPreference(
+                        title = "시스템 다이나믹 컬러로 되돌리기",
+                        summary = "직접 지정 색상을 해제하고 기기 배경화면 다이나믹 컬러(Monet)로 복원합니다",
+                        onClick = {
+                            onUpdateCustomKeyColor(null)
+                            if (!state.settings.monetEnabled) {
+                                onUpdateMonet(true)
+                            }
+                            onNotify("시스템 배경화면 다이나믹 컬러로 복원되었습니다.")
+                        },
+                        startAction = {
+                            MiuixGlassIcon(
+                                icon = MiuixIcons.Reset,
+                                contentDescription = null,
+                                accentColor = MiuixTheme.colorScheme.primary
+                            )
+                        }
+                    )
+                }
             }
         }
 
@@ -268,11 +302,31 @@ fun MoreSettingsScreen(
         }
 
         item {
-            SmallTitle(text = "앱 정보")
-            Card(modifier = Modifier.fillMaxWidth(), insideMargin = PaddingValues(16.dp)) {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            SmallTitle(text = "앱 정보 및 업데이트")
+            Card(modifier = Modifier.fillMaxWidth()) {
+                ArrowPreference(
+                    title = "앱 업데이트 확인",
+                    summary = when {
+                        updateUiState.isChecking -> "GitHub 릴리즈에서 최신 버전을 확인하는 중..."
+                        !updateUiState.lastStatusNote.isNullOrBlank() -> "현재 v${BuildConfig.VERSION_NAME} · ${updateUiState.lastStatusNote}"
+                        else -> "현재 v${BuildConfig.VERSION_NAME} · 앱 실행 시 자동 확인 (탭하여 지금 확인)"
+                    },
+                    onClick = onCheckForUpdate,
+                    startAction = {
+                        MiuixGlassIcon(
+                            icon = MiuixIcons.Store,
+                            contentDescription = null,
+                            accentColor = MiuixTheme.colorScheme.primary
+                        )
+                    }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
                     Text(
-                        "알바토라 (AlbaTora) v1.0.2",
+                        "알바토라 (AlbaTora) v${BuildConfig.VERSION_NAME}",
                         style = MiuixTheme.textStyles.body1
                     )
                     Text(
@@ -287,164 +341,166 @@ fun MoreSettingsScreen(
 
     MiuixColorPickerDialog(
         show = showAppColorDialog,
-        title = "앱 포인트 색상 선택",
+        title = "앱 테마 포인트 색상 선택",
         initialColorHex = state.settings.customKeyColorHex ?: 0xFF3482FF,
         onDismiss = { showAppColorDialog = false },
         onConfirm = { chosenHex ->
             onUpdateCustomKeyColor(chosenHex)
-            if (state.settings.monetEnabled) {
-                onUpdateMonet(false)
+            if (!state.settings.monetEnabled) {
+                onUpdateMonet(true)
             }
-            onNotify("앱 포인트 색상이 ${formatRgbHex(chosenHex)}로 변경되었습니다")
-        }
+            onNotify("테마 포인트 색상이 ${formatRgbHex(chosenHex)}로 적용되었습니다.")
+        },
+        onResetDynamic = {
+            onUpdateCustomKeyColor(null)
+            if (!state.settings.monetEnabled) {
+                onUpdateMonet(true)
+            }
+            onNotify("시스템 배경화면 다이나믹 컬러로 복원되었습니다.")
+        },
+        resetDynamicLabel = "시스템 배경화면 다이나믹으로 복원"
     )
 
     // Default minimum wage editor
-    if (showMinWageDialog) {
-        var wageText by remember { mutableStateOf(state.settings.defaultMinWage.toString()) }
-        OverlayDialog(
-            show = true,
-            title = "기본 최저시급 설정",
-            summary = "2026년 대한민국 법정 최저시급은 10,320원입니다.",
-            onDismissRequest = { showMinWageDialog = false }
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                TextField(
-                    value = wageText,
-                    onValueChange = { wageText = it.filter(Char::isDigit) },
-                    label = "시급 (원)",
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+    var wageText by remember(showMinWageDialog, state.settings.defaultMinWage) {
+        mutableStateOf(state.settings.defaultMinWage.toString())
+    }
+    OverlayDialog(
+        show = showMinWageDialog,
+        title = "기본 최저시급 설정",
+        summary = "2026년 대한민국 법정 최저시급은 10,320원입니다.",
+        onDismissRequest = { showMinWageDialog = false }
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            TextField(
+                value = wageText,
+                onValueChange = { wageText = it.filter(Char::isDigit) },
+                label = "시급 (원)",
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                TextButton(text = "취소", onClick = { showMinWageDialog = false }, modifier = Modifier.weight(1f))
+                TextButton(
+                    text = "저장",
+                    onClick = {
+                        val w = wageText.toLongOrNull() ?: DEFAULT_2026_MIN_WAGE
+                        onUpdateDefaultMinWage(w)
+                        showMinWageDialog = false
+                        onNotify("기본 최저시급이 ${PayrollCalculator.formatWon(w)}으로 저장되었습니다.")
+                    },
+                    colors = ButtonDefaults.textButtonColorsPrimary(),
+                    modifier = Modifier.weight(1f)
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    TextButton(text = "취소", onClick = { showMinWageDialog = false }, modifier = Modifier.weight(1f))
-                    TextButton(
-                        text = "저장",
-                        onClick = {
-                            val w = wageText.toLongOrNull() ?: DEFAULT_2026_MIN_WAGE
-                            onUpdateDefaultMinWage(w)
-                            showMinWageDialog = false
-                            onNotify("기본 최저시급이 ${PayrollCalculator.formatWon(w)}으로 저장되었습니다.")
-                        },
-                        colors = ButtonDefaults.textButtonColorsPrimary(),
-                        modifier = Modifier.weight(1f)
-                    )
-                }
             }
         }
     }
 
     // Saved short-term templates list
-    if (showTemplatesDialog) {
-        OverlayDialog(
-            show = true,
-            title = "단기 알바 프리셋 관리",
-            onDismissRequest = { showTemplatesDialog = false }
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (state.templates.isEmpty()) {
-                    Text(
-                        "저장된 프리셋이 없습니다. [단기/일용직 10초 퀵 등록]에서 '프리셋으로 저장'을 켜고 등록해 보세요.",
-                        style = MiuixTheme.textStyles.body2,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                    )
-                } else {
-                    state.templates.forEach { tpl ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(tpl.name, style = MiuixTheme.textStyles.body2)
-                                Text(
-                                    "${tpl.payType.label} ${PayrollCalculator.formatWon(tpl.unitAmount)} · ${tpl.taxMode.shortLabel}",
-                                    style = MiuixTheme.textStyles.footnote2,
-                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                                )
-                            }
-                            IconButton(onClick = { onDeleteTemplate(tpl.id) }) {
-                                Icon(MiuixIcons.Delete, contentDescription = "프리셋 삭제")
-                            }
+    OverlayDialog(
+        show = showTemplatesDialog,
+        title = "단기 알바 프리셋 관리",
+        onDismissRequest = { showTemplatesDialog = false }
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (state.templates.isEmpty()) {
+                Text(
+                    "저장된 프리셋이 없습니다. [단기/일용직 10초 퀵 등록]에서 '프리셋으로 저장'을 켜고 등록해 보세요.",
+                    style = MiuixTheme.textStyles.body2,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                )
+            } else {
+                state.templates.forEach { tpl ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(tpl.name, style = MiuixTheme.textStyles.body2)
+                            Text(
+                                "${tpl.payType.label} ${PayrollCalculator.formatWon(tpl.unitAmount)} · ${tpl.taxMode.shortLabel}",
+                                style = MiuixTheme.textStyles.footnote2,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                            )
+                        }
+                        IconButton(onClick = { onDeleteTemplate(tpl.id) }) {
+                            Icon(MiuixIcons.Delete, contentDescription = "프리셋 삭제")
                         }
                     }
                 }
-                TextButton(
-                    text = "닫기",
-                    onClick = { showTemplatesDialog = false },
-                    modifier = Modifier.fillMaxWidth()
-                )
             }
+            TextButton(
+                text = "닫기",
+                onClick = { showTemplatesDialog = false },
+                modifier = Modifier.fillMaxWidth()
+            )
         }
     }
 
     // Clipboard JSON export/restore
-    if (showPasteRestoreDialog) {
-        var pasteJson by remember { mutableStateOf("") }
-        OverlayDialog(
-            show = true,
-            title = "클립보드 JSON 백업 / 복원",
-            onDismissRequest = { showPasteRestoreDialog = false }
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    var pasteJson by remember(showPasteRestoreDialog) { mutableStateOf("") }
+    OverlayDialog(
+        show = showPasteRestoreDialog,
+        title = "클립보드 JSON 백업 / 복원",
+        onDismissRequest = { showPasteRestoreDialog = false }
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            TextButton(
+                text = "현재 데이터 JSON 클립보드로 복사",
+                onClick = {
+                    clipboardManager.setText(AnnotatedString(onExportJson()))
+                    onNotify("백업 JSON을 클립보드에 복사했습니다.")
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+            HorizontalDivider()
+            TextField(
+                value = pasteJson,
+                onValueChange = { pasteJson = it },
+                label = "복원할 JSON 텍스트 붙여넣기",
+                modifier = Modifier.fillMaxWidth()
+            )
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                TextButton(text = "취소", onClick = { showPasteRestoreDialog = false }, modifier = Modifier.weight(1f))
                 TextButton(
-                    text = "현재 데이터 JSON 클립보드로 복사",
+                    text = "복원 실행",
                     onClick = {
-                        clipboardManager.setText(AnnotatedString(onExportJson()))
-                        onNotify("백업 JSON을 클립보드에 복사했습니다.")
+                        onImportJson(pasteJson).onSuccess {
+                            showPasteRestoreDialog = false
+                            onNotify("클립보드 데이터로 복원을 완료했습니다.")
+                        }.onFailure {
+                            onNotify("유효한 JSON 형식이 아닙니다.")
+                        }
                     },
-                    modifier = Modifier.fillMaxWidth()
+                    colors = ButtonDefaults.textButtonColorsPrimary(),
+                    modifier = Modifier.weight(1f)
                 )
-                HorizontalDivider()
-                TextField(
-                    value = pasteJson,
-                    onValueChange = { pasteJson = it },
-                    label = "복원할 JSON 텍스트 붙여넣기",
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    TextButton(text = "취소", onClick = { showPasteRestoreDialog = false }, modifier = Modifier.weight(1f))
-                    TextButton(
-                        text = "복원 실행",
-                        onClick = {
-                            onImportJson(pasteJson).onSuccess {
-                                showPasteRestoreDialog = false
-                                onNotify("클립보드 데이터로 복원을 완료했습니다.")
-                            }.onFailure {
-                                onNotify("유효한 JSON 형식이 아닙니다.")
-                            }
-                        },
-                        colors = ButtonDefaults.textButtonColorsPrimary(),
-                        modifier = Modifier.weight(1f)
-                    )
-                }
             }
         }
     }
 
-    if (showResetConfirm) {
-        OverlayDialog(
-            show = true,
-            title = "전체 데이터 초기화",
-            summary = "모든 알바와 근무 기록, 프리셋, 목표 금액이 영구 삭제됩니다. 계속할까요?",
-            onDismissRequest = { showResetConfirm = false }
-        ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                TextButton(text = "취소", onClick = { showResetConfirm = false }, modifier = Modifier.weight(1f))
-                TextButton(
-                    text = "초기화",
-                    onClick = {
-                        onResetAllData()
-                        showResetConfirm = false
-                        onNotify("모든 데이터가 초기화되었습니다.")
-                    },
-                    colors = ButtonDefaults.textButtonColors(
-                        color = MiuixTheme.colorScheme.error,
-                        textColor = Color.White
-                    ),
-                    modifier = Modifier.weight(1f)
-                )
-            }
+    OverlayDialog(
+        show = showResetConfirm,
+        title = "전체 데이터 초기화",
+        summary = "모든 알바와 근무 기록, 프리셋, 목표 금액이 영구 삭제됩니다. 계속할까요?",
+        onDismissRequest = { showResetConfirm = false }
+    ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            TextButton(text = "취소", onClick = { showResetConfirm = false }, modifier = Modifier.weight(1f))
+            TextButton(
+                text = "초기화",
+                onClick = {
+                    onResetAllData()
+                    showResetConfirm = false
+                    onNotify("모든 데이터가 초기화되었습니다.")
+                },
+                colors = ButtonDefaults.textButtonColors(
+                    color = MiuixTheme.colorScheme.error,
+                    textColor = Color.White
+                ),
+                modifier = Modifier.weight(1f)
+            )
         }
     }
 }
