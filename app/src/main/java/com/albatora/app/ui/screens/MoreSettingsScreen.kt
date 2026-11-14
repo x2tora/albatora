@@ -12,6 +12,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
@@ -124,11 +125,7 @@ fun MoreSettingsScreen(
                     selectedIndex = options.indexOf(state.settings.themeOption),
                     onSelectedIndexChange = { onUpdateTheme(options[it]) },
                     startAction = {
-                        MiuixGlassIcon(
-                            icon = MiuixIcons.Theme,
-                            contentDescription = null,
-                            accentColor = MiuixTheme.colorScheme.primary
-                        )
+                        PreferenceStartIcon(MiuixIcons.Theme, MiuixTheme.colorScheme.primary)
                     }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
@@ -145,11 +142,7 @@ fun MoreSettingsScreen(
                         onNotify("테마 컬러가 '${chosen.label}'으로 적용되었습니다.")
                     },
                     startAction = {
-                        MiuixGlassIcon(
-                            icon = MiuixIcons.Favorites,
-                            contentDescription = null,
-                            accentColor = Color(0xFF7C5CFF)
-                        )
+                        PreferenceStartIcon(MiuixIcons.Favorites, Color(0xFF7C5CFF))
                     }
                 )
                 if (colorStyle == ThemeColorStyle.CUSTOM) {
@@ -162,9 +155,10 @@ fun MoreSettingsScreen(
                         startAction = {
                             Box(
                                 modifier = Modifier
-                                    .size(40.dp)
-                                    .squircleBackground(Color(previewHex), 12.dp)
-                                    .squircleBorder(1.dp, MiuixTheme.colorScheme.onSurface.copy(alpha = 0.16f), 12.dp)
+                                    .padding(end = 6.dp)
+                                    .size(38.dp)
+                                    .squircleBackground(Color(previewHex), 11.dp)
+                                    .squircleBorder(1.dp, MiuixTheme.colorScheme.onSurface.copy(alpha = 0.16f), 11.dp)
                             )
                         }
                     )
@@ -175,11 +169,7 @@ fun MoreSettingsScreen(
                     summary = "${state.settings.widgetConfig.themeStyle.label} · 투명도 ${state.settings.widgetConfig.opacity.label} (위젯 4종)",
                     onClick = onOpenWidgetStudio,
                     startAction = {
-                        MiuixGlassIcon(
-                            icon = MiuixIcons.Layers,
-                            contentDescription = null,
-                            accentColor = Color(0xFF0EA5E9)
-                        )
+                        PreferenceStartIcon(MiuixIcons.Layers, Color(0xFF0EA5E9))
                     }
                 )
             }
@@ -194,11 +184,7 @@ fun MoreSettingsScreen(
                     checked = state.settings.ongoingNotificationEnabled,
                     onCheckedChange = onUpdateOngoingNotification,
                     startAction = {
-                        MiuixGlassIcon(
-                            icon = MiuixIcons.Alarm,
-                            contentDescription = null,
-                            accentColor = Color(0xFFFF6B4A)
-                        )
+                        PreferenceStartIcon(MiuixIcons.Alarm, Color(0xFFFF6B4A))
                     }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
@@ -207,11 +193,7 @@ fun MoreSettingsScreen(
                     summary = "현재 기본값: ${PayrollCalculator.formatWon(state.settings.defaultMinWage)} (2026 기준)",
                     onClick = { showMinWageDialog = true },
                     startAction = {
-                        MiuixGlassIcon(
-                            icon = MiuixIcons.BankCards,
-                            contentDescription = null,
-                            accentColor = Color(0xFF10B981)
-                        )
+                        PreferenceStartIcon(MiuixIcons.BankCards, Color(0xFF10B981))
                     }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
@@ -220,11 +202,7 @@ fun MoreSettingsScreen(
                     summary = "저장된 프리셋 ${state.templates.size}개",
                     onClick = { showTemplatesDialog = true },
                     startAction = {
-                        MiuixGlassIcon(
-                            icon = MiuixIcons.Notes,
-                            contentDescription = null,
-                            accentColor = MiuixTheme.colorScheme.primary
-                        )
+                        PreferenceStartIcon(MiuixIcons.Notes, MiuixTheme.colorScheme.primary)
                     }
                 )
             }
@@ -241,11 +219,7 @@ fun MoreSettingsScreen(
                         exportFileLauncher.launch("albatora-backup-$today.json")
                     },
                     startAction = {
-                        MiuixGlassIcon(
-                            icon = MiuixIcons.Backup,
-                            contentDescription = null,
-                            accentColor = Color(0xFF3482FF)
-                        )
+                        PreferenceStartIcon(MiuixIcons.Backup, Color(0xFF3482FF))
                     }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
@@ -256,11 +230,7 @@ fun MoreSettingsScreen(
                         importFileLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
                     },
                     startAction = {
-                        MiuixGlassIcon(
-                            icon = MiuixIcons.Import,
-                            contentDescription = null,
-                            accentColor = Color(0xFF10B981)
-                        )
+                        PreferenceStartIcon(MiuixIcons.Import, Color(0xFF10B981))
                     }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
@@ -269,11 +239,7 @@ fun MoreSettingsScreen(
                     summary = "파일 없이 JSON 텍스트로 바로 백업하거나 복원합니다",
                     onClick = { showPasteRestoreDialog = true },
                     startAction = {
-                        MiuixGlassIcon(
-                            icon = MiuixIcons.Copy,
-                            contentDescription = null,
-                            accentColor = Color(0xFF06B6D4)
-                        )
+                        PreferenceStartIcon(MiuixIcons.Copy, Color(0xFF06B6D4))
                     }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
@@ -282,11 +248,7 @@ fun MoreSettingsScreen(
                     summary = "등록된 모든 알바와 기록을 비웁니다 (테마/기본 설정 유지)",
                     onClick = { showResetConfirm = true },
                     startAction = {
-                        MiuixGlassIcon(
-                            icon = MiuixIcons.Reset,
-                            contentDescription = null,
-                            accentColor = MiuixTheme.colorScheme.error
-                        )
+                        PreferenceStartIcon(MiuixIcons.Reset, MiuixTheme.colorScheme.error)
                     }
                 )
             }
@@ -304,28 +266,17 @@ fun MoreSettingsScreen(
                     },
                     onClick = onCheckForUpdate,
                     startAction = {
-                        MiuixGlassIcon(
-                            icon = MiuixIcons.Store,
-                            contentDescription = null,
-                            accentColor = MiuixTheme.colorScheme.primary
-                        )
+                        PreferenceStartIcon(MiuixIcons.Store, MiuixTheme.colorScheme.primary)
                     }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                Column(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        "알바토라 (AlbaTora) v${BuildConfig.VERSION_NAME}",
-                        style = MiuixTheme.textStyles.body1
-                    )
-                    Text(
-                        "실시간 하이브리드 수익 트래커 · 정규/단기 일용직 올인원 급여 관리",
-                        style = MiuixTheme.textStyles.footnote2,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                    )
-                }
+                BasicComponent(
+                    title = "알바토라 (AlbaTora) v${BuildConfig.VERSION_NAME}",
+                    summary = "실시간 하이브리드 수익 트래커 · 정규/단기 일용직 올인원 급여 관리",
+                    startAction = {
+                        PreferenceStartIcon(MiuixIcons.Info, MiuixTheme.colorScheme.primary)
+                    }
+                )
             }
         }
     }
@@ -483,4 +434,20 @@ fun MoreSettingsScreen(
             )
         }
     }
+}
+
+@Composable
+private fun PreferenceStartIcon(
+    icon: ImageVector,
+    accentColor: Color
+) {
+    MiuixGlassIcon(
+        icon = icon,
+        contentDescription = null,
+        accentColor = accentColor,
+        modifier = Modifier.padding(end = 6.dp),
+        size = 38.dp,
+        iconSize = 18.dp,
+        cornerRadius = 11.dp
+    )
 }

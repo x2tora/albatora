@@ -283,9 +283,10 @@ fun WidgetStudioScreen(
                                 icon = MiuixIcons.Layers,
                                 contentDescription = null,
                                 accentColor = MiuixTheme.colorScheme.primary,
-                                size = 36.dp,
+                                modifier = Modifier.padding(end = 6.dp),
+                                size = 38.dp,
                                 iconSize = 18.dp,
-                                cornerRadius = 10.dp
+                                cornerRadius = 11.dp
                             )
                         }
                     )
@@ -304,9 +305,10 @@ fun WidgetStudioScreen(
                                 icon = MiuixIcons.Tune,
                                 contentDescription = null,
                                 accentColor = Color(0xFF0EA5E9),
-                                size = 36.dp,
+                                modifier = Modifier.padding(end = 6.dp),
+                                size = 38.dp,
                                 iconSize = 18.dp,
-                                cornerRadius = 10.dp
+                                cornerRadius = 11.dp
                             )
                         }
                     )
@@ -323,9 +325,10 @@ fun WidgetStudioScreen(
                                 icon = MiuixIcons.Theme,
                                 contentDescription = null,
                                 accentColor = previewAccent,
-                                size = 36.dp,
+                                modifier = Modifier.padding(end = 6.dp),
+                                size = 38.dp,
                                 iconSize = 18.dp,
-                                cornerRadius = 10.dp
+                                cornerRadius = 11.dp
                             )
                         }
                     )

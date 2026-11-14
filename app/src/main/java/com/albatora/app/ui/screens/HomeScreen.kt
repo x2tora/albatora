@@ -1034,7 +1034,7 @@ private fun HomeActionHubGrid(
                         onClick = spec.onClick
                     ) {
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(11.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             MiuixGlassIcon(
