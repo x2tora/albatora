@@ -100,6 +100,7 @@ fun HomeScreen(
 
     val completelyEmpty = state.jobs.isEmpty() &&
         state.records.isEmpty() &&
+        state.templates.isEmpty() &&
         liveDashboard.activeShifts.isEmpty()
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -109,8 +110,8 @@ fun HomeScreen(
                 .fillMaxSize()
                 .overScrollVertical()
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 104.dp + navBottomInset),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 116.dp + navBottomInset),
+            verticalArrangement = Arrangement.spacedBy(20.dp)
         ) {
             // 1. Live Earnings Focus Timer Stage (fills primary viewport when active)
             if (liveDashboard.activeShifts.isNotEmpty()) {
@@ -146,6 +147,7 @@ fun HomeScreen(
                 item(key = "standby_focus_card") {
                     StandbyFocusCard(
                         jobs = state.jobs,
+                        templates = state.templates,
                         onStartStopwatch = { showStopwatchSheet = true },
                         onQuickStartJob = { job ->
                             val wage = PayrollCalculator.effectiveJobWage(job, LocalDate.now())
@@ -162,6 +164,26 @@ fun HomeScreen(
                                 BreakPayType.PAID,
                                 job.allowance
                             )
+                        },
+                        onQuickStartTemplate = { tpl ->
+                            val span = if (tpl.endMinute > tpl.startMinute) {
+                                tpl.endMinute - tpl.startMinute
+                            } else {
+                                (24 * 60 - tpl.startMinute) + tpl.endMinute
+                            }.coerceAtLeast(60)
+                            onStartStopwatch(
+                                tpl.name,
+                                tpl.emoji,
+                                JobKind.SHORT_TERM,
+                                tpl.payType,
+                                tpl.unitAmount,
+                                null,
+                                tpl.colorHex,
+                                span,
+                                if (tpl.breakPayType == BreakPayType.UNPAID) tpl.breakMinutes else 0,
+                                tpl.breakPayType,
+                                AllowanceSettings()
+                            )
                         }
                     )
                 }
@@ -174,9 +196,9 @@ fun HomeScreen(
                     SmallTitle(text = "${currentMonth.monthValue}월 누적 수익 현황")
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        insideMargin = PaddingValues(16.dp)
+                        insideMargin = PaddingValues(20.dp)
                     ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -692,8 +714,10 @@ private fun EmptyOnboardingFocusCard(
 @Composable
 private fun StandbyFocusCard(
     jobs: List<Job>,
+    templates: List<ShortTermTemplate>,
     onStartStopwatch: () -> Unit,
-    onQuickStartJob: (Job) -> Unit
+    onQuickStartJob: (Job) -> Unit,
+    onQuickStartTemplate: (ShortTermTemplate) -> Unit
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -734,15 +758,24 @@ private fun StandbyFocusCard(
                 )
             }
 
-            if (jobs.isNotEmpty()) {
+            if (jobs.isNotEmpty() || templates.isNotEmpty()) {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(jobs, key = { it.id }) { job ->
+                    items(jobs, key = { "job_${it.id}" }) { job ->
                         val prefix = if (job.emoji.isNotBlank()) "${job.emoji} " else ""
                         SquirclePillBadge(
                             text = "$prefix${job.name} 바로 출근",
                             backgroundColor = Color(job.colorHex).copy(alpha = 0.14f),
                             contentColor = Color(job.colorHex),
                             onClick = { onQuickStartJob(job) }
+                        )
+                    }
+                    items(templates, key = { "tpl_${it.id}" }) { tpl ->
+                        val prefix = if (tpl.emoji.isNotBlank()) "${tpl.emoji} " else ""
+                        SquirclePillBadge(
+                            text = "$prefix${tpl.name} 프리셋 출근",
+                            backgroundColor = Color(tpl.colorHex).copy(alpha = 0.14f),
+                            contentColor = Color(tpl.colorHex),
+                            onClick = { onQuickStartTemplate(tpl) }
                         )
                     }
                 }

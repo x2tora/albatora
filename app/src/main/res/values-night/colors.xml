@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="widget_bg">#1C1E24</color>
+    <color name="widget_card_inner">#272A33</color>
+    <color name="widget_border">#26FFFFFF</color>
+    <color name="widget_text_primary">#F3F4F6</color>
+    <color name="widget_text_secondary">#9CA3AF</color>
+    <color name="widget_accent">#5B7CFA</color>
+    <color name="widget_accent_soft">#2E5B7CFA</color>
+    <color name="widget_on_accent">#FFFFFF</color>
+    <color name="widget_green">#4ADE80</color>
+    <color name="widget_amber">#FBBF24</color>
+    <color name="widget_red">#F87171</color>
+</resources>

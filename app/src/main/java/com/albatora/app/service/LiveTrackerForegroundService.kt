@@ -14,6 +14,7 @@ import com.albatora.app.MainActivity
 import com.albatora.app.R
 import com.albatora.app.data.AlbaToraStateHolder
 import com.albatora.app.domain.PayrollCalculator
+import com.albatora.app.widget.AlbaToraWidgetUpdater
 import kotlinx.coroutines.*
 import java.util.Locale
 
@@ -45,16 +46,22 @@ class LiveTrackerForegroundService : Service() {
     private fun startTicker() {
         tickerJob?.cancel()
         tickerJob = serviceScope.launch {
+            var tickCount = 0
             while (isActive) {
                 val stateHolder = AlbaToraStateHolder.getInstance(applicationContext)
                 val st = stateHolder.state.value
                 val live = PayrollCalculator.evaluateLiveDashboard(st, System.currentTimeMillis())
                 if (!st.settings.ongoingNotificationEnabled || live.activeShifts.isEmpty()) {
+                    AlbaToraWidgetUpdater.updateAll(applicationContext)
                     stopSelf()
                     break
                 }
                 val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                 nm.notify(NOTIFICATION_ID, buildNotification())
+                if (tickCount % 5 == 0) {
+                    AlbaToraWidgetUpdater.updateLiveEarningsOnly(applicationContext)
+                }
+                tickCount++
                 delay(1000L)
             }
         }

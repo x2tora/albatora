@@ -90,14 +90,14 @@ fun CalendarScreen(
             .fillMaxSize()
             .overScrollVertical()
             .nestedScroll(scrollBehavior.nestedScrollConnection),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 104.dp + navBottomInset),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 116.dp + navBottomInset),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // Month header + Net Summary
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                insideMargin = PaddingValues(14.dp)
+                insideMargin = PaddingValues(18.dp)
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),

@@ -8,6 +8,7 @@ import android.os.Build
 import com.albatora.app.domain.PayrollCalculator
 import com.albatora.app.model.*
 import com.albatora.app.service.LiveTrackerForegroundService
+import com.albatora.app.widget.AlbaToraWidgetUpdater
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -35,6 +36,7 @@ class AlbaToraStateHolder private constructor(context: Context) {
         latestState?.let { next ->
             repository.save(next)
             syncForegroundService(next)
+            AlbaToraWidgetUpdater.updateAll(appContext)
         }
     }
 
@@ -516,6 +518,7 @@ class AlbaToraStateHolder private constructor(context: Context) {
             _state.value = imported
             repository.save(imported)
             syncForegroundService(imported)
+            AlbaToraWidgetUpdater.updateAll(appContext)
         }
     }
 
@@ -526,6 +529,7 @@ class AlbaToraStateHolder private constructor(context: Context) {
         _state.value = fresh
         repository.save(fresh)
         syncForegroundService(fresh)
+        AlbaToraWidgetUpdater.updateAll(appContext)
     }
 
     companion object {

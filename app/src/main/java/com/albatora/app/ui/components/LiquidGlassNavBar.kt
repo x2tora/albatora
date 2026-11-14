@@ -46,10 +46,12 @@ import androidx.compose.ui.graphics.asComposeRenderEffect
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -69,6 +71,8 @@ import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.blur.blur
 import top.yukonga.miuix.kmp.blur.drawBackdrop
 import top.yukonga.miuix.kmp.blur.highlight.Highlight
+import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Add
 import top.yukonga.miuix.kmp.icon.extended.Home
@@ -92,19 +96,21 @@ import kotlin.random.Random
 private val DockHeight = 64.dp
 private const val DockPressedScale = 1.04f
 private val DockBlurRadius = 5.dp
-private val DockRefractionHeight = 28.dp
-private val DockRefractionAmount = 40.dp
+private val DockRefractionHeight = 14.dp
+private val DockRefractionAmount = 10.dp
+private val DockChromaticAberration = 2.2.dp
 
 private val GlassSurfaceTint = Color(0xFF6E7D96).copy(alpha = 0.03f)
-private const val GlassGrainAlpha = 0.12f
+private const val GlassGrainAlpha = 0.10f
 private const val GRAIN_TILE = 96
 
 private val SliderInset = 5.dp
 private val SliderDragStartSlop = 4.dp
 private val SliderHitSlop = 4.dp
 private val SliderBlurRadius = 4.dp
-private val SliderRefractionHeight = 12.dp
-private val SliderRefractionAmount = 16.dp
+private val SliderRefractionHeight = 10.dp
+private val SliderRefractionAmount = 6.dp
+private val SliderChromaticAberration = 1.8.dp
 private val SliderPressedOverhang = 4.dp
 private const val SliderStretchMax = 0.22f
 
@@ -115,6 +121,7 @@ private const val LIQUID_LENS_SHADER = """
     uniform float2 uSize;
     uniform float uHeight;
     uniform float uAmount;
+    uniform float uChromatic;
 
     float sdPill(float2 p, float2 halfSize, float radius) {
         float2 q = abs(p) - (halfSize - float2(radius));
@@ -141,14 +148,19 @@ private const val LIQUID_LENS_SHADER = """
 
         float centerLen = length(local);
         if (centerLen > 0.0001) {
-            dir = normalize(dir + (local / centerLen) * 0.22);
+            dir = normalize(dir + (local / centerLen) * 0.18);
         }
 
         float t = clamp(1.0 - distInward / max(uHeight, 1.0), 0.0, 1.0);
         float bend = t * t * (3.0 - 2.0 * t);
-        float2 sampleCoord = fragCoord - dir * (bend * uAmount);
         float2 maxCoord = uPad * 2.0 + uSize - float2(0.5);
-        return content.eval(clamp(sampleCoord, float2(0.5), maxCoord));
+        float2 baseCoord = fragCoord - dir * (bend * uAmount);
+        float2 chromaShift = dir * (bend * uChromatic);
+
+        half red = content.eval(clamp(baseCoord + chromaShift, float2(0.5), maxCoord)).r;
+        half4 greenSample = content.eval(clamp(baseCoord, float2(0.5), maxCoord));
+        half blue = content.eval(clamp(baseCoord - chromaShift, float2(0.5), maxCoord)).b;
+        return half4(red, greenSample.g, blue, greenSample.a);
     }
 """
 
@@ -184,7 +196,8 @@ private fun BackdropEffectScope.vibrancySaturation(saturation: Float = 1.5f) {
 
 private fun BackdropEffectScope.liquidLensEffect(
     refractionHeightPx: Float,
-    refractionAmountPx: Float
+    refractionAmountPx: Float,
+    chromaticPx: Float
 ) {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
     val scale = downscaleFactor.coerceAtLeast(1).toFloat()
@@ -193,6 +206,7 @@ private fun BackdropEffectScope.liquidLensEffect(
     shader.setFloatUniform("uSize", size.width / scale, size.height / scale)
     shader.setFloatUniform("uHeight", (refractionHeightPx / scale).coerceAtLeast(1f))
     shader.setFloatUniform("uAmount", refractionAmountPx / scale)
+    shader.setFloatUniform("uChromatic", chromaticPx / scale)
     chainPlatformRenderEffect(
         android.graphics.RenderEffect.createRuntimeShaderEffect(
             shader.asAndroidRuntimeShader(),
@@ -208,6 +222,7 @@ fun Modifier.liquidGlassSurface(
     blurRadius: Dp = DockBlurRadius,
     refractionHeight: Dp = DockRefractionHeight,
     refractionAmount: Dp = DockRefractionAmount,
+    chromaticAberration: Dp = DockChromaticAberration,
     refraction: Boolean = true,
     surfaceTint: Color = GlassSurfaceTint,
     grainAlpha: Float = GlassGrainAlpha,
@@ -240,7 +255,8 @@ fun Modifier.liquidGlassSurface(
             if (refraction) {
                 liquidLensEffect(
                     refractionHeightPx = refractionHeight.toPx(),
-                    refractionAmountPx = refractionAmount.toPx()
+                    refractionAmountPx = refractionAmount.toPx(),
+                    chromaticPx = chromaticAberration.toPx()
                 )
             }
         }
@@ -256,15 +272,16 @@ private data class NavSlot(
 
 private fun tabToSlot(tabIndex: Int): Int = if (tabIndex < 2) tabIndex else tabIndex + 1
 
-private fun nearestTabSlot(
+private fun slotToTab(slotIndex: Int): Int = if (slotIndex < 2) slotIndex else slotIndex - 1
+
+private fun nearestAllSlot(
     leftPx: Float,
     insetPx: Float,
     itemWidthPx: Float
 ): Int {
     if (itemWidthPx <= 0f) return 0
-    val tabSlots = intArrayOf(0, 1, 3, 4)
-    val approxSlot = (leftPx - insetPx) / itemWidthPx
-    return tabSlots.minBy { slot -> abs(approxSlot - slot.toFloat()) }
+    val approxSlot = ((leftPx - insetPx) / itemWidthPx).roundToInt()
+    return approxSlot.coerceIn(0, 4)
 }
 
 private fun stretchOf(leftPx: Float, anchorPx: Float, itemWidthPx: Float): Float {
@@ -303,9 +320,9 @@ fun FloatingLiquidGlassNavBar(
         )
     }
 
-    // Dual-Box sibling structure required by chengxixian/liquid-miuix:
-    // 1) Empty liquid glass surface Box (clip only touches glass layer)
-    // 2) Interactive slider & tab row as sibling on top so press overhang is never clipped
+    // Dual-Box sibling structure:
+    // 1) Captured dock layer (page-glass background + nav icons/labels/center '+') via dockBackdrop
+    // 2) Sliding liquid-glass selector lens ABOVE the dock items so it visibly refracts them
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -315,20 +332,6 @@ fun FloatingLiquidGlassNavBar(
                 scaleY = barScale
             }
     ) {
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .liquidGlassSurface(
-                    backdrop = backdrop,
-                    shape = RoundedCornerShape(50),
-                    blurRadius = DockBlurRadius,
-                    refractionHeight = DockRefractionHeight,
-                    refractionAmount = DockRefractionAmount,
-                    refraction = true,
-                    fallbackColor = MiuixTheme.colorScheme.surfaceContainer
-                )
-        )
-
         LiquidGlassNavBarContent(
             slots = slots,
             selectedTab = selectedTab,
@@ -336,7 +339,7 @@ fun FloatingLiquidGlassNavBar(
             unpaidCount = unpaidCount,
             onSelectTab = onSelectTab,
             onCenterAddClick = onCenterAddClick,
-            backdrop = backdrop,
+            pageBackdrop = backdrop,
             contentHeight = DockHeight,
             onBarPressedChange = { barPressed = it },
             modifier = Modifier.matchParentSize()
@@ -352,12 +355,15 @@ private fun LiquidGlassNavBarContent(
     unpaidCount: Int,
     onSelectTab: (Int) -> Unit,
     onCenterAddClick: () -> Unit,
-    backdrop: LayerBackdrop?,
+    pageBackdrop: LayerBackdrop?,
     contentHeight: Dp,
     onBarPressedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val isDark = LocalIsDarkTheme.current
+    val dockBackdrop = rememberLayerBackdrop()
     val density = LocalDensity.current
+    val haptic = LocalHapticFeedback.current
     val slotCount = slots.size
     var barWidthPx by remember { mutableIntStateOf(0) }
 
@@ -451,23 +457,11 @@ private fun LiquidGlassNavBarContent(
                 val minLeft = insetPx
                 val maxLeft = itemWidthPx * (slotCount - 1) + insetPx
                 val slopPx = with(density) { SliderDragStartSlop.toPx() }
-                val hit = with(density) { SliderHitSlop.toPx() }
 
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     val pointerId = down.id
                     val startX = down.position.x
-
-                    val pillLeft = sliderLeftPx
-                    val pillRight = sliderLeftPx + sliderWidthPx
-                    val pillTop = insetPx
-                    val pillBottom = pillTop + sliderHeightPx
-
-                    val onPill = down.position.x in (pillLeft - hit)..(pillRight + hit) &&
-                        down.position.y in (pillTop - hit)..(pillBottom + hit)
-                    if (!onPill) return@awaitEachGesture
-
-                    val startLeft = sliderLeftPx
                     var started = false
 
                     while (true) {
@@ -477,13 +471,16 @@ private fun LiquidGlassNavBarContent(
                             if (started) {
                                 draggingState.value = false
                                 dragHighlightSlot = null
-                                val snapSlot = nearestTabSlot(
+                                val snapSlot = nearestAllSlot(
                                     leftPx = fingerTargetState.floatValue,
                                     insetPx = insetPx,
                                     itemWidthPx = itemWidthPx
                                 )
-                                val snapTab = if (snapSlot < 2) snapSlot else snapSlot - 1
-                                onSelectTab(snapTab)
+                                if (snapSlot == 2) {
+                                    onCenterAddClick()
+                                } else {
+                                    onSelectTab(slotToTab(snapSlot))
+                                }
                             }
                             break
                         }
@@ -500,21 +497,138 @@ private fun LiquidGlassNavBarContent(
                             if (abs(dx) < slopPx) continue
                             started = true
                             draggingState.value = true
-                            dragHighlightSlot = nearestTabSlot(startLeft, insetPx, itemWidthPx)
+                            val initialTarget = (change.position.x - sliderWidthPx / 2f).coerceIn(minLeft, maxLeft)
+                            fingerTargetState.floatValue = initialTarget
+                            dragHighlightSlot = nearestAllSlot(initialTarget, insetPx, itemWidthPx)
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         }
                         change.consume()
 
-                        val next = (startLeft + dx).coerceIn(minLeft, maxLeft)
+                        val next = (change.position.x - sliderWidthPx / 2f).coerceIn(minLeft, maxLeft)
                         fingerTargetState.floatValue = next
-                        val nearest = nearestTabSlot(next, insetPx, itemWidthPx)
+                        val nearest = nearestAllSlot(next, insetPx, itemWidthPx)
                         if (nearest != dragHighlightSlot) {
                             dragHighlightSlot = nearest
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         }
                     }
                 }
             }
     ) {
-        // Layer 1 (underneath): sliding liquid-glass jelly capsule
+        // Layer 1 (underneath selector lens, captured by dockBackdrop):
+        // Dock glass surface + crisp tab icons/labels + center '+' button
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .layerBackdrop(dockBackdrop)
+        ) {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .liquidGlassSurface(
+                        backdrop = pageBackdrop,
+                        shape = RoundedCornerShape(50),
+                        blurRadius = DockBlurRadius,
+                        refractionHeight = DockRefractionHeight,
+                        refractionAmount = DockRefractionAmount,
+                        refraction = true,
+                        fallbackColor = MiuixTheme.colorScheme.surfaceContainer
+                    )
+            )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(contentHeight),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                slots.forEachIndexed { slotIdx, slot ->
+                    if (slot.tabIndex == null) {
+                        // Emphasized centered '+' action button
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .clickable(
+                                    interactionSource = interactionSources[slotIdx],
+                                    indication = null,
+                                    role = Role.Button,
+                                    onClick = onCenterAddClick
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(width = 50.dp, height = 44.dp)
+                                    .squircleBackground(
+                                        color = MiuixTheme.colorScheme.primary,
+                                        cornerRadius = 22.dp
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = slot.icon,
+                                    contentDescription = "새 알바 등록 및 즉시 출근",
+                                    tint = MiuixTheme.colorScheme.onPrimary,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+                    } else {
+                        val selected = slotIdx == anchorSlot
+                        val tint = if (selected) {
+                            MiuixTheme.colorScheme.primary
+                        } else {
+                            MiuixTheme.colorScheme.onSurfaceVariantSummary
+                        }
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .clickable(
+                                    interactionSource = interactionSources[slotIdx],
+                                    indication = null,
+                                    role = Role.Tab,
+                                    onClick = { onSelectTab(slot.tabIndex) }
+                                ),
+                            verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Box(contentAlignment = Alignment.TopEnd) {
+                                Icon(
+                                    imageVector = slot.icon,
+                                    contentDescription = slot.label,
+                                    modifier = Modifier.size(22.dp),
+                                    tint = tint
+                                )
+                                if (slot.tabIndex == 0 && hasActiveShift) {
+                                    Box(modifier = Modifier.offset(x = 5.dp, y = (-3).dp)) {
+                                        Badge()
+                                    }
+                                } else if (slot.tabIndex == 2 && unpaidCount > 0) {
+                                    Box(modifier = Modifier.offset(x = 9.dp, y = (-5).dp)) {
+                                        Badge { Text(unpaidCount.toString()) }
+                                    }
+                                }
+                            }
+                            Text(
+                                text = slot.label,
+                                color = tint,
+                                fontSize = 11.sp,
+                                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // Layer 2 (on top of nav items, sibling of dockBackdrop):
+        // Sliding Liquid Glass Selector Lens that refracts the dock icons/labels underneath
         if (sliderWidthPx > 0f && sliderHeightPx > 0f) {
             Box(
                 modifier = Modifier
@@ -536,107 +650,18 @@ private fun LiquidGlassNavBarContent(
                         scaleX = 1f + SliderStretchMax * stretch
                     }
                     .liquidGlassSurface(
-                        backdrop = backdrop,
+                        backdrop = dockBackdrop,
                         shape = RoundedCornerShape(50),
-                        blurRadius = SliderBlurRadius,
+                        blurRadius = if (draggingState.value) 1.5.dp else 0.8.dp,
                         refractionHeight = SliderRefractionHeight,
                         refractionAmount = SliderRefractionAmount,
+                        chromaticAberration = SliderChromaticAberration,
                         refraction = true,
-                        surfaceTint = Color.White.copy(alpha = 0.08f),
-                        fallbackColor = MiuixTheme.colorScheme.surfaceContainerHigh
+                        surfaceTint = MiuixTheme.colorScheme.primary.copy(alpha = if (isDark) 0.14f else 0.08f),
+                        grainAlpha = 0.04f,
+                        fallbackColor = MiuixTheme.colorScheme.primary.copy(alpha = if (isDark) 0.22f else 0.16f)
                     )
             )
-        }
-
-        // Layer 2 (on top): crisp tab icons/labels + center emphasized '+' button
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(contentHeight),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            slots.forEachIndexed { slotIdx, slot ->
-                if (slot.tabIndex == null) {
-                    // Emphasized centered '+' action button
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .clickable(
-                                interactionSource = interactionSources[slotIdx],
-                                indication = null,
-                                role = Role.Button,
-                                onClick = onCenterAddClick
-                            ),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(width = 50.dp, height = 44.dp)
-                                .squircleBackground(
-                                    color = MiuixTheme.colorScheme.primary,
-                                    cornerRadius = 22.dp
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = slot.icon,
-                                contentDescription = "새 알바 등록 및 즉시 출근",
-                                tint = MiuixTheme.colorScheme.onPrimary,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-                    }
-                } else {
-                    val selected = slotIdx == anchorSlot
-                    val tint = if (selected) {
-                        MiuixTheme.colorScheme.primary
-                    } else {
-                        MiuixTheme.colorScheme.onSurfaceVariantSummary
-                    }
-                    Column(
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight()
-                            .clickable(
-                                interactionSource = interactionSources[slotIdx],
-                                indication = null,
-                                role = Role.Tab,
-                                onClick = { onSelectTab(slot.tabIndex) }
-                            ),
-                        verticalArrangement = Arrangement.Center,
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Box(contentAlignment = Alignment.TopEnd) {
-                            Icon(
-                                imageVector = slot.icon,
-                                contentDescription = slot.label,
-                                modifier = Modifier.size(22.dp),
-                                tint = tint
-                            )
-                            if (slot.tabIndex == 0 && hasActiveShift) {
-                                Box(modifier = Modifier.offset(x = 5.dp, y = (-3).dp)) {
-                                    Badge()
-                                }
-                            } else if (slot.tabIndex == 2 && unpaidCount > 0) {
-                                Box(modifier = Modifier.offset(x = 9.dp, y = (-5).dp)) {
-                                    Badge { Text(unpaidCount.toString()) }
-                                }
-                            }
-                        }
-                        Text(
-                            text = slot.label,
-                            color = tint,
-                            fontSize = 11.sp,
-                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.padding(top = 2.dp)
-                        )
-                    }
-                }
-            }
         }
     }
 }

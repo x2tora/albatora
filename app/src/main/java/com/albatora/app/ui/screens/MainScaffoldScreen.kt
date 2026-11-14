@@ -62,7 +62,10 @@ sealed interface AppRoute : NavKey {
 
 @Composable
 fun MainScaffoldScreen(
-    viewModel: AlbaToraViewModel
+    viewModel: AlbaToraViewModel,
+    launchActionNonce: Int = 0,
+    launchTargetTab: Int = 0,
+    launchOpenStopwatch: Boolean = false
 ) {
     val context = LocalContext.current
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -126,6 +129,9 @@ fun MainScaffoldScreen(
                         viewModel = viewModel,
                         barBackdrop = barBackdrop,
                         toastState = toastState,
+                        launchActionNonce = launchActionNonce,
+                        launchTargetTab = launchTargetTab,
+                        launchOpenStopwatch = launchOpenStopwatch,
                         onOpenAddRegularJob = { jobId ->
                             backStack.add(AppRoute.AddEditRegularJob(jobId))
                         },
@@ -194,6 +200,9 @@ private fun MainTabsHost(
     viewModel: AlbaToraViewModel,
     barBackdrop: LayerBackdrop,
     toastState: StackedToastState,
+    launchActionNonce: Int,
+    launchTargetTab: Int,
+    launchOpenStopwatch: Boolean,
     onOpenAddRegularJob: (String?) -> Unit,
     onOpenQuickShortTerm: (String?, String?) -> Unit,
     onOpenSettings: () -> Unit
@@ -209,6 +218,16 @@ private fun MainTabsHost(
     var isFullscreenFocus by remember { mutableStateOf(false) }
     var showHomeQuickMenu by remember { mutableStateOf(false) }
     var openStopwatchTrigger by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(launchActionNonce) {
+        if (launchActionNonce > 0) {
+            selectedTab = launchTargetTab.coerceIn(0, 3)
+            if (launchOpenStopwatch) {
+                selectedTab = 0
+                openStopwatchTrigger++
+            }
+        }
+    }
 
     LaunchedEffect(liveDashboard.activeShifts.isEmpty()) {
         if (liveDashboard.activeShifts.isEmpty()) {

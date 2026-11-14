@@ -5,8 +5,8 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -23,6 +23,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
@@ -36,6 +37,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.shadow.Shadow
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -46,7 +48,6 @@ import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Close
 import top.yukonga.miuix.kmp.icon.extended.Ok
 import top.yukonga.miuix.kmp.squircle.squircleBackground
 import top.yukonga.miuix.kmp.squircle.squircleClip
@@ -59,7 +60,8 @@ import kotlin.math.sign
 data class ToastEntry(
     val id: Long,
     val message: String,
-    val durationMs: Long = 3400L
+    val durationMs: Long = 3400L,
+    val isExiting: Boolean = false
 )
 
 @Stable
@@ -72,8 +74,15 @@ class StackedToastState {
         if (trimmed.isEmpty()) return
         val id = ++nextId
         entries.add(0, ToastEntry(id = id, message = trimmed, durationMs = durationMs))
-        if (entries.size > 6) {
+        if (entries.size > 5) {
             entries.removeAt(entries.lastIndex)
+        }
+    }
+
+    fun requestDismiss(id: Long) {
+        val idx = entries.indexOfFirst { it.id == id }
+        if (idx >= 0 && !entries[idx].isExiting) {
+            entries[idx] = entries[idx].copy(isExiting = true)
         }
     }
 
@@ -91,10 +100,9 @@ fun rememberStackedToastState(): StackedToastState = remember { StackedToastStat
 
 /**
  * Stacked card-deck toast host:
- * - Newly pushed notifications land on top (depth = 0), covering previous notifications.
- * - Older notifications peek upward layer-by-layer underneath with depth scaling & offset.
- * - Swiping the top toast left or right slides it away and promotes the next notification in order.
- * - Auto-dismiss timer only ticks for the active frontmost toast so buried cards remain readable as you swipe.
+ * - Up to 5 notifications stack cleanly (depth 0 frontmost, older cards peeking upward).
+ * - Smooth fade-in on arrival, fade-out on auto-dismiss or sideways swipe.
+ * - No close ('X') button; swipe horizontally to slide away and fade out.
  */
 @Composable
 fun StackedToastHost(
@@ -105,14 +113,14 @@ fun StackedToastHost(
     if (entries.isEmpty()) return
 
     val frontEntry = entries.firstOrNull()
-    LaunchedEffect(frontEntry?.id) {
-        if (frontEntry != null) {
+    LaunchedEffect(frontEntry?.id, frontEntry?.isExiting) {
+        if (frontEntry != null && !frontEntry.isExiting) {
             delay(frontEntry.durationMs)
-            state.dismiss(frontEntry.id)
+            state.requestDismiss(frontEntry.id)
         }
     }
 
-    val visibleEntries = entries.take(4)
+    val visibleEntries = entries.take(5)
 
     Box(
         modifier = modifier.fillMaxWidth(),
@@ -122,9 +130,9 @@ fun StackedToastHost(
         for (depth in visibleEntries.lastIndex downTo 0) {
             val item = visibleEntries[depth]
             key(item.id) {
-                val targetScale = (1f - depth * 0.045f).coerceAtLeast(0.86f)
-                val targetOffsetY = (-9 * depth).dp
-                val targetAlpha = (1f - depth * 0.14f).coerceAtLeast(0.58f)
+                val targetScale = (1f - depth * 0.04f).coerceAtLeast(0.84f)
+                val targetOffsetY = (-8 * depth).dp
+                val targetAlpha = (1f - depth * 0.14f).coerceAtLeast(0.44f)
 
                 val animatedScale by animateFloatAsState(
                     targetValue = targetScale,
@@ -144,17 +152,16 @@ fun StackedToastHost(
                 )
                 val animatedAlpha by animateFloatAsState(
                     targetValue = targetAlpha,
-                    animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioNoBouncy,
-                        stiffness = Spring.StiffnessMedium
-                    ),
+                    animationSpec = tween(durationMillis = 220),
                     label = "toastDeckAlpha"
                 )
 
                 SwipeableToastCard(
                     message = item.message,
                     isFront = depth == 0,
-                    onDismiss = { state.dismiss(item.id) },
+                    isExiting = item.isExiting,
+                    deckAlpha = animatedAlpha,
+                    onRemove = { state.dismiss(item.id) },
                     modifier = Modifier
                         .zIndex((visibleEntries.size - depth).toFloat())
                         .offset(y = animatedOffsetY)
@@ -162,7 +169,6 @@ fun StackedToastHost(
                             scaleX = animatedScale
                             scaleY = animatedScale
                         }
-                        .alpha(animatedAlpha)
                 )
             }
         }
@@ -173,12 +179,32 @@ fun StackedToastHost(
 private fun SwipeableToastCard(
     message: String,
     isFront: Boolean,
-    onDismiss: () -> Unit,
+    isExiting: Boolean,
+    deckAlpha: Float,
+    onRemove: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val isDark = LocalIsDarkTheme.current
     val scope = rememberCoroutineScope()
     val dragX = remember { Animatable(0f) }
+    val fadeAnim = remember { Animatable(0f) }
+    var cardWidthPx by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(Unit) {
+        fadeAnim.animateTo(1f, animationSpec = tween(durationMillis = 220))
+    }
+
+    LaunchedEffect(isExiting) {
+        if (isExiting) {
+            fadeAnim.animateTo(0f, animationSpec = tween(durationMillis = 220))
+            onRemove()
+        }
+    }
+
+    val swipeFade = if (cardWidthPx > 0) {
+        (1f - (abs(dragX.value) / (cardWidthPx * 0.72f))).coerceIn(0f, 1f)
+    } else 1f
+    val combinedAlpha = (deckAlpha * fadeAnim.value * swipeFade).coerceIn(0f, 1f)
 
     val containerColor = if (isFront) {
         if (isDark) MiuixTheme.colorScheme.surfaceContainerHighest else MiuixTheme.colorScheme.surfaceContainerHigh
@@ -191,10 +217,9 @@ private fun SwipeableToastCard(
     Row(
         modifier = modifier
             .fillMaxWidth()
+            .onSizeChanged { cardWidthPx = it.width }
             .offset { IntOffset(dragX.value.roundToInt(), 0) }
-            .graphicsLayer {
-                rotationZ = (dragX.value / 55f).coerceIn(-8f, 8f)
-            }
+            .alpha(combinedAlpha)
             .dropShadow(
                 shape = RoundedCornerShape(corner),
                 shadow = Shadow(
@@ -207,23 +232,20 @@ private fun SwipeableToastCard(
             .squircleBackground(color = containerColor, cornerRadius = corner)
             .border(width = 0.75.dp, color = borderColor, shape = RoundedCornerShape(corner))
             .then(
-                if (isFront) {
+                if (isFront && !isExiting) {
                     Modifier.pointerInput(Unit) {
                         detectHorizontalDragGestures(
                             onDragEnd = {
                                 val current = dragX.value
-                                val threshold = size.width * 0.24f
+                                val threshold = size.width * 0.22f
                                 if (abs(current) > threshold) {
                                     val direction = if (current == 0f) 1f else sign(current)
                                     scope.launch {
                                         dragX.animateTo(
-                                            targetValue = direction * size.width * 1.15f,
-                                            animationSpec = spring(
-                                                dampingRatio = Spring.DampingRatioNoBouncy,
-                                                stiffness = Spring.StiffnessMedium
-                                            )
+                                            targetValue = direction * size.width * 0.9f,
+                                            animationSpec = tween(durationMillis = 200)
                                         )
-                                        onDismiss()
+                                        onRemove()
                                     }
                                 } else {
                                     scope.launch {
@@ -259,7 +281,7 @@ private fun SwipeableToastCard(
                     Modifier
                 }
             )
-            .padding(horizontal = 14.dp, vertical = 12.dp)
+            .padding(horizontal = 16.dp, vertical = 13.dp)
             .heightIn(min = 24.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -288,20 +310,5 @@ private fun SwipeableToastCard(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
         )
-        Spacer(modifier = Modifier.width(6.dp))
-        Box(
-            modifier = Modifier
-                .size(26.dp)
-                .squircleClip(9.dp)
-                .clickable(enabled = isFront, onClick = onDismiss),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = MiuixIcons.Close,
-                contentDescription = "알림 닫기",
-                tint = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                modifier = Modifier.size(15.dp)
-            )
-        }
     }
 }
