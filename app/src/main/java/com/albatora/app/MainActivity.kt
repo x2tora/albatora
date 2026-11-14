@@ -4,6 +4,7 @@ import android.animation.AnimatorSet
 import android.animation.ObjectAnimator
 import android.content.Intent
 import android.os.Bundle
+import android.os.SystemClock
 import android.view.View
 import android.view.animation.DecelerateInterpolator
 import androidx.activity.ComponentActivity
@@ -34,20 +35,24 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
         super.onCreate(savedInstanceState)
+        val splashDeadlineMs = SystemClock.elapsedRealtime() + if (savedInstanceState == null) 650L else 0L
+        splashScreen.setKeepOnScreenCondition {
+            SystemClock.elapsedRealtime() < splashDeadlineMs
+        }
         splashScreen.setOnExitAnimationListener { splashViewProvider ->
             val interpolator = DecelerateInterpolator(1.6f)
             val containerFade = ObjectAnimator.ofFloat(splashViewProvider.view, View.ALPHA, 1f, 0f).apply {
-                duration = 260L
+                duration = 320L
                 this.interpolator = interpolator
             }
             val animators = mutableListOf<android.animation.Animator>(containerFade)
             runCatching { splashViewProvider.iconView }.getOrNull()?.let { icon ->
                 animators += ObjectAnimator.ofFloat(icon, View.SCALE_X, 1f, 1.08f).apply {
-                    duration = 260L
+                    duration = 320L
                     this.interpolator = interpolator
                 }
                 animators += ObjectAnimator.ofFloat(icon, View.SCALE_Y, 1f, 1.08f).apply {
-                    duration = 260L
+                    duration = 320L
                     this.interpolator = interpolator
                 }
             }
