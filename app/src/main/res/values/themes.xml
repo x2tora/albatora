@@ -5,4 +5,11 @@
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
     </style>
+
+    <style name="Theme.AlbaTora.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">#F7F8FA</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="windowSplashScreenIconBackgroundColor">#1B1D28</item>
+        <item name="postSplashScreenTheme">@style/Theme.AlbaTora</item>
+    </style>
 </resources>
