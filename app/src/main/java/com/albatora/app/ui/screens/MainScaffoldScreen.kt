@@ -710,7 +710,11 @@ private fun MainTabsHost(
                                 icon = MiuixIcons.Regular.Home,
                                 label = "홈",
                                 badge = if (liveDashboard.activeShifts.isNotEmpty()) {
-                                    { Badge(modifier = Modifier.size(7.dp)) }
+                                    {
+                                        Box(modifier = Modifier.offset(x = 6.dp, y = (-4).dp)) {
+                                            Badge(modifier = Modifier.size(7.dp))
+                                        }
+                                    }
                                 } else null
                             )
                             NavigationBarItem(
@@ -800,7 +804,11 @@ private fun MainTabsHost(
                                 icon = MiuixIcons.Regular.Notes,
                                 label = "기록",
                                 badge = if (unpaidCount > 0) {
-                                    { Badge { Text(unpaidCount.toString()) } }
+                                    {
+                                        Box(modifier = Modifier.offset(x = 6.dp, y = (-3).dp)) {
+                                            Badge { Text(unpaidCount.toString()) }
+                                        }
+                                    }
                                 } else null
                             )
                             NavigationBarItem(

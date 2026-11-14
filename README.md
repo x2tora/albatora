@@ -49,10 +49,10 @@
 
 | 파일 이름 | 추천 기기 |
 | --- | --- |
-| **`albatora-v1.3.1.2_hotfix-arm64-v8a.apk`** | 대부분의 최신 안드로이드 스마트폰 (가장 추천) |
-| `albatora-v1.3.1.2_hotfix-armeabi-v7a.apk` | 구형 32비트 안드로이드 기기 |
-| `albatora-v1.3.1.2_hotfix-x86_64.apk` / `x86.apk` | 일부 태블릿·크롬북·에뮬레이터 |
-| `albatora-v1.3.1.2_hotfix-universal.apk` | 기기 사양을 잘 모를 때 (모든 기기 호환 통합본) |
+| **`albatora-v1.3.1.3_hotfix-arm64-v8a.apk`** | 대부분의 최신 안드로이드 스마트폰 (가장 추천) |
+| `albatora-v1.3.1.3_hotfix-armeabi-v7a.apk` | 구형 32비트 안드로이드 기기 |
+| `albatora-v1.3.1.3_hotfix-x86_64.apk` / `x86.apk` | 일부 태블릿·크롬북·에뮬레이터 |
+| `albatora-v1.3.1.3_hotfix-universal.apk` | 기기 사양을 잘 모를 때 (모든 기기 호환 통합본) |
 
 ### 2. 권장 초기 설정
 
