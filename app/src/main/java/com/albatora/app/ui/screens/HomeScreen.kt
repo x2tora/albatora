@@ -1275,6 +1275,8 @@ private fun FocusTimerStage(
     val isPaused = !isCombinedView && focusedShift.isPaused
     val statusDotColor = if (isPaused) Color(0xFFD97706) else Color(0xFF16A34A)
     val secondFraction = ((focusedShift.elapsedWorkMillis % 60_000L) / 60_000f).coerceIn(0f, 1f)
+    var pendingBreakTarget by remember { mutableStateOf<LiveShiftSnapshot?>(null) }
+    var pendingClockOutTarget by remember { mutableStateOf<LiveShiftSnapshot?>(null) }
 
     Box(
         modifier = modifier
@@ -1517,17 +1519,53 @@ private fun FocusTimerStage(
                 ) {
                     TextButton(
                         text = if (actionTarget.isManualPaused) "휴게 종료" else "휴게 시작",
-                        onClick = { onToggleBreak(actionTarget.runtimeKey) },
+                        onClick = { pendingBreakTarget = actionTarget },
                         modifier = Modifier.weight(1f)
                     )
                     TextButton(
                         text = "퇴근 완료",
-                        onClick = { onClockOut(actionTarget.runtimeKey) },
+                        onClick = { pendingClockOutTarget = actionTarget },
                         colors = ButtonDefaults.textButtonColorsPrimary(),
                         modifier = Modifier.weight(1f)
                     )
                 }
             }
+        }
+
+        val breakTarget = pendingBreakTarget
+        if (breakTarget != null) {
+            ConfirmActionDialog(
+                show = true,
+                title = if (breakTarget.isManualPaused) "휴게 종료" else "휴게 시작",
+                summary = if (breakTarget.isManualPaused) {
+                    "'${breakTarget.title}' 휴게를 종료하고 근무를 재개할까요?"
+                } else {
+                    "'${breakTarget.title}' 휴게를 시작할까요? 휴게 중에는 근무 시간이 일시 정지됩니다."
+                },
+                confirmText = if (breakTarget.isManualPaused) "휴게 종료" else "휴게 시작",
+                onDismiss = { pendingBreakTarget = null },
+                onConfirm = {
+                    val key = breakTarget.runtimeKey
+                    pendingBreakTarget = null
+                    onToggleBreak(key)
+                }
+            )
+        }
+
+        val clockOutTarget = pendingClockOutTarget
+        if (clockOutTarget != null) {
+            ConfirmActionDialog(
+                show = true,
+                title = "퇴근 완료",
+                summary = "'${clockOutTarget.title}' 근무를 종료하고 현재까지의 급여(${PayrollCalculator.formatWon(clockOutTarget.liveEarnedWon.toLong())})를 기록으로 저장할까요?",
+                confirmText = "퇴근 완료",
+                onDismiss = { pendingClockOutTarget = null },
+                onConfirm = {
+                    val key = clockOutTarget.runtimeKey
+                    pendingClockOutTarget = null
+                    onClockOut(key)
+                }
+            )
         }
     }
 }
