@@ -95,10 +95,10 @@ import kotlin.random.Random
  */
 private val DockHeight = 64.dp
 private const val DockPressedScale = 1.04f
-private val DockBlurRadius = 5.dp
-private val DockRefractionHeight = 14.dp
-private val DockRefractionAmount = 10.dp
-private val DockChromaticAberration = 2.2.dp
+private val DockBlurRadius = 14.dp
+private val DockRefractionHeight = 12.dp
+private val DockRefractionAmount = 7.dp
+private val DockChromaticAberration = 2.0.dp
 
 private val GlassSurfaceTint = Color(0xFF6E7D96).copy(alpha = 0.03f)
 private const val GlassGrainAlpha = 0.10f
@@ -235,18 +235,13 @@ fun Modifier.liquidGlassSurface(
 
     val grainBrush = rememberGrainBrush()
     val highlight = if (isDark) Highlight.GlassStrokeMiddleDark else Highlight.GlassStrokeMiddleLight
-    val extraSurfaceTint = if (isDark) {
-        Color.White.copy(alpha = 0.045f)
-    } else {
-        surfaceTint
-    }
 
     return this.drawBackdrop(
         backdrop = backdrop,
         shape = { shape },
         highlight = { highlight },
         onDrawSurface = {
-            if (extraSurfaceTint.alpha > 0f) drawRect(color = extraSurfaceTint)
+            if (surfaceTint.alpha > 0f) drawRect(color = surfaceTint)
             if (grainAlpha > 0f) drawRect(brush = grainBrush, alpha = grainAlpha)
         },
         effects = {
@@ -532,6 +527,12 @@ private fun LiquidGlassNavBarContent(
                         refractionHeight = DockRefractionHeight,
                         refractionAmount = DockRefractionAmount,
                         refraction = true,
+                        surfaceTint = if (isDark) {
+                            Color(0xFF14161B).copy(alpha = 0.72f)
+                        } else {
+                            Color(0xFFF6F7FB).copy(alpha = 0.78f)
+                        },
+                        grainAlpha = if (isDark) 0.06f else 0.08f,
                         fallbackColor = MiuixTheme.colorScheme.surfaceContainer
                     )
             )
@@ -602,15 +603,6 @@ private fun LiquidGlassNavBarContent(
                                     modifier = Modifier.size(22.dp),
                                     tint = tint
                                 )
-                                if (slot.tabIndex == 0 && hasActiveShift) {
-                                    Box(modifier = Modifier.offset(x = 5.dp, y = (-3).dp)) {
-                                        Badge()
-                                    }
-                                } else if (slot.tabIndex == 2 && unpaidCount > 0) {
-                                    Box(modifier = Modifier.offset(x = 9.dp, y = (-5).dp)) {
-                                        Badge { Text(unpaidCount.toString()) }
-                                    }
-                                }
                             }
                             Text(
                                 text = slot.label,
@@ -662,6 +654,50 @@ private fun LiquidGlassNavBarContent(
                         fallbackColor = MiuixTheme.colorScheme.primary.copy(alpha = if (isDark) 0.22f else 0.16f)
                     )
             )
+        }
+
+        // Layer 3 (unrefracted badge overlay above the glass lens so red badges never distort):
+        if (hasActiveShift || unpaidCount > 0) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(contentHeight),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                slots.forEach { slot ->
+                    if (slot.tabIndex == null) {
+                        Box(modifier = Modifier.weight(1f).fillMaxHeight())
+                    } else {
+                        Column(
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
+                            verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Box(contentAlignment = Alignment.TopEnd) {
+                                Box(modifier = Modifier.size(22.dp))
+                                if (slot.tabIndex == 0 && hasActiveShift) {
+                                    Box(modifier = Modifier.offset(x = 5.dp, y = (-3).dp)) {
+                                        Badge()
+                                    }
+                                } else if (slot.tabIndex == 2 && unpaidCount > 0) {
+                                    Box(modifier = Modifier.offset(x = 9.dp, y = (-5).dp)) {
+                                        Badge { Text(unpaidCount.toString()) }
+                                    }
+                                }
+                            }
+                            Text(
+                                text = slot.label,
+                                color = Color.Transparent,
+                                fontSize = 11.sp,
+                                fontWeight = if (slot.slotIndex == anchorSlot) FontWeight.SemiBold else FontWeight.Normal,
+                                maxLines = 1,
+                                modifier = Modifier.padding(top = 2.dp)
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
