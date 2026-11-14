@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalContext
@@ -27,6 +28,7 @@ import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.blur.BlendColorEntry
 import top.yukonga.miuix.kmp.blur.BlurBlendMode
 import top.yukonga.miuix.kmp.blur.BlurDefaults
+import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.blur.ProgressiveBlur
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.progressiveTextureBlur
@@ -84,70 +86,92 @@ fun MainScaffoldScreen(
     }
 
     val surfaceBg = MiuixTheme.colorScheme.surface
-    val backdrop = rememberLayerBackdrop {
+    val primaryAmbient = MiuixTheme.colorScheme.primary.copy(alpha = 0.08f)
+    val secondaryAmbient = MiuixTheme.colorScheme.secondary.copy(alpha = 0.06f)
+
+    // Keep card/icon glass blur strictly separate from scrollable content barBackdrop to avoid cyclic RenderNode graphs.
+    val ambientBackdrop = rememberLayerBackdrop {
+        drawRect(surfaceBg)
+        drawContent()
+    }
+    val barBackdrop = rememberLayerBackdrop {
         drawRect(surfaceBg)
         drawContent()
     }
 
-    CompositionLocalProvider(LocalAppBackdrop provides backdrop) {
-        NavDisplay(
-            backStack = backStack,
-            onBack = {
-                if (backStack.size > 1) {
-                    backStack.removeAt(backStack.lastIndex)
-                }
-            },
-            transition = NavTransitions.MiuixDefault
-        ) {
-            entry<AppRoute.Main> {
-                MainTabsHost(
-                    viewModel = viewModel,
-                    onOpenAddRegularJob = { jobId ->
-                        backStack.add(AppRoute.AddEditRegularJob(jobId))
-                    },
-                    onOpenQuickShortTerm = { recId, dateIso ->
-                        backStack.add(AppRoute.QuickAddShortTerm(recId, dateIso))
-                    }
+    Box(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .layerBackdrop(ambientBackdrop)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(surfaceBg, primaryAmbient, secondaryAmbient, surfaceBg)
+                    )
                 )
-            }
+        )
 
-            entry<AppRoute.AddEditRegularJob> { route ->
-                val existing = route.jobId?.let { id -> state.jobs.find { it.id == id } }
-                AddEditRegularJobScreen(
-                    existingJob = existing,
-                    defaultMinWage = state.settings.defaultMinWage,
-                    onBack = { backStack.removeAt(backStack.lastIndex) },
-                    onSave = { job ->
-                        viewModel.upsertJob(job)
-                        backStack.removeAt(backStack.lastIndex)
-                    },
-                    onDelete = { id ->
-                        viewModel.deleteJob(id, deleteRecords = false)
+        CompositionLocalProvider(LocalAppBackdrop provides ambientBackdrop) {
+            NavDisplay(
+                backStack = backStack,
+                onBack = {
+                    if (backStack.size > 1) {
                         backStack.removeAt(backStack.lastIndex)
                     }
-                )
-            }
-
-            entry<AppRoute.QuickAddShortTerm> { route ->
-                val existing = route.recordId?.let { id -> state.records.find { it.id == id } }
-                QuickAddShortTermScreen(
-                    existingRecord = existing,
-                    initialDateIso = route.initialDateIso,
-                    templates = state.templates,
-                    defaultMinWage = state.settings.defaultMinWage,
-                    onBack = { backStack.removeAt(backStack.lastIndex) },
-                    onSave = { rec, optionalTemplate ->
-                        viewModel.upsertRecord(rec)
-                        if (optionalTemplate != null) {
-                            viewModel.upsertTemplate(optionalTemplate)
+                },
+                transition = NavTransitions.MiuixDefault
+            ) {
+                entry<AppRoute.Main> {
+                    MainTabsHost(
+                        viewModel = viewModel,
+                        barBackdrop = barBackdrop,
+                        onOpenAddRegularJob = { jobId ->
+                            backStack.add(AppRoute.AddEditRegularJob(jobId))
+                        },
+                        onOpenQuickShortTerm = { recId, dateIso ->
+                            backStack.add(AppRoute.QuickAddShortTerm(recId, dateIso))
                         }
-                        backStack.removeAt(backStack.lastIndex)
-                    },
-                    onDelete = { id ->
-                        viewModel.deleteRecord(id)
-                        backStack.removeAt(backStack.lastIndex)
-                    }
-                )
+                    )
+                }
+
+                entry<AppRoute.AddEditRegularJob> { route ->
+                    val existing = route.jobId?.let { id -> state.jobs.find { it.id == id } }
+                    AddEditRegularJobScreen(
+                        existingJob = existing,
+                        defaultMinWage = state.settings.defaultMinWage,
+                        onBack = { backStack.removeAt(backStack.lastIndex) },
+                        onSave = { job ->
+                            viewModel.upsertJob(job)
+                            backStack.removeAt(backStack.lastIndex)
+                        },
+                        onDelete = { id ->
+                            viewModel.deleteJob(id, deleteRecords = false)
+                            backStack.removeAt(backStack.lastIndex)
+                        }
+                    )
+                }
+
+                entry<AppRoute.QuickAddShortTerm> { route ->
+                    val existing = route.recordId?.let { id -> state.records.find { it.id == id } }
+                    QuickAddShortTermScreen(
+                        existingRecord = existing,
+                        initialDateIso = route.initialDateIso,
+                        templates = state.templates,
+                        defaultMinWage = state.settings.defaultMinWage,
+                        onBack = { backStack.removeAt(backStack.lastIndex) },
+                        onSave = { rec, optionalTemplate ->
+                            viewModel.upsertRecord(rec)
+                            if (optionalTemplate != null) {
+                                viewModel.upsertTemplate(optionalTemplate)
+                            }
+                            backStack.removeAt(backStack.lastIndex)
+                        },
+                        onDelete = { id ->
+                            viewModel.deleteRecord(id)
+                            backStack.removeAt(backStack.lastIndex)
+                        }
+                    )
+                }
             }
         }
     }
@@ -156,12 +180,12 @@ fun MainScaffoldScreen(
 @Composable
 private fun MainTabsHost(
     viewModel: AlbaToraViewModel,
+    barBackdrop: LayerBackdrop,
     onOpenAddRegularJob: (String?) -> Unit,
     onOpenQuickShortTerm: (String?, String?) -> Unit
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val liveDashboard by viewModel.liveDashboard.collectAsStateWithLifecycle()
-    val backdrop = LocalAppBackdrop.current
     val isDark = LocalIsDarkTheme.current
 
     var selectedTab by remember { mutableIntStateOf(0) } // 0=홈, 1=달력, 2=기록, 3=계산기, 4=더보기
@@ -180,7 +204,7 @@ private fun MainTabsHost(
     }
 
     val scrollBehavior = MiuixScrollBehavior(state = rememberTopAppBarState())
-    val useShader = isRuntimeShaderSupported() && backdrop != null
+    val useShader = isRuntimeShaderSupported()
     val barOverlayColor = MiuixTheme.colorScheme.surface.copy(alpha = if (useShader) 0.72f else 0.96f)
 
     val tabTitles = listOf("알바토라", "근무 달력", "정산 · 명세서", "급여 계산기", "더보기")
@@ -191,7 +215,7 @@ private fun MainTabsHost(
         topBar = {
             val topBlurMod = if (useShader) {
                 Modifier.progressiveTextureBlur(
-                    backdrop = backdrop!!,
+                    backdrop = barBackdrop,
                     shape = RectangleShape,
                     blurRadius = 16f,
                     gradient = ProgressiveBlur.Top,
@@ -228,7 +252,7 @@ private fun MainTabsHost(
         bottomBar = {
             val bottomBlurMod = if (useShader) {
                 Modifier.progressiveTextureBlur(
-                    backdrop = backdrop!!,
+                    backdrop = barBackdrop,
                     shape = RectangleShape,
                     blurRadius = 16f,
                     gradient = ProgressiveBlur.Bottom,
@@ -291,13 +315,9 @@ private fun MainTabsHost(
             }
         }
     ) { paddingValues ->
-        val contentBackdropModifier = if (backdrop != null) {
-            Modifier
-                .fillMaxSize()
-                .layerBackdrop(backdrop)
-        } else {
-            Modifier.fillMaxSize()
-        }
+        val contentBackdropModifier = Modifier
+            .fillMaxSize()
+            .layerBackdrop(barBackdrop)
 
         Box(
             modifier = contentBackdropModifier.padding(top = paddingValues.calculateTopPadding())

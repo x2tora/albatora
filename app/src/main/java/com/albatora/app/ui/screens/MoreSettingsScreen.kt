@@ -257,7 +257,7 @@ fun MoreSettingsScreen(
             Card(modifier = Modifier.fillMaxWidth(), insideMargin = PaddingValues(16.dp)) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        "알바토라 (AlbaTora) v1.0.0",
+                        "알바토라 (AlbaTora) v1.0.1",
                         style = MiuixTheme.textStyles.body1
                     )
                     Text(
