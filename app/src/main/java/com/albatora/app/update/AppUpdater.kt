@@ -72,11 +72,26 @@ object AppUpdater {
     }
 
     /**
+     * Normalizes version segments so a 3-part "_hotfix" release (e.g. "1.1.4_hotfix")
+     * aligns with 4-part hotfix tags (e.g. "1.1.4.1_hotfix") used for legacy client compatibility.
+     */
+    private fun parseComparableSegments(version: String): List<Int> {
+        val base = parseVersionSegments(version)
+        if (base.isEmpty()) return emptyList()
+        val hotfixLevel = parseHotfixLevel(version)
+        return if (base.size <= 3 && hotfixLevel > 0) {
+            List(3) { index -> base.getOrElse(index) { 0 } } + hotfixLevel
+        } else {
+            base
+        }
+    }
+
+    /**
      * Returns true strictly when remoteVersion represents a newer version than currentVersion.
      */
     fun isNewerVersion(remoteVersion: String, currentVersion: String): Boolean {
-        val remote = parseVersionSegments(remoteVersion)
-        val current = parseVersionSegments(currentVersion)
+        val remote = parseComparableSegments(remoteVersion)
+        val current = parseComparableSegments(currentVersion)
         if (remote.isEmpty() || current.isEmpty()) return false
         val maxLen = maxOf(remote.size, current.size)
         for (i in 0 until maxLen) {
@@ -85,7 +100,7 @@ object AppUpdater {
             if (r > c) return true
             if (r < c) return false
         }
-        return parseHotfixLevel(remoteVersion) > parseHotfixLevel(currentVersion)
+        return false
     }
 
     /**
