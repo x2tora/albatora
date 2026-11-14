@@ -16,6 +16,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.albatora.app.domain.PayrollCalculator
 import com.albatora.app.model.*
+import com.albatora.app.ui.components.ConfirmActionDialog
 import com.albatora.app.ui.components.EmojiAndColorIdentityRow
 import com.albatora.app.ui.components.MiuixDatePickerDialog
 import com.albatora.app.ui.components.MiuixTimePickerDialog
@@ -103,6 +104,7 @@ fun QuickAddShortTermScreen(
     var showDatePicker by remember { mutableStateOf(false) }
     var pickTimeMode by remember { mutableStateOf<String?>(null) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var pendingEditSave by remember { mutableStateOf<Pair<WorkRecord, ShortTermTemplate?>?>(null) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
 
     val effectiveBreakMins = if (autoRecBreak) PayrollCalculator.recommendedBreakMinutes(rawDur) else (breakMinText.toIntOrNull() ?: 0)
@@ -210,7 +212,11 @@ fun QuickAddShortTermScreen(
                 memo = memo.trim()
             )
         } else null
-        onSave(finalRecord, templateToSave)
+        if (isEditing) {
+            pendingEditSave = finalRecord to templateToSave
+        } else {
+            onSave(finalRecord, templateToSave)
+        }
     }
 
     Scaffold(
@@ -672,6 +678,21 @@ fun QuickAddShortTermScreen(
                     )
                 }
             }
+        }
+
+        val editPair = pendingEditSave
+        if (editPair != null) {
+            ConfirmActionDialog(
+                show = true,
+                title = "근무 내역 수정",
+                summary = "'${editPair.first.title}' (${editPair.first.date}) 변경 사항을 저장할까요?",
+                confirmText = "저장",
+                onDismiss = { pendingEditSave = null },
+                onConfirm = {
+                    pendingEditSave = null
+                    onSave(editPair.first, editPair.second)
+                }
+            )
         }
     }
 }

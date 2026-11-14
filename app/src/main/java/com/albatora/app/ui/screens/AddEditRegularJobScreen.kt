@@ -20,6 +20,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.albatora.app.domain.PayrollCalculator
 import com.albatora.app.model.*
+import com.albatora.app.ui.components.ConfirmActionDialog
 import com.albatora.app.ui.components.EmojiAndColorIdentityRow
 import com.albatora.app.ui.components.MiuixDatePickerDialog
 import com.albatora.app.ui.components.MiuixTimePickerDialog
@@ -102,6 +103,7 @@ fun AddEditRegularJobScreen(
 
     var showStartDatePicker by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var pendingEditJob by remember { mutableStateOf<Job?>(null) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
 
     val scrollBehavior = MiuixScrollBehavior(state = rememberTopAppBarState())
@@ -177,7 +179,11 @@ fun AddEditRegularJobScreen(
                                 isArchived = existingJob?.isArchived ?: false,
                                 createdAtMillis = existingJob?.createdAtMillis ?: System.currentTimeMillis()
                             )
-                            onSave(built)
+                            if (isEditing) {
+                                pendingEditJob = built
+                            } else {
+                                onSave(built)
+                            }
                         }
                     ) {
                         Icon(
@@ -673,7 +679,11 @@ fun AddEditRegularJobScreen(
                             isArchived = existingJob?.isArchived ?: false,
                             createdAtMillis = existingJob?.createdAtMillis ?: System.currentTimeMillis()
                         )
-                        onSave(built)
+                        if (isEditing) {
+                            pendingEditJob = built
+                        } else {
+                            onSave(built)
+                        }
                     },
                     colors = ButtonDefaults.textButtonColorsPrimary(),
                     modifier = Modifier.fillMaxWidth()
@@ -757,6 +767,21 @@ fun AddEditRegularJobScreen(
                     )
                 }
             }
+        }
+
+        val editCandidate = pendingEditJob
+        if (editCandidate != null) {
+            ConfirmActionDialog(
+                show = true,
+                title = "알바 정보 수정",
+                summary = "'${editCandidate.name}' 근무지 변경 사항을 저장할까요?",
+                confirmText = "저장",
+                onDismiss = { pendingEditJob = null },
+                onConfirm = {
+                    pendingEditJob = null
+                    onSave(editCandidate)
+                }
+            )
         }
     }
 }

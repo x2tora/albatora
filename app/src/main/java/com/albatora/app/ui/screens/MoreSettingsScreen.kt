@@ -23,6 +23,7 @@ import com.albatora.app.BuildConfig
 import com.albatora.app.domain.PayrollCalculator
 import com.albatora.app.model.*
 import com.albatora.app.ui.components.AppUpdateUiState
+import com.albatora.app.ui.components.ConfirmActionDialog
 import com.albatora.app.ui.components.MiuixColorPickerDialog
 import com.albatora.app.ui.components.MiuixGlassIcon
 import com.albatora.app.ui.components.formatRgbHex
@@ -329,6 +330,7 @@ fun MoreSettingsScreen(
     }
 
     // Saved short-term templates list
+    var pendingDeleteTemplate by remember { mutableStateOf<ShortTermTemplate?>(null) }
     OverlayDialog(
         show = showTemplatesDialog,
         title = "단기 알바 프리셋 관리",
@@ -355,7 +357,7 @@ fun MoreSettingsScreen(
                                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                             )
                         }
-                        IconButton(onClick = { onDeleteTemplate(tpl.id) }) {
+                        IconButton(onClick = { pendingDeleteTemplate = tpl }) {
                             Icon(MiuixIcons.Delete, contentDescription = "프리셋 삭제")
                         }
                     }
@@ -367,6 +369,22 @@ fun MoreSettingsScreen(
                 modifier = Modifier.fillMaxWidth()
             )
         }
+    }
+
+    val tplToDelete = pendingDeleteTemplate
+    if (tplToDelete != null) {
+        ConfirmActionDialog(
+            show = true,
+            title = "프리셋 삭제",
+            summary = "'${tplToDelete.name}' 프리셋을 삭제할까요?",
+            confirmText = "삭제",
+            isDestructive = true,
+            onDismiss = { pendingDeleteTemplate = null },
+            onConfirm = {
+                onDeleteTemplate(tplToDelete.id)
+                pendingDeleteTemplate = null
+            }
+        )
     }
 
     // Clipboard JSON export/restore

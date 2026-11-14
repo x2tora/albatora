@@ -1712,6 +1712,8 @@ private fun TangibleItemsManagerSheet(
     var emojiText by remember(show) { mutableStateOf("store") }
     var priceText by remember(show) { mutableStateOf("") }
     var showEmojiPicker by remember { mutableStateOf(false) }
+    var pendingDeleteItem by remember { mutableStateOf<TangibleItem?>(null) }
+    var pendingEditItem by remember { mutableStateOf<TangibleItem?>(null) }
 
     OverlayBottomSheet(
         show = show,
@@ -1779,7 +1781,7 @@ private fun TangibleItemsManagerSheet(
                         }) {
                             Icon(MiuixIcons.Edit, contentDescription = "수정")
                         }
-                        IconButton(onClick = { onDelete(item.id) }) {
+                        IconButton(onClick = { pendingDeleteItem = item }) {
                             Icon(MiuixIcons.Delete, contentDescription = "삭제")
                         }
                     }
@@ -1837,10 +1839,14 @@ private fun TangibleItemsManagerSheet(
                             unitPrice = price,
                             isDefault = editingItem?.isDefault ?: false
                         )
-                        onUpsert(next)
-                        editingItem = null
-                        nameText = ""
-                        priceText = ""
+                        if (editingItem != null) {
+                            pendingEditItem = next
+                        } else {
+                            onUpsert(next)
+                            editingItem = null
+                            nameText = ""
+                            priceText = ""
+                        }
                     }
                 },
                 colors = ButtonDefaults.textButtonColorsPrimary(),
@@ -1858,6 +1864,45 @@ private fun TangibleItemsManagerSheet(
         onDismiss = { showEmojiPicker = false },
         onSelect = { emojiText = it.ifBlank { "promotions" } }
     )
+
+    val itemToDelete = pendingDeleteItem
+    if (itemToDelete != null) {
+        ConfirmActionDialog(
+            show = true,
+            title = "체감 아이템 삭제",
+            summary = "'${itemToDelete.name}' 항목을 삭제할까요?",
+            confirmText = "삭제",
+            isDestructive = true,
+            onDismiss = { pendingDeleteItem = null },
+            onConfirm = {
+                onDelete(itemToDelete.id)
+                if (editingItem?.id == itemToDelete.id) {
+                    editingItem = null
+                    nameText = ""
+                    priceText = ""
+                }
+                pendingDeleteItem = null
+            }
+        )
+    }
+
+    val itemToEdit = pendingEditItem
+    if (itemToEdit != null) {
+        ConfirmActionDialog(
+            show = true,
+            title = "체감 아이템 수정",
+            summary = "'${itemToEdit.name}' 항목의 변경 내용을 저장할까요?",
+            confirmText = "저장",
+            onDismiss = { pendingEditItem = null },
+            onConfirm = {
+                onUpsert(itemToEdit)
+                editingItem = null
+                nameText = ""
+                priceText = ""
+                pendingEditItem = null
+            }
+        )
+    }
 }
 
 @Composable
@@ -1872,6 +1917,8 @@ private fun WishlistGoalEditSheet(
     var emojiText by remember(show, existingGoal) { mutableStateOf(existingGoal?.emoji ?: "update") }
     var targetText by remember(show, existingGoal) { mutableStateOf(existingGoal?.targetAmount?.toString() ?: "") }
     var showEmojiPicker by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+    var pendingEditGoal by remember { mutableStateOf<WishlistGoal?>(null) }
 
     OverlayBottomSheet(
         show = show,
@@ -1926,7 +1973,7 @@ private fun WishlistGoalEditSheet(
                 if (existingGoal != null) {
                     TextButton(
                         text = "삭제",
-                        onClick = { onDelete(existingGoal.id) },
+                        onClick = { showDeleteConfirm = true },
                         modifier = Modifier.weight(0.8f)
                     )
                 }
@@ -1936,15 +1983,18 @@ private fun WishlistGoalEditSheet(
                         val clean = titleText.trim()
                         val target = targetText.toLongOrNull() ?: 0L
                         if (clean.isNotEmpty() && target > 0L) {
-                            onSave(
-                                WishlistGoal(
-                                    id = existingGoal?.id ?: UUID.randomUUID().toString(),
-                                    title = clean,
-                                    emoji = emojiText.ifBlank { "update" },
-                                    targetAmount = target,
-                                    createdAtMillis = existingGoal?.createdAtMillis ?: System.currentTimeMillis()
-                                )
+                            val built = WishlistGoal(
+                                id = existingGoal?.id ?: UUID.randomUUID().toString(),
+                                title = clean,
+                                emoji = emojiText.ifBlank { "update" },
+                                targetAmount = target,
+                                createdAtMillis = existingGoal?.createdAtMillis ?: System.currentTimeMillis()
                             )
+                            if (existingGoal != null) {
+                                pendingEditGoal = built
+                            } else {
+                                onSave(built)
+                            }
                         }
                     },
                     colors = ButtonDefaults.textButtonColorsPrimary(),
@@ -1963,4 +2013,34 @@ private fun WishlistGoalEditSheet(
         onDismiss = { showEmojiPicker = false },
         onSelect = { emojiText = it.ifBlank { "update" } }
     )
+
+    if (showDeleteConfirm && existingGoal != null) {
+        ConfirmActionDialog(
+            show = true,
+            title = "목표 삭제",
+            summary = "'${existingGoal.title}' 목표를 삭제할까요?",
+            confirmText = "삭제",
+            isDestructive = true,
+            onDismiss = { showDeleteConfirm = false },
+            onConfirm = {
+                showDeleteConfirm = false
+                onDelete(existingGoal.id)
+            }
+        )
+    }
+
+    val goalToEdit = pendingEditGoal
+    if (goalToEdit != null) {
+        ConfirmActionDialog(
+            show = true,
+            title = "목표 수정",
+            summary = "'${goalToEdit.title}' 목표의 변경 내용을 저장할까요?",
+            confirmText = "저장",
+            onDismiss = { pendingEditGoal = null },
+            onConfirm = {
+                pendingEditGoal = null
+                onSave(goalToEdit)
+            }
+        )
+    }
 }

@@ -544,3 +544,42 @@ fun dayOfWeekKorean(dayOfWeek: Int): String = when (dayOfWeek) {
     7 -> "일"
     else -> ""
 }
+
+@Composable
+fun ConfirmActionDialog(
+    show: Boolean,
+    title: String,
+    summary: String,
+    confirmText: String,
+    isDestructive: Boolean = false,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    OverlayDialog(
+        show = show,
+        title = title,
+        summary = summary,
+        onDismissRequest = onDismiss
+    ) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            TextButton(
+                text = "취소",
+                onClick = onDismiss,
+                modifier = Modifier.weight(1f)
+            )
+            TextButton(
+                text = confirmText,
+                onClick = onConfirm,
+                colors = if (isDestructive) {
+                    ButtonDefaults.textButtonColors(
+                        color = MiuixTheme.colorScheme.error,
+                        textColor = Color.White
+                    )
+                } else {
+                    ButtonDefaults.textButtonColorsPrimary()
+                },
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}

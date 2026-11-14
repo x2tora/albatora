@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import com.albatora.app.domain.CalendarDayScheduleItem
 import com.albatora.app.domain.PayrollCalculator
 import com.albatora.app.model.*
+import com.albatora.app.ui.components.ConfirmActionDialog
 import com.albatora.app.ui.components.MiuixEntityBadge
 import com.albatora.app.ui.components.MiuixGlassIcon
 import com.albatora.app.ui.components.MiuixTimePickerDialog
@@ -73,6 +74,8 @@ fun CalendarScreen(
     }
     var activeStampTemplate by remember { mutableStateOf<ShortTermTemplate?>(null) }
     var showSubstituteDialog by remember { mutableStateOf(false) }
+    var pendingEarlyLeaveRecord by remember { mutableStateOf<WorkRecord?>(null) }
+    var pendingAbsentRecord by remember { mutableStateOf<WorkRecord?>(null) }
 
     val nowDt = remember { LocalDateTime.now() }
     val selectedItems = remember(state, selectedDate) {
@@ -386,8 +389,7 @@ fun CalendarScreen(
                         onClick = {
                             val targetRec = primaryItem?.record
                             if (targetRec != null) {
-                                onMarkEarlyLeave(targetRec)
-                                onNotify("${targetRec.title} 조퇴 처리 완료")
+                                pendingEarlyLeaveRecord = targetRec
                             } else {
                                 onNotify("조퇴 처리할 근무가 해당 날짜에 없습니다.")
                             }
@@ -402,8 +404,7 @@ fun CalendarScreen(
                         onClick = {
                             val targetRec = primaryItem?.record
                             if (targetRec != null) {
-                                onMarkAbsent(targetRec)
-                                onNotify("${targetRec.title} 결근 처리 (주휴수당 제외 규칙 자동 연동)")
+                                pendingAbsentRecord = targetRec
                             } else {
                                 onNotify("결근 처리할 스케줄/근무가 해당 날짜에 없습니다.")
                             }
@@ -530,6 +531,39 @@ fun CalendarScreen(
                 onAddSubstituteFromJob(job, selectedDate, sMin, eMin, brkMins, BreakPayType.UNPAID)
                 showSubstituteDialog = false
                 onNotify("${job.name} 대타 근무 추가 완료")
+            }
+        )
+    }
+
+    val earlyRec = pendingEarlyLeaveRecord
+    if (earlyRec != null) {
+        ConfirmActionDialog(
+            show = true,
+            title = "조퇴 처리",
+            summary = "'${earlyRec.title}' (${earlyRec.date}) 근무를 조퇴(-1시간) 처리할까요?",
+            confirmText = "처리",
+            onDismiss = { pendingEarlyLeaveRecord = null },
+            onConfirm = {
+                onMarkEarlyLeave(earlyRec)
+                onNotify("${earlyRec.title} 조퇴 처리 완료")
+                pendingEarlyLeaveRecord = null
+            }
+        )
+    }
+
+    val absentRec = pendingAbsentRecord
+    if (absentRec != null) {
+        ConfirmActionDialog(
+            show = true,
+            title = "결근 처리",
+            summary = "'${absentRec.title}' (${absentRec.date}) 근무를 결근 처리할까요? 주휴수당 제외 규칙이 자동 연동됩니다.",
+            confirmText = "결근 처리",
+            isDestructive = true,
+            onDismiss = { pendingAbsentRecord = null },
+            onConfirm = {
+                onMarkAbsent(absentRec)
+                onNotify("${absentRec.title} 결근 처리 (주휴수당 제외 규칙 자동 연동)")
+                pendingAbsentRecord = null
             }
         )
     }
