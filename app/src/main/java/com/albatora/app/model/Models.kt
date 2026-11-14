@@ -297,6 +297,8 @@ data class AppSettings(
     val monetEnabled: Boolean = false,
     val customKeyColorHex: Long? = null,
     val ongoingNotificationEnabled: Boolean = true,
+    val autoDndEnabled: Boolean = false,
+    val hasShownBatteryPrompt: Boolean = false,
     val defaultMinWage: Long = DEFAULT_2026_MIN_WAGE,
     val selectedTangibleItemId: String = "tangible_americano",
     val widgetConfig: WidgetConfig = WidgetConfig()
@@ -312,12 +314,24 @@ data class AppSettings(
 }
 
 @Serializable
+data class ArchivedGoalAchievement(
+    val id: String,
+    val title: String,
+    val emoji: String = "favorites",
+    val targetAmount: Long,
+    val achievedAmount: Long,
+    val estimatedWorkHours: Double,
+    val achievedAtMillis: Long = System.currentTimeMillis()
+)
+
+@Serializable
 data class AlbaToraDataState(
     val jobs: List<Job> = emptyList(),
     val records: List<WorkRecord> = emptyList(),
     val templates: List<ShortTermTemplate> = emptyList(),
     val tangibleItems: List<TangibleItem> = emptyList(),
     val wishlistGoals: List<WishlistGoal> = emptyList(),
+    val archivedGoals: List<ArchivedGoalAchievement> = emptyList(),
     val activeStopwatches: List<ActiveStopwatchSession> = emptyList(),
     val scheduledRuntimes: List<ScheduledShiftRuntime> = emptyList(),
     val settings: AppSettings = AppSettings(),

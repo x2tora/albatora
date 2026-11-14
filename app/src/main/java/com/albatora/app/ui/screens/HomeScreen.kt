@@ -33,9 +33,11 @@ import top.yukonga.miuix.kmp.squircle.squircleClip
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import java.time.DayOfWeek
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.YearMonth
+import java.time.ZoneId
 import java.time.temporal.TemporalAdjusters
 import java.util.Locale
 import java.util.UUID
@@ -73,6 +75,8 @@ fun HomeScreen(
     onDeleteTangibleItem: (String) -> Unit,
     onUpsertWishlistGoal: (WishlistGoal) -> Unit,
     onDeleteWishlistGoal: (String) -> Unit,
+    onArchiveWishlistGoal: (String, Long) -> Unit = { _, _ -> },
+    onDeleteArchivedGoal: (String) -> Unit = {},
     onOpenCalendar: () -> Unit = {},
     onOpenCalculator: () -> Unit = {},
     onOpenWidgetStudio: () -> Unit = {}
@@ -97,6 +101,7 @@ fun HomeScreen(
     var showTangibleManager by remember { mutableStateOf(false) }
     var editingGoal by remember { mutableStateOf<WishlistGoal?>(null) }
     var showGoalSheet by remember { mutableStateOf(false) }
+    var showGoalArchiveSheet by remember { mutableStateOf(false) }
 
     LaunchedEffect(openStopwatchTrigger) {
         if (openStopwatchTrigger > 0) {
@@ -401,17 +406,32 @@ fun HomeScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     SmallTitle(text = "목표 금액 (위시리스트) 달성률")
-                    Text(
-                        text = "+ 목표 추가",
-                        style = MiuixTheme.textStyles.footnote1.copy(fontWeight = FontWeight.Medium),
-                        color = MiuixTheme.colorScheme.primary,
-                        modifier = Modifier
-                            .clickable {
-                                editingGoal = null
-                                showGoalSheet = true
-                            }
-                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                    )
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (state.archivedGoals.isNotEmpty()) {
+                            Text(
+                                text = "아카이브 (${state.archivedGoals.size})",
+                                style = MiuixTheme.textStyles.footnote1.copy(fontWeight = FontWeight.Medium),
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                modifier = Modifier
+                                    .clickable { showGoalArchiveSheet = true }
+                                    .padding(horizontal = 6.dp, vertical = 4.dp)
+                            )
+                        }
+                        Text(
+                            text = "+ 목표 추가",
+                            style = MiuixTheme.textStyles.footnote1.copy(fontWeight = FontWeight.Medium),
+                            color = MiuixTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .clickable {
+                                    editingGoal = null
+                                    showGoalSheet = true
+                                }
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
                 }
                 if (state.wishlistGoals.isEmpty()) {
                     Card(
@@ -513,6 +533,17 @@ fun HomeScreen(
                                             text = "목표 ${PayrollCalculator.formatWon(goal.targetAmount)}",
                                             style = MiuixTheme.textStyles.footnote2.copy(fontFeatureSettings = "tnum"),
                                             color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                                        )
+                                    }
+                                    if (pct >= 1f) {
+                                        SquirclePillBadge(
+                                            text = "달성 완료 · 아카이브 보관",
+                                            backgroundColor = Color(0xFF10B981).copy(alpha = 0.16f),
+                                            contentColor = Color(0xFF059669),
+                                            leadingIcon = MiuixIcons.Ok,
+                                            onClick = {
+                                                onArchiveWishlistGoal(goal.id, liveCumulative.toLong())
+                                            }
                                         )
                                     }
                                 }
@@ -765,6 +796,13 @@ fun HomeScreen(
                 onDeleteWishlistGoal(id)
                 showGoalSheet = false
             }
+        )
+
+        GoalArchiveBottomSheet(
+            show = showGoalArchiveSheet,
+            archivedGoals = state.archivedGoals,
+            onDismiss = { showGoalArchiveSheet = false },
+            onDeleteArchive = onDeleteArchivedGoal
         )
     }
 }
@@ -2078,6 +2116,107 @@ private fun WishlistGoalEditSheet(
             onConfirm = {
                 pendingEditGoal = null
                 onSave(goalToEdit)
+            }
+        )
+    }
+}
+
+@Composable
+private fun GoalArchiveBottomSheet(
+    show: Boolean,
+    archivedGoals: List<ArchivedGoalAchievement>,
+    onDismiss: () -> Unit,
+    onDeleteArchive: (String) -> Unit
+) {
+    var pendingDelete by remember { mutableStateOf<ArchivedGoalAchievement?>(null) }
+
+    OverlayBottomSheet(
+        show = show,
+        title = "목표 달성 아카이브",
+        onDismissRequest = onDismiss
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            if (archivedGoals.isEmpty()) {
+                Text(
+                    text = "아직 달성한 목표가 없습니다. 목표 100%를 달성하면 이곳에 보관할 수 있습니다.",
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                )
+            } else {
+                archivedGoals.forEach { item ->
+                    val achievedDate = remember(item.achievedAtMillis) {
+                        PayrollCalculator.formatDate(
+                            Instant.ofEpochMilli(item.achievedAtMillis)
+                                .atZone(ZoneId.systemDefault())
+                                .toLocalDate()
+                        )
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .squircleBackground(MiuixTheme.colorScheme.surfaceContainer, 14.dp)
+                            .padding(horizontal = 12.dp, vertical = 12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            MiuixEntityBadge(
+                                emoji = item.emoji,
+                                fallbackIcon = MiuixIcons.Favorites,
+                                accentColor = Color(0xFF10B981),
+                                size = 40.dp,
+                                cornerRadius = 11.dp
+                            )
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(
+                                    text = item.title,
+                                    style = MiuixTheme.textStyles.body2.copy(fontWeight = FontWeight.SemiBold),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = "${PayrollCalculator.formatWon(item.targetAmount)} · 약 ${String.format(Locale.US, "%.1f", item.estimatedWorkHours)}시간 근무로 달성",
+                                    style = MiuixTheme.textStyles.footnote2.copy(fontFeatureSettings = "tnum"),
+                                    color = MiuixTheme.colorScheme.primary
+                                )
+                                Text(
+                                    text = "달성일 $achievedDate",
+                                    style = MiuixTheme.textStyles.footnote2,
+                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                                )
+                            }
+                        }
+                        IconButton(onClick = { pendingDelete = item }) {
+                            Icon(MiuixIcons.Delete, contentDescription = "아카이브 삭제")
+                        }
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+    }
+
+    val targetDelete = pendingDelete
+    if (targetDelete != null) {
+        ConfirmActionDialog(
+            show = true,
+            title = "아카이브 기록 삭제",
+            summary = "'${targetDelete.title}' 달성 기록을 삭제할까요?",
+            confirmText = "삭제",
+            isDestructive = true,
+            onDismiss = { pendingDelete = null },
+            onConfirm = {
+                onDeleteArchive(targetDelete.id)
+                pendingDelete = null
             }
         )
     }

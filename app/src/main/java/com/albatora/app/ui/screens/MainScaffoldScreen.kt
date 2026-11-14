@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.albatora.app.domain.PayrollCalculator
 import com.albatora.app.model.ThemeColorStyle
+import com.albatora.app.service.BatteryOptimizationHelper
 import com.albatora.app.ui.components.AppUpdateDialog
 import com.albatora.app.ui.components.FloatingLiquidGlassNavBar
 import com.albatora.app.ui.components.StackedToastHost
@@ -438,6 +439,11 @@ private fun MainTabsHost(
                                 onDeleteTangibleItem = viewModel::deleteTangibleItem,
                                 onUpsertWishlistGoal = viewModel::upsertWishlistGoal,
                                 onDeleteWishlistGoal = viewModel::deleteWishlistGoal,
+                                onArchiveWishlistGoal = { id, amt ->
+                                    viewModel.archiveWishlistGoal(id, amt)
+                                    notify("목표 달성을 아카이브에 보관했습니다!")
+                                },
+                                onDeleteArchivedGoal = viewModel::deleteArchivedGoal,
                                 onOpenCalendar = { selectedTab = 1 },
                                 onOpenCalculator = { selectedTab = 3 },
                                 onOpenWidgetStudio = onOpenWidgetStudio
@@ -620,6 +626,33 @@ private fun MainTabsHost(
                         )
                     }
                 }
+            } else if (!state.settings.hasShownBatteryPrompt &&
+                !updateUiState.showDialog &&
+                !BatteryOptimizationHelper.isIgnoringBatteryOptimizations(hostContext)
+            ) {
+                OverlayDialog(
+                    show = true,
+                    title = "백그라운드 항상 실행 허용",
+                    summary = "상단바 실시간 알림을 꺼두더라도 자동 방해금지, 위젯, 실시간 급여 계산이 백그라운드에서 끊기지 않도록 배터리 최적화 예외(제한 없음) 권한을 허용해 주세요.",
+                    onDismissRequest = { viewModel.markBatteryPromptShown() }
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        TextButton(
+                            text = "나중에",
+                            onClick = { viewModel.markBatteryPromptShown() },
+                            modifier = Modifier.weight(0.9f)
+                        )
+                        TextButton(
+                            text = "권한 허용",
+                            onClick = {
+                                viewModel.markBatteryPromptShown()
+                                BatteryOptimizationHelper.requestIgnoreBatteryOptimizations(hostContext)
+                            },
+                            colors = ButtonDefaults.textButtonColorsPrimary(),
+                            modifier = Modifier.weight(1.1f)
+                        )
+                    }
+                }
             }
         }
     }
@@ -667,6 +700,7 @@ private fun SettingsScreenHost(
                 onUpdateThemeColorStyle = viewModel::updateThemeColorStyle,
                 onUpdateCustomKeyColor = viewModel::updateCustomKeyColor,
                 onUpdateOngoingNotification = viewModel::updateOngoingNotification,
+                onUpdateAutoDnd = viewModel::updateAutoDnd,
                 onUpdateDefaultMinWage = viewModel::updateDefaultMinWage,
                 onDeleteTemplate = viewModel::deleteTemplate,
                 onExportJson = viewModel::exportBackupJson,

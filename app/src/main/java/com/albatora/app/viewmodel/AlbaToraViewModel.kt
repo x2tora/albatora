@@ -287,6 +287,8 @@ class AlbaToraViewModel(application: Application) : AndroidViewModel(application
 
     fun upsertWishlistGoal(goal: WishlistGoal) = stateHolder.upsertWishlistGoal(goal)
     fun deleteWishlistGoal(goalId: String) = stateHolder.deleteWishlistGoal(goalId)
+    fun archiveWishlistGoal(goalId: String, achievedAmount: Long) = stateHolder.archiveWishlistGoal(goalId, achievedAmount)
+    fun deleteArchivedGoal(archiveId: String) = stateHolder.deleteArchivedGoal(archiveId)
 
     fun updateTheme(option: ThemeOption) = stateHolder.updateSettings { it.copy(themeOption = option) }
     fun updateThemeColorStyle(style: ThemeColorStyle) = stateHolder.updateSettings {
@@ -304,6 +306,8 @@ class AlbaToraViewModel(application: Application) : AndroidViewModel(application
         )
     }
     fun updateOngoingNotification(enabled: Boolean) = stateHolder.updateSettings { it.copy(ongoingNotificationEnabled = enabled) }
+    fun updateAutoDnd(enabled: Boolean) = stateHolder.updateSettings { it.copy(autoDndEnabled = enabled) }
+    fun markBatteryPromptShown() = stateHolder.updateSettings { it.copy(hasShownBatteryPrompt = true) }
     fun updateDefaultMinWage(wage: Long) = stateHolder.updateSettings { it.copy(defaultMinWage = wage.coerceAtLeast(1L)) }
     fun updateWidgetConfig(transform: (WidgetConfig) -> WidgetConfig) = stateHolder.updateSettings {
         it.copy(widgetConfig = transform(it.widgetConfig))

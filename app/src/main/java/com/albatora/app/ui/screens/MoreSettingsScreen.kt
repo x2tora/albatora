@@ -22,6 +22,8 @@ import androidx.compose.ui.unit.dp
 import com.albatora.app.BuildConfig
 import com.albatora.app.domain.PayrollCalculator
 import com.albatora.app.model.*
+import com.albatora.app.service.AutoDndController
+import com.albatora.app.service.BatteryOptimizationHelper
 import com.albatora.app.ui.components.AppUpdateUiState
 import com.albatora.app.ui.components.ConfirmActionDialog
 import com.albatora.app.ui.components.MiuixColorPickerDialog
@@ -49,6 +51,7 @@ fun MoreSettingsScreen(
     onUpdateThemeColorStyle: (ThemeColorStyle) -> Unit,
     onUpdateCustomKeyColor: (Long?) -> Unit,
     onUpdateOngoingNotification: (Boolean) -> Unit,
+    onUpdateAutoDnd: (Boolean) -> Unit,
     onUpdateDefaultMinWage: (Long) -> Unit,
     onDeleteTemplate: (String) -> Unit,
     onExportJson: () -> String,
@@ -66,6 +69,22 @@ fun MoreSettingsScreen(
     var showAppColorDialog by remember { mutableStateOf(false) }
     var showTemplatesDialog by remember { mutableStateOf(false) }
     var showPasteRestoreDialog by remember { mutableStateOf(false) }
+    var showDndPermissionDialog by remember { mutableStateOf(false) }
+    var hasDndAccess by remember { mutableStateOf(AutoDndController.hasPolicyAccess(context)) }
+    var hasBatteryExemption by remember {
+        mutableStateOf(BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context))
+    }
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                hasDndAccess = AutoDndController.hasPolicyAccess(context)
+                hasBatteryExemption = BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     var showResetConfirm by remember { mutableStateOf(false) }
 
     val exportFileLauncher = rememberLauncherForActivityResult(
@@ -189,6 +208,49 @@ fun MoreSettingsScreen(
                     }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                SwitchPreference(
+                    title = "알바 중 자동 방해금지(무음)",
+                    summary = when {
+                        !hasDndAccess -> "방해금지 권한을 허용하면 근무 시작 시 자동 무음 전환됩니다"
+                        state.settings.autoDndEnabled -> "근무 중 방해금지 자동 켜기 · 휴게/퇴근 시 원래 상태로 복원"
+                        else -> "근무 중 알림 방해를 자동으로 차단하고 퇴근 시 해제합니다"
+                    },
+                    checked = state.settings.autoDndEnabled && hasDndAccess,
+                    onCheckedChange = { enabled ->
+                        if (enabled && !AutoDndController.hasPolicyAccess(context)) {
+                            showDndPermissionDialog = true
+                        } else {
+                            onUpdateAutoDnd(enabled)
+                            onNotify(if (enabled) "알바 중 자동 방해금지가 켜졌습니다." else "알바 중 자동 방해금지가 꺼졌습니다.")
+                        }
+                    },
+                    startAction = {
+                        PreferenceStartIcon(MiuixIcons.Timer, Color(0xFF6366F1))
+                    }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                ArrowPreference(
+                    title = "백그라운드 항상 실행 (배터리 최적화 제외)",
+                    summary = if (hasBatteryExemption) {
+                        "허용됨 · 상단바 알림이 꺼져 있어도 백그라운드 동작 유지"
+                    } else {
+                        "미허용 · 탭하여 배터리 최적화 제외(제한 없음) 권한 허용"
+                    },
+                    onClick = {
+                        if (hasBatteryExemption) {
+                            onNotify("이미 백그라운드 항상 실행이 허용되어 있습니다.")
+                        } else {
+                            BatteryOptimizationHelper.requestIgnoreBatteryOptimizations(context)
+                        }
+                    },
+                    startAction = {
+                        PreferenceStartIcon(
+                            MiuixIcons.Lock,
+                            if (hasBatteryExemption) Color(0xFF10B981) else Color(0xFFF59E0B)
+                        )
+                    }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 ArrowPreference(
                     title = "기본 최저시급 설정",
                     summary = "현재 기본값: ${PayrollCalculator.formatWon(state.settings.defaultMinWage)} (2026 기준)",
@@ -292,6 +354,20 @@ fun MoreSettingsScreen(
             onNotify("커스텀 포인트 색상이 ${formatRgbHex(chosenHex)}로 적용되었습니다.")
         }
     )
+
+    if (showDndPermissionDialog) {
+        ConfirmActionDialog(
+            show = true,
+            title = "방해금지 권한 필요",
+            summary = "알바 중 자동 방해금지(무음) 기능을 사용하려면 시스템 설정에서 알바토라의 '방해 금지 권한'을 허용해 주세요.",
+            confirmText = "설정으로 이동",
+            onDismiss = { showDndPermissionDialog = false },
+            onConfirm = {
+                showDndPermissionDialog = false
+                AutoDndController.openPolicyAccessSettings(context)
+            }
+        )
+    }
 
     // Default minimum wage editor
     var wageText by remember(showMinWageDialog, state.settings.defaultMinWage) {

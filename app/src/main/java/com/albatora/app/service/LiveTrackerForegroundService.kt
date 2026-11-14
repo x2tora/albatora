@@ -32,8 +32,11 @@ class LiveTrackerForegroundService : Service() {
         val stateHolder = AlbaToraStateHolder.getInstance(applicationContext)
         val currentState = stateHolder.state.value
         val snapshot = PayrollCalculator.evaluateLiveDashboard(currentState, System.currentTimeMillis())
+        AutoDndController.sync(applicationContext, currentState.settings, snapshot)
 
-        if (!currentState.settings.ongoingNotificationEnabled || snapshot.activeShifts.isEmpty()) {
+        if ((!currentState.settings.ongoingNotificationEnabled && !currentState.settings.autoDndEnabled) ||
+            snapshot.activeShifts.isEmpty()
+        ) {
             stopSelf()
             return START_NOT_STICKY
         }
@@ -51,7 +54,10 @@ class LiveTrackerForegroundService : Service() {
                 val stateHolder = AlbaToraStateHolder.getInstance(applicationContext)
                 val st = stateHolder.state.value
                 val live = PayrollCalculator.evaluateLiveDashboard(st, System.currentTimeMillis())
-                if (!st.settings.ongoingNotificationEnabled || live.activeShifts.isEmpty()) {
+                AutoDndController.sync(applicationContext, st.settings, live)
+                if ((!st.settings.ongoingNotificationEnabled && !st.settings.autoDndEnabled) ||
+                    live.activeShifts.isEmpty()
+                ) {
                     AlbaToraWidgetUpdater.updateAll(applicationContext)
                     stopSelf()
                     break
@@ -148,6 +154,10 @@ class LiveTrackerForegroundService : Service() {
     }
 
     override fun onDestroy() {
+        val stateHolder = AlbaToraStateHolder.getInstance(applicationContext)
+        val st = stateHolder.state.value
+        val live = PayrollCalculator.evaluateLiveDashboard(st, System.currentTimeMillis())
+        AutoDndController.sync(applicationContext, st.settings, live)
         tickerJob?.cancel()
         serviceScope.cancel()
         super.onDestroy()

@@ -7,6 +7,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import com.albatora.app.domain.PayrollCalculator
 import com.albatora.app.model.*
+import com.albatora.app.service.AutoDndController
 import com.albatora.app.service.LiveTrackerForegroundService
 import com.albatora.app.widget.AlbaToraWidgetUpdater
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -41,11 +42,12 @@ class AlbaToraStateHolder private constructor(context: Context) {
     }
 
     fun syncForegroundService(currentState: AlbaToraDataState = _state.value) {
-        if (!currentState.settings.ongoingNotificationEnabled) {
+        val live = PayrollCalculator.evaluateLiveDashboard(currentState, System.currentTimeMillis())
+        AutoDndController.sync(appContext, currentState.settings, live)
+        if (!currentState.settings.ongoingNotificationEnabled && !currentState.settings.autoDndEnabled) {
             LiveTrackerForegroundService.stop(appContext)
             return
         }
-        val live = PayrollCalculator.evaluateLiveDashboard(currentState, System.currentTimeMillis())
         if (live.activeShifts.isNotEmpty()) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 val granted = appContext.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
@@ -550,6 +552,43 @@ class AlbaToraStateHolder private constructor(context: Context) {
     fun deleteWishlistGoal(goalId: String) {
         updateAndPersist { st ->
             st.copy(wishlistGoals = st.wishlistGoals.filterNot { it.id == goalId })
+        }
+    }
+
+    fun archiveWishlistGoal(goalId: String, achievedAmount: Long) {
+        updateAndPersist { st ->
+            val goal = st.wishlistGoals.find { it.id == goalId } ?: return@updateAndPersist st
+            val totalMinutes = st.records.sumOf {
+                PayrollCalculator.calculateShiftFinancials(it).paidWorkMinutes
+            }
+            val totalNet = st.records.sumOf {
+                PayrollCalculator.calculateShiftFinancials(it).netPay
+            }
+            val effectiveHourly = if (totalMinutes > 0 && totalNet > 0L) {
+                (totalNet.toDouble() / (totalMinutes / 60.0)).coerceAtLeast(1.0)
+            } else {
+                st.settings.defaultMinWage.toDouble().coerceAtLeast(1.0)
+            }
+            val estimatedHours = (goal.targetAmount.toDouble() / effectiveHourly).coerceAtLeast(0.1)
+            val archived = ArchivedGoalAchievement(
+                id = UUID.randomUUID().toString(),
+                title = goal.title,
+                emoji = goal.emoji,
+                targetAmount = goal.targetAmount,
+                achievedAmount = achievedAmount.coerceAtLeast(goal.targetAmount),
+                estimatedWorkHours = estimatedHours,
+                achievedAtMillis = System.currentTimeMillis()
+            )
+            st.copy(
+                wishlistGoals = st.wishlistGoals.filterNot { it.id == goalId },
+                archivedGoals = listOf(archived) + st.archivedGoals
+            )
+        }
+    }
+
+    fun deleteArchivedGoal(archiveId: String) {
+        updateAndPersist { st ->
+            st.copy(archivedGoals = st.archivedGoals.filterNot { it.id == archiveId })
         }
     }
 
