@@ -1,8 +1,11 @@
 package com.albatora.app.ui.screens
 
 import android.Manifest
+import android.app.Activity
 import android.content.pm.PackageManager
 import android.os.Build
+import android.os.SystemClock
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -257,6 +260,30 @@ private fun MainTabsHost(
     var isFullscreenFocus by remember { mutableStateOf(false) }
     var showHomeQuickMenu by remember { mutableStateOf(false) }
     var openStopwatchTrigger by remember { mutableIntStateOf(0) }
+    val hostContext = LocalContext.current
+    var lastBackPressedAtMs by remember { mutableLongStateOf(0L) }
+
+    BackHandler(enabled = !showHomeQuickMenu) {
+        when {
+            isFullscreenFocus && selectedTab == 0 -> {
+                isFullscreenFocus = false
+            }
+            selectedTab != 0 -> {
+                selectedTab = 0
+                recordsOpenUnpaid = false
+                lastBackPressedAtMs = 0L
+            }
+            else -> {
+                val now = SystemClock.elapsedRealtime()
+                if (now - lastBackPressedAtMs <= 2_000L) {
+                    (hostContext as? Activity)?.finish()
+                } else {
+                    lastBackPressedAtMs = now
+                    toastState.show("뒤로가기를 한 번 더 누르면 앱이 종료됩니다.")
+                }
+            }
+        }
+    }
 
     LaunchedEffect(launchActionNonce) {
         if (launchActionNonce > 0) {
