@@ -920,7 +920,7 @@ object PayrollCalculator {
             fixedBreakStartMinute != null && fixedBreakEndMinute != null &&
             fixedBreakStartMinute != fixedBreakEndMinute
 
-        // Proration factor for proportional unpaid break (Q16=A) when no fixed break or manual pause
+        // Proration factor for proportional unpaid break when no fixed break or manual pause is active
         val plannedTotalMs = if (plannedEndEpochMillis != null && plannedEndEpochMillis > startEpochMillis) {
             plannedEndEpochMillis - startEpochMillis
         } else null
@@ -990,7 +990,7 @@ object PayrollCalculator {
         val effectivelyPaused = isManualPaused || inFixedBreakNow
         val pauseReason = when {
             isManualPaused -> "수동 휴게 중"
-            inFixedBreakNow -> "고정 휴게 시간 (${formatMinutes(fixedBreakStartMinute ?: 0)}~${formatMinutes(fixedBreakEndMinute ?: 0)})"
+            inFixedBreakNow -> "고정 휴게 시간 (${formatMinutes(fixedBreakStartMinute)}~${formatMinutes(fixedBreakEndMinute)})"
             else -> null
         }
 
@@ -1041,7 +1041,7 @@ object PayrollCalculator {
     }
 
     /**
-     * Format payslip text for 1-tap clipboard copy (Q15-2).
+     * Format payslip summary text for clipboard export.
      */
     fun buildPayslipText(
         title: String,

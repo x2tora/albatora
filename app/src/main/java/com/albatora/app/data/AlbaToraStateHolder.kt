@@ -57,7 +57,7 @@ class AlbaToraStateHolder private constructor(context: Context) {
         }
     }
 
-    // --- Jobs CRUD ---
+    // Jobs
     fun upsertJob(job: Job) {
         updateAndPersist { st ->
             val exists = st.jobs.any { it.id == job.id }
@@ -81,7 +81,7 @@ class AlbaToraStateHolder private constructor(context: Context) {
         }
     }
 
-    // --- Work Records CRUD ---
+    // Work records
     fun upsertRecord(record: WorkRecord) {
         updateAndPersist { st ->
             val exists = st.records.any { it.id == record.id }
@@ -116,7 +116,7 @@ class AlbaToraStateHolder private constructor(context: Context) {
         }
     }
 
-    // --- Quick Calendar Actions (Q15-3) ---
+    // Calendar quick actions
     fun applyExtendOneHour(baseRecord: WorkRecord) {
         val dur = PayrollCalculator.rawDurationMinutes(baseRecord.startMinute, baseRecord.endMinute)
         val newDur = dur + 60
@@ -200,7 +200,7 @@ class AlbaToraStateHolder private constructor(context: Context) {
         upsertRecord(rec)
     }
 
-    // --- Short-Term Templates (Q8-2) ---
+    // Short-term templates
     fun upsertTemplate(template: ShortTermTemplate) {
         updateAndPersist { st ->
             val exists = st.templates.any { it.id == template.id }
@@ -250,7 +250,7 @@ class AlbaToraStateHolder private constructor(context: Context) {
         upsertRecord(rec)
     }
 
-    // --- Hybrid Live Tracker Actions ---
+    // Live tracker actions
     fun startManualStopwatch(
         title: String,
         emoji: String = "",
@@ -475,7 +475,7 @@ class AlbaToraStateHolder private constructor(context: Context) {
         }
     }
 
-    // --- Tangible Items (Q19=A) ---
+    // Tangible items
     fun upsertTangibleItem(item: TangibleItem) {
         updateAndPersist { st ->
             val exists = st.tangibleItems.any { it.id == item.id }
@@ -506,7 +506,7 @@ class AlbaToraStateHolder private constructor(context: Context) {
         }
     }
 
-    // --- Wishlist Goals (Q15-1) ---
+    // Wishlist goals
     fun upsertWishlistGoal(goal: WishlistGoal) {
         updateAndPersist { st ->
             val exists = st.wishlistGoals.any { it.id == goal.id }
@@ -525,7 +525,7 @@ class AlbaToraStateHolder private constructor(context: Context) {
         }
     }
 
-    // --- Settings & Backup (Q15-4) ---
+    // Settings and backup
     fun updateSettings(transform: (AppSettings) -> AppSettings) {
         updateAndPersist { st ->
             st.copy(settings = transform(st.settings))

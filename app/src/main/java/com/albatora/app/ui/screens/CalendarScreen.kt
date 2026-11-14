@@ -144,7 +144,7 @@ fun CalendarScreen(
             }
         }
 
-        // Q8-2: 1-tap Stamp Mode for Short-term Presets
+        // One-tap stamp mode for short-term presets
         if (state.templates.isNotEmpty()) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -324,7 +324,7 @@ fun CalendarScreen(
     }
 
     val rightContent: androidx.compose.foundation.lazy.LazyListScope.() -> Unit = {
-        // Q15-3: 1-Tap Quick Actions Bar for Selected Date (supports target selection when multiple shifts exist)
+        // Quick actions bar for the selected date
         item {
             val actionableItems = selectedItems.filter { it.record != null && it.status != ShiftStatus.ABSENT }
             var selectedTargetId by remember(selectedDate) { mutableStateOf<String?>(null) }

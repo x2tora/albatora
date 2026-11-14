@@ -8,7 +8,4 @@
     <color name="widget_accent">#2F54EB</color>
     <color name="widget_accent_soft">#1E2F54EB</color>
     <color name="widget_on_accent">#FFFFFF</color>
-    <color name="widget_green">#16A34A</color>
-    <color name="widget_amber">#D97706</color>
-    <color name="widget_red">#DC2626</color>
 </resources>

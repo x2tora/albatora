@@ -67,7 +67,7 @@ fun AddEditRegularJobScreen(
         )
     }
 
-    // Wage revisions (Q11=B)
+    // Wage revisions
     var wageHistory by remember { mutableStateOf(existingJob?.wageHistory ?: emptyList()) }
     var showAddWageDialog by remember { mutableStateOf(false) }
 
@@ -75,18 +75,18 @@ fun AddEditRegularJobScreen(
     var schedules by remember { mutableStateOf(existingJob?.schedules ?: emptyList()) }
     var editingSlotDay by remember { mutableStateOf<Int?>(null) }
 
-    // Weekly holiday rules (Q9=B)
+    // Weekly holiday rules
     var whEnabled by remember { mutableStateOf(existingJob?.weeklyHoliday?.enabled ?: true) }
     var whExcludeAbsence by remember { mutableStateOf(existingJob?.weeklyHoliday?.excludeOnAbsenceOrEarlyLeave ?: true) }
     var whForceUnder15h by remember { mutableStateOf(existingJob?.weeklyHoliday?.forceIncludeUnder15h ?: false) }
 
-    // Allowance boosts (Q5-3)
+    // Allowance boosts
     var nightEnabled by remember { mutableStateOf(existingJob?.allowance?.nightAllowanceEnabled ?: false) }
     var overtimeEnabled by remember { mutableStateOf(existingJob?.allowance?.overtimeAllowanceEnabled ?: false) }
     var holidayEnabled by remember { mutableStateOf(existingJob?.allowance?.holidayAllowanceEnabled ?: false) }
     var holidayIncludesWeekends by remember { mutableStateOf(existingJob?.allowance?.holidayIncludesWeekends ?: true) }
 
-    // Tax & Settlement (Q17)
+    // Tax and settlement
     var taxMode by remember { mutableStateOf(existingJob?.taxMode ?: TaxMode.NONE) }
     var customTaxText by remember { mutableStateOf((existingJob?.customTaxRatePercent ?: 3.3).toString()) }
     var dailyIncludeLocalTax by remember { mutableStateOf(existingJob?.dailyWorkerIncludeLocalTax ?: true) }
@@ -299,7 +299,7 @@ fun AddEditRegularJobScreen(
                 }
             }
 
-            // Wage History (Q11=B)
+            // Wage history
             item {
                 SmallTitle(text = "시급/급여 변경 이력 (과거 기록 보존)")
                 Card(
@@ -353,7 +353,7 @@ fun AddEditRegularJobScreen(
                 }
             }
 
-            // Weekly Schedules + Break rules (Q10=B, Q16=A)
+            // Weekly schedules and break rules
             item {
                 SmallTitle(text = "정규 근무 요일 · 시간 및 휴게시간")
                 Card(
@@ -441,7 +441,7 @@ fun AddEditRegularJobScreen(
                 }
             }
 
-            // Weekly Holiday & Allowance Boosts (Q9=B, Q5-3)
+            // Weekly holiday and allowance boosts
             item {
                 SmallTitle(text = "주휴수당 및 1.5배 가산수당")
                 Card(modifier = Modifier.fillMaxWidth()) {
@@ -500,7 +500,7 @@ fun AddEditRegularJobScreen(
                 }
             }
 
-            // Tax, Settlement & Payday (Q17)
+            // Tax, settlement, and payday
             item {
                 SmallTitle(text = "세금 공제 · 정산 기간 · 월급날 보정")
                 Card(modifier = Modifier.fillMaxWidth()) {

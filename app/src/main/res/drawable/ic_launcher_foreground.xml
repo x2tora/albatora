@@ -1,35 +1,127 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- Subtle inner squircle glass shine -->
-    <path
-        android:fillColor="#26FFFFFF"
-        android:pathData="M54,22C70,22 86,26 86,54C86,82 70,86 54,86C38,86 22,82 22,54C22,26 38,22 54,22Z" />
-    <!-- Coin / Won circle ring -->
+
+    <!-- Soft ambient cyan-violet radial glow (no hard border) -->
+    <path android:pathData="M54,16A38,38 0 1,1 53.99,16Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:centerX="43"
+                android:centerY="45"
+                android:gradientRadius="38"
+                android:type="radial">
+                <item android:offset="0.0" android:color="#5238BDF8" />
+                <item android:offset="0.45" android:color="#2660A5FA" />
+                <item android:offset="1.0" android:color="#0060A5FA" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <path android:pathData="M54,18A36,36 0 1,1 53.99,18Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:centerX="65"
+                android:centerY="62"
+                android:gradientRadius="36"
+                android:type="radial">
+                <item android:offset="0.0" android:color="#46A78BFA" />
+                <item android:offset="0.50" android:color="#1E818CF8" />
+                <item android:offset="1.0" android:color="#00818CF8" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Feathered multi-step bloom behind chronometer arc (soft glow, no hard border) -->
     <path
         android:fillColor="#00000000"
-        android:pathData="M54,31A23,23 0 1,1 53.99,31Z"
-        android:strokeWidth="4.5"
-        android:strokeColor="#FFFFFFFF" />
-    <!-- Clock hand + Won accent -->
+        android:pathData="M67.5,33.5A24,24 0 1,0 78,54"
+        android:strokeWidth="18"
+        android:strokeColor="#0838BDF8"
+        android:strokeLineCap="round" />
     <path
         android:fillColor="#00000000"
-        android:pathData="M43,47L47.5,63L54,48L60.5,63L65,47"
+        android:pathData="M67.5,33.5A24,24 0 1,0 78,54"
+        android:strokeWidth="13.5"
+        android:strokeColor="#0E38BDF8"
+        android:strokeLineCap="round" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M67.5,33.5A24,24 0 1,0 78,54"
+        android:strokeWidth="9.5"
+        android:strokeColor="#1638BDF8"
+        android:strokeLineCap="round" />
+
+    <!-- Feathered multi-step bloom behind Won symbol -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M42.5,46.5L47.5,63.5L54,48L60.5,63.5L65.5,46.5"
+        android:strokeWidth="16"
+        android:strokeColor="#08A78BFA"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M42.5,46.5L47.5,63.5L54,48L60.5,63.5L65.5,46.5"
+        android:strokeWidth="11.5"
+        android:strokeColor="#10A78BFA"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M42.5,46.5L47.5,63.5L54,48L60.5,63.5L65.5,46.5"
+        android:strokeWidth="8"
+        android:strokeColor="#18A78BFA"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M39.5,53.5L68.5,53.5"
+        android:strokeWidth="11"
+        android:strokeColor="#0E60A5FA"
+        android:strokeLineCap="round" />
+
+    <!-- Crisp white geometric chronometer open arc -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M67.5,33.5A24,24 0 1,0 78,54"
+        android:strokeWidth="4.4"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round" />
+
+    <!-- Crisp white Won (₩) centerpiece -->
+    <path
+        android:fillColor="#00000000"
+        android:pathData="M42.5,46.5L47.5,63.5L54,48L60.5,63.5L65.5,46.5"
         android:strokeWidth="3.8"
         android:strokeColor="#FFFFFFFF"
         android:strokeLineCap="round"
         android:strokeLineJoin="round" />
     <path
         android:fillColor="#00000000"
-        android:pathData="M40.5,53.5L67.5,53.5"
-        android:strokeWidth="3"
+        android:pathData="M39.5,53.5L68.5,53.5"
+        android:strokeWidth="3.0"
         android:strokeColor="#FFFFFFFF"
         android:strokeLineCap="round" />
-    <!-- Real-time pulse dot -->
+
+    <!-- Luminous cyan live pulse node -->
+    <path android:pathData="M73.5,34.7A8,8 0 1,1 73.49,34.7Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:centerX="73.5"
+                android:centerY="42.7"
+                android:gradientRadius="8"
+                android:type="radial">
+                <item android:offset="0.0" android:color="#8867E8F9" />
+                <item android:offset="0.5" android:color="#3338BDF8" />
+                <item android:offset="1.0" android:color="#0038BDF8" />
+            </gradient>
+        </aapt:attr>
+    </path>
     <path
-        android:fillColor="#FF5AE6A0"
-        android:pathData="M73,35A4.5,4.5 0 1,1 72.99,35Z" />
+        android:fillColor="#FF67E8F9"
+        android:pathData="M73.5,39.5A3.2,3.2 0 1,1 73.49,39.5Z" />
 </vector>

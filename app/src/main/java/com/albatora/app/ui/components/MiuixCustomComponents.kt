@@ -54,7 +54,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * Calm squircle icon container with subtle accent fill and hairline border.
+ * Squircle icon badge using a neutral glass container and semantic icon tint.
  */
 @Composable
 fun MiuixGlassIcon(
@@ -119,7 +119,7 @@ fun MiuixEntityBadge(
 }
 
 /**
- * Quiet signature dot marking live/paused/status states without decorative emoji clutter.
+ * Minimal status dot for active/paused shift indicators.
  */
 @Composable
 fun LiveStatusDot(
@@ -238,7 +238,7 @@ fun Modifier.miuixGlassSurface(
 }
 
 /**
- * Q4=B: 0.1-second (100ms) continuous odometer / slot-machine rolling display
+ * Rolling 0.1-second odometer numeric display
  * up to 1 decimal place (e.g., "12,345.6원").
  */
 @Composable

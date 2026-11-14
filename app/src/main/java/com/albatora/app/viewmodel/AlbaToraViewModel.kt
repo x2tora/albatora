@@ -51,7 +51,7 @@ class AlbaToraViewModel(application: Application) : AndroidViewModel(application
         viewModelScope.launch {
             stateHolder.syncForegroundService()
             while (isActive) {
-                delay(100L) // Q4=B: 0.1초(100ms) 단위 끊김 없는 실시간 적립 틱
+                delay(100L)
                 _nowEpochMillis.value = System.currentTimeMillis()
             }
         }

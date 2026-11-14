@@ -77,19 +77,19 @@ fun QuickAddShortTermScreen(
     }
     var breakPayType by remember { mutableStateOf(existingRecord?.breakPayType ?: BreakPayType.UNPAID) }
 
-    // Short-term net profit expenses & agency fee (Q8-4)
+    // Expenses and agency fee
     var transportText by remember { mutableStateOf((existingRecord?.transportExpense ?: 0L).toString()) }
     var mealText by remember { mutableStateOf((existingRecord?.mealExpense ?: 0L).toString()) }
     var siteBonusText by remember { mutableStateOf((existingRecord?.siteBonus ?: 0L).toString()) }
     var agencyFeeText by remember { mutableStateOf(if ((existingRecord?.agencyFeeValue ?: 0.0) > 0.0) existingRecord!!.agencyFeeValue.toString() else "") }
     var agencyFeeType by remember { mutableStateOf(existingRecord?.agencyFeeType ?: FeeType.PERCENT) }
 
-    // Daily-worker tax (Q8-5)
+    // Daily-worker tax
     var taxMode by remember { mutableStateOf(existingRecord?.taxMode ?: TaxMode.DAILY_WORKER) }
     var customTaxText by remember { mutableStateOf((existingRecord?.customTaxRatePercent ?: 3.3).toString()) }
     var includeLocalTax by remember { mutableStateOf(existingRecord?.dailyWorkerIncludeLocalTax ?: true) }
 
-    // Unpaid/Paid toggle (Q8-1)
+    // Payment status
     var paymentStatus by remember { mutableStateOf(existingRecord?.paymentStatus ?: PaymentStatus.UNPAID) }
 
     // Optional allowances
@@ -224,7 +224,7 @@ fun QuickAddShortTermScreen(
                     }
                 },
                 actions = {
-                    if (isEditing && onDelete != null && existingRecord != null) {
+                    if (isEditing && onDelete != null) {
                         IconButton(onClick = { showDeleteConfirm = true }) {
                             Icon(
                                 MiuixIcons.Delete,
@@ -265,7 +265,7 @@ fun QuickAddShortTermScreen(
                 }
             }
 
-            // Saved templates bar (Q8-2)
+            // Saved templates bar
             if (templates.isNotEmpty() && !isEditing) {
                 item {
                     SmallTitle(text = "원탭 단기 프리셋 불러오기")
@@ -435,7 +435,7 @@ fun QuickAddShortTermScreen(
                             }
                         }
 
-                        // 입금 상태 (Q8-1)
+                        // Payment status
                         Text(
                             "정산 입금 상태",
                             style = MiuixTheme.textStyles.footnote1,
@@ -450,7 +450,7 @@ fun QuickAddShortTermScreen(
                 }
             }
 
-            // Net Profit & Expenses & Fees (Q8-4)
+            // Expenses and fees
             item {
                 SmallTitle(text = "순수익 정산 (교통비·식비·지원금·수수료)")
                 Card(
@@ -508,7 +508,7 @@ fun QuickAddShortTermScreen(
                 }
             }
 
-            // Tax & Boosts (Q8-5)
+            // Tax and allowance boosts
             item {
                 SmallTitle(text = "세금 공제 · 수당 가산 옵션")
                 Card(modifier = Modifier.fillMaxWidth()) {

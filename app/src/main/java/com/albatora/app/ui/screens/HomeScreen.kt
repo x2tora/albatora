@@ -683,7 +683,7 @@ fun HomeScreen(
             }
         }
 
-        // True 100% Fullscreen Focus Mode Overlay when expanded
+        // Fullscreen focus mode overlay
         if (isFullscreenFocus && liveDashboard.activeShifts.isNotEmpty()) {
             Box(
                 modifier = Modifier
@@ -1273,7 +1273,7 @@ private fun FocusTimerStage(
             verticalArrangement = Arrangement.SpaceBetween,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Top bar: concurrent switcher + shift status + boost + fullscreen focus toggle
+            // Top bar: concurrent shift switcher, status, boost badge, and fullscreen toggle
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -1351,7 +1351,7 @@ private fun FocusTimerStage(
                 }
             }
 
-            // Centerpiece: Large Precision Focus Chronometer Ring + 0.1s Tabular Odometer
+            // Focus chronometer ring and 0.1s odometer
             Box(
                 modifier = Modifier
                     .weight(1f, fill = false)
@@ -1419,7 +1419,7 @@ private fun FocusTimerStage(
                 }
             }
 
-            // Bottom Section: Tangible conversion + Break / Clock-out Ergonomic Action Bar
+            // Tangible conversion and break/clock-out controls
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(12.dp)

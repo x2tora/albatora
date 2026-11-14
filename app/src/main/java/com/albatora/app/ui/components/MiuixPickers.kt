@@ -151,25 +151,6 @@ fun MiuixIconPickerSheet(
     }
 }
 
-@Composable
-fun MiuixEmojiPickerSheet(
-    show: Boolean,
-    title: String = "아이콘 선택",
-    currentEmoji: String,
-    allowClear: Boolean = true,
-    onDismiss: () -> Unit,
-    onSelect: (String) -> Unit
-) {
-    MiuixIconPickerSheet(
-        show = show,
-        title = title.replace("이모지", "아이콘"),
-        currentIconKey = currentEmoji,
-        allowClear = allowClear,
-        onDismiss = onDismiss,
-        onSelect = onSelect
-    )
-}
-
 /**
  * Full HSV + Hex custom color picker allowing any arbitrary color selection.
  */
@@ -516,9 +497,9 @@ fun EmojiAndColorIdentityRow(
         }
     }
 
-    MiuixEmojiPickerSheet(
+    MiuixIconPickerSheet(
         show = showEmojiPicker,
-        currentEmoji = emoji,
+        currentIconKey = emoji,
         onDismiss = { showEmojiPicker = false },
         onSelect = onEmojiChange
     )

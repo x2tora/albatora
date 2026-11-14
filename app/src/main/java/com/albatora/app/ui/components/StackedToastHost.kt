@@ -100,7 +100,7 @@ fun rememberStackedToastState(): StackedToastState = remember { StackedToastStat
 
 /**
  * Stacked card-deck toast host:
- * - Up to 5 notifications stack cleanly (depth 0 frontmost, older cards peeking upward).
+ * - Stacks up to 5 notifications (depth 0 frontmost, older cards peeking upward).
  * - Smooth fade-in on arrival, fade-out on auto-dismiss or sideways swipe.
  * - No close ('X') button; swipe horizontally to slide away and fade out.
  */
