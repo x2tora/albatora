@@ -722,12 +722,74 @@ private fun MainTabsHost(
                                 icon = MiuixIcons.Regular.Months,
                                 label = "달력"
                             )
-                            NavigationBarItem(
-                                selected = showHomeQuickMenu,
-                                onClick = { showHomeQuickMenu = !showHomeQuickMenu },
-                                icon = MiuixIcons.Add,
-                                label = "추가"
+                            val addScale by animateFloatAsState(
+                                targetValue = if (showHomeQuickMenu) 1.15f else 1f,
+                                animationSpec = spring(
+                                    dampingRatio = 0.56f,
+                                    stiffness = Spring.StiffnessMediumLow
+                                ),
+                                label = "miuixAddScale"
                             )
+                            val addTint by animateColorAsState(
+                                targetValue = if (showHomeQuickMenu) {
+                                    MiuixTheme.colorScheme.primary
+                                } else {
+                                    MiuixTheme.colorScheme.onSurfaceVariantSummary
+                                },
+                                animationSpec = tween(180),
+                                label = "miuixAddTint"
+                            )
+                            val addPillAlpha by animateFloatAsState(
+                                targetValue = if (showHomeQuickMenu) 1f else 0f,
+                                animationSpec = tween(180),
+                                label = "miuixAddPillAlpha"
+                            )
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(NavigationBarDefaults.ItemHeight)
+                                    .clickable(
+                                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                        indication = null,
+                                        onClick = { showHomeQuickMenu = !showHomeQuickMenu }
+                                    )
+                                    .padding(
+                                        top = NavigationBarDefaults.IconTopPadding,
+                                        bottom = NavigationBarDefaults.BottomPadding
+                                    ),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(width = 48.dp, height = 28.dp)
+                                        .clip(RoundedCornerShape(14.dp))
+                                        .background(
+                                            MiuixTheme.colorScheme.primary.copy(alpha = 0.12f * addPillAlpha)
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = MiuixIcons.Add,
+                                        contentDescription = "추가",
+                                        tint = addTint,
+                                        modifier = Modifier
+                                            .size(NavigationBarDefaults.IconSize)
+                                            .graphicsLayer {
+                                                scaleX = addScale
+                                                scaleY = addScale
+                                            }
+                                    )
+                                }
+                                Text(
+                                    text = "추가",
+                                    color = addTint,
+                                    fontSize = NavigationBarDefaults.LabelFontSize,
+                                    fontWeight = if (showHomeQuickMenu) FontWeight.SemiBold else FontWeight.Normal,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                             NavigationBarItem(
                                 selected = !showHomeQuickMenu && selectedTab == 2,
                                 onClick = {
@@ -767,11 +829,12 @@ private fun MainTabsHost(
                 )
             }
 
-            // ⑤ Morphing Quick-Add menu expanding directly from the center '+' capsule
+            // ⑤ Morphing Quick-Add menu expanding from the center '+' button
             if (isQuickMenuMounted) {
                 ExpandableQuickAddMenuOverlay(
                     morphProgress = quickMenuMorphProgress.value,
                     interactive = showHomeQuickMenu,
+                    isLiquidGlass = isLiquidGlassNav,
                     onAddRegularJob = {
                         showHomeQuickMenu = false
                         onOpenAddRegularJob(null, null)
@@ -1045,6 +1108,7 @@ private fun PinnedHeaderLiveTicker(
 private fun ExpandableQuickAddMenuOverlay(
     morphProgress: Float,
     interactive: Boolean,
+    isLiquidGlass: Boolean,
     onAddRegularJob: () -> Unit,
     onQuickAddShortTerm: () -> Unit,
     onStartStopwatch: () -> Unit
@@ -1058,16 +1122,29 @@ private fun ExpandableQuickAddMenuOverlay(
     val colorBlend = smoothStep(0.06f, 0.58f, clamped)
     val contentFade = smoothStep(0.32f, 0.84f, clamped)
 
-    val cardColor = androidx.compose.ui.graphics.lerp(
-        MiuixTheme.colorScheme.primary,
-        if (isDark) MiuixTheme.colorScheme.surfaceContainerHigh else Color.White,
-        colorBlend
-    )
+    val surfaceCardColor = if (isDark) MiuixTheme.colorScheme.surfaceContainerHigh else Color.White
+    val cardColor = if (isLiquidGlass) {
+        androidx.compose.ui.graphics.lerp(
+            MiuixTheme.colorScheme.primary,
+            surfaceCardColor,
+            colorBlend
+        )
+    } else {
+        surfaceCardColor.copy(alpha = smoothStep(0f, 0.30f, clamped))
+    }
     val borderColor = MiuixTheme.colorScheme.onSurface.copy(
         alpha = lerpFloat(0f, if (isDark) 0.12f else 0.08f, clamped)
     )
-    val bottomOffset = androidx.compose.ui.unit.lerp(22.dp, 88.dp, liftProgress.coerceAtLeast(0f))
-    val cornerRadius = androidx.compose.ui.unit.lerp(22.dp, 26.dp, clamped)
+    val bottomOffset = androidx.compose.ui.unit.lerp(
+        if (isLiquidGlass) 22.dp else 36.dp,
+        if (isLiquidGlass) 88.dp else 80.dp,
+        liftProgress.coerceAtLeast(0f)
+    )
+    val cornerRadius = androidx.compose.ui.unit.lerp(
+        if (isLiquidGlass) 22.dp else 18.dp,
+        26.dp,
+        clamped
+    )
 
     BoxWithConstraints(
         modifier = Modifier
@@ -1077,8 +1154,8 @@ private fun ExpandableQuickAddMenuOverlay(
     ) {
         val targetWidthDp = (maxWidth - 40.dp).coerceIn(264.dp, 340.dp)
         val targetWidthPx = with(density) { targetWidthDp.roundToPx() }
-        val minWidthPx = with(density) { 50.dp.roundToPx() }
-        val minHeightPx = with(density) { 44.dp.roundToPx() }
+        val minWidthPx = with(density) { (if (isLiquidGlass) 50.dp else 84.dp).roundToPx() }
+        val minHeightPx = with(density) { (if (isLiquidGlass) 44.dp else 36.dp).roundToPx() }
         val cardShape = RoundedCornerShape(cornerRadius)
 
         Box(
