@@ -29,6 +29,8 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
@@ -726,72 +728,54 @@ private fun MainTabsHost(
                                 icon = MiuixIcons.Regular.Months,
                                 label = "달력"
                             )
-                            val addScale by animateFloatAsState(
-                                targetValue = if (showHomeQuickMenu) 1.15f else 1f,
+                            val addInteraction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+                            val addPressed by addInteraction.collectIsPressedAsState()
+                            val addRotation by animateFloatAsState(
+                                targetValue = if (showHomeQuickMenu) 45f else 0f,
                                 animationSpec = spring(
-                                    dampingRatio = 0.56f,
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
                                     stiffness = Spring.StiffnessMediumLow
                                 ),
-                                label = "miuixAddScale"
+                                label = "miuixAddRotation"
                             )
-                            val addTint by animateColorAsState(
-                                targetValue = if (showHomeQuickMenu) {
-                                    MiuixTheme.colorScheme.primary
-                                } else {
-                                    MiuixTheme.colorScheme.onSurfaceVariantSummary
-                                },
-                                animationSpec = tween(180),
-                                label = "miuixAddTint"
-                            )
-                            val addPillAlpha by animateFloatAsState(
-                                targetValue = if (showHomeQuickMenu) 1f else 0f,
-                                animationSpec = tween(180),
-                                label = "miuixAddPillAlpha"
+                            val addContentColor = MiuixTheme.colorScheme.onSurface.copy(
+                                alpha = when {
+                                    showHomeQuickMenu && addPressed -> NavigationBarDefaults.SelectedPressedAlpha
+                                    showHomeQuickMenu -> 1f
+                                    addPressed -> NavigationBarDefaults.UnselectedPressedAlpha
+                                    else -> NavigationBarDefaults.UnselectedAlpha
+                                }
                             )
                             Column(
                                 modifier = Modifier
                                     .weight(1f)
                                     .height(NavigationBarDefaults.ItemHeight)
                                     .clickable(
-                                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                                        interactionSource = addInteraction,
                                         indication = null,
+                                        role = androidx.compose.ui.semantics.Role.Tab,
                                         onClick = { showHomeQuickMenu = !showHomeQuickMenu }
-                                    )
-                                    .padding(
-                                        top = NavigationBarDefaults.IconTopPadding,
-                                        bottom = NavigationBarDefaults.BottomPadding
                                     ),
                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center
+                                verticalArrangement = Arrangement.Top
                             ) {
-                                Box(
+                                Icon(
+                                    imageVector = MiuixIcons.Add,
+                                    contentDescription = "추가",
+                                    tint = addContentColor,
                                     modifier = Modifier
-                                        .size(width = 48.dp, height = 28.dp)
-                                        .clip(RoundedCornerShape(14.dp))
-                                        .background(
-                                            MiuixTheme.colorScheme.primary.copy(alpha = 0.12f * addPillAlpha)
-                                        ),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = MiuixIcons.Add,
-                                        contentDescription = "추가",
-                                        tint = addTint,
-                                        modifier = Modifier
-                                            .size(NavigationBarDefaults.IconSize)
-                                            .graphicsLayer {
-                                                scaleX = addScale
-                                                scaleY = addScale
-                                            }
-                                    )
-                                }
+                                        .padding(top = NavigationBarDefaults.IconTopPadding)
+                                        .size(NavigationBarDefaults.IconSize)
+                                        .graphicsLayer { rotationZ = addRotation }
+                                )
                                 Text(
                                     text = "추가",
-                                    color = addTint,
+                                    color = addContentColor,
                                     fontSize = NavigationBarDefaults.LabelFontSize,
-                                    fontWeight = if (showHomeQuickMenu) FontWeight.SemiBold else FontWeight.Normal,
+                                    fontWeight = if (showHomeQuickMenu) FontWeight.Bold else FontWeight.Normal,
                                     maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(bottom = NavigationBarDefaults.BottomPadding)
                                 )
                             }
                             NavigationBarItem(

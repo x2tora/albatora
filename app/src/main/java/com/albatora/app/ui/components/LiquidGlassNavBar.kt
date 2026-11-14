@@ -597,6 +597,14 @@ private fun LiquidGlassNavBarContent(
                 slots.forEachIndexed { slotIdx, slot ->
                     if (slot.tabIndex == null) {
                         val centerActive = isCenterAddSelected || dragHighlightSlot == 2
+                        val addIconRotation by animateFloatAsState(
+                            targetValue = if (centerActive) 45f else 0f,
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessMediumLow
+                            ),
+                            label = "centerAddRotation"
+                        )
                         val addPillScale by animateFloatAsState(
                             targetValue = if (centerActive) 1.07f else 1f,
                             animationSpec = spring(
@@ -635,7 +643,9 @@ private fun LiquidGlassNavBarContent(
                                     imageVector = slot.icon,
                                     contentDescription = if (centerActive) "빠른 등록 메뉴 닫기" else "새 알바 등록 및 즉시 출근",
                                     tint = MiuixTheme.colorScheme.onPrimary,
-                                    modifier = Modifier.size(24.dp)
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .graphicsLayer { rotationZ = addIconRotation }
                                 )
                             }
                         }
