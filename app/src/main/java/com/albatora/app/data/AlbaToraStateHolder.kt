@@ -342,6 +342,23 @@ class AlbaToraStateHolder private constructor(context: Context) {
         }
     }
 
+    fun restoreScheduledShift(runtimeKey: String) {
+        updateAndPersist { st ->
+            val nextRuntimes = st.scheduledRuntimes.map { rt ->
+                if (rt.key == runtimeKey) {
+                    rt.copy(
+                        clockedOutAtEpochMillis = null,
+                        isManualPaused = false,
+                        manualPausedAtEpochMillis = null
+                    )
+                } else {
+                    rt
+                }
+            }
+            st.copy(scheduledRuntimes = nextRuntimes)
+        }
+    }
+
     fun clockOutShift(runtimeKey: String) {
         val now = System.currentTimeMillis()
         val zone = ZoneId.systemDefault()

@@ -279,6 +279,7 @@ class AlbaToraViewModel(application: Application) : AndroidViewModel(application
 
     fun toggleBreak(runtimeKey: String) = stateHolder.toggleBreakForShift(runtimeKey)
     fun clockOut(runtimeKey: String) = stateHolder.clockOutShift(runtimeKey)
+    fun restoreScheduledShift(runtimeKey: String) = stateHolder.restoreScheduledShift(runtimeKey)
 
     fun upsertTangibleItem(item: TangibleItem) = stateHolder.upsertTangibleItem(item)
     fun deleteTangibleItem(itemId: String) = stateHolder.deleteTangibleItem(itemId)

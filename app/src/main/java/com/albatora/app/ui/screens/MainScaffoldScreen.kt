@@ -588,6 +588,39 @@ private fun MainTabsHost(
                 onRetryInstall = viewModel::retryApkInstall,
                 onOpenPermissionSettings = viewModel::openInstallUnknownSourcesSettings
             )
+
+            val dismissedRecoveryKeys = remember { mutableStateListOf<String>() }
+            val recoverableCandidate = remember(state, liveDashboard.activeShifts.size, dismissedRecoveryKeys.size) {
+                PayrollCalculator.findRecoverableClockedOutShifts(
+                    state = state,
+                    nowEpochMillis = System.currentTimeMillis()
+                ).firstOrNull { it.runtimeKey !in dismissedRecoveryKeys }
+            }
+            if (recoverableCandidate != null && !updateUiState.showDialog) {
+                OverlayDialog(
+                    show = true,
+                    title = "근무 시간 복구",
+                    summary = "실수로 '${recoverableCandidate.title}' (${recoverableCandidate.dateIso}) 퇴근 버튼을 누르셨나요?\n아래 버튼을 눌러 진행 중인 근무 시간을 복구할 수 있습니다.",
+                    onDismissRequest = { dismissedRecoveryKeys.add(recoverableCandidate.runtimeKey) }
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        TextButton(
+                            text = "닫기",
+                            onClick = { dismissedRecoveryKeys.add(recoverableCandidate.runtimeKey) },
+                            modifier = Modifier.weight(0.8f)
+                        )
+                        TextButton(
+                            text = "여기를 눌러 근무 복구",
+                            onClick = {
+                                viewModel.restoreScheduledShift(recoverableCandidate.runtimeKey)
+                                toastState.show("'${recoverableCandidate.title}' 근무 시간이 복구되었습니다.")
+                            },
+                            colors = ButtonDefaults.textButtonColorsPrimary(),
+                            modifier = Modifier.weight(1.4f)
+                        )
+                    }
+                }
+            }
         }
     }
 }

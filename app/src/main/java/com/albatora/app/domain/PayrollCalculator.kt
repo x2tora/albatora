@@ -72,6 +72,15 @@ data class LiveDashboardSnapshot(
     val maxBoostMultiplier: Double = 1.0
 )
 
+data class RecoverableShiftCandidate(
+    val runtimeKey: String,
+    val jobId: String,
+    val title: String,
+    val dateIso: String,
+    val startEpochMillis: Long,
+    val endEpochMillis: Long
+)
+
 data class ResolvedRecordItem(
     val record: WorkRecord,
     val job: Job?,
@@ -941,6 +950,56 @@ object PayrollCalculator {
             anyBoostActive = anyBoost,
             maxBoostMultiplier = maxBoost
         )
+    }
+
+    /**
+     * Finds regular scheduled shifts whose shift window currently includes [nowEpochMillis],
+     * were explicitly clocked out earlier, and no longer have any saved record for that job/date.
+     */
+    fun findRecoverableClockedOutShifts(
+        state: AlbaToraDataState,
+        nowEpochMillis: Long
+    ): List<RecoverableShiftCandidate> {
+        val nowInstant = Instant.ofEpochMilli(nowEpochMillis)
+        val nowDt = LocalDateTime.ofInstant(nowInstant, KOR_ZONE)
+        val today = nowDt.toLocalDate()
+        val runtimeByKey = state.scheduledRuntimes.associateBy { it.key }
+        val explicitKeys = state.records.mapNotNull { rec -> rec.jobId?.let { "$it|${rec.date}" } }.toSet()
+
+        val candidates = mutableListOf<RecoverableShiftCandidate>()
+        val candidateDates = listOf(today.minusDays(1), today)
+        state.jobs.filter { !it.isArchived && it.kind == JobKind.REGULAR }.forEach { job ->
+            val startGate = if (job.scheduleStartDate.isNotBlank()) parseDate(job.scheduleStartDate, today) else today
+            candidateDates.forEach { shiftDate ->
+                if (shiftDate.isBefore(startGate)) return@forEach
+                val dateIso = formatDate(shiftDate)
+                if ("${job.id}|$dateIso" in explicitKeys) return@forEach
+
+                job.schedules.filter { it.dayOfWeek == shiftDate.dayOfWeek.value }.forEach { slot ->
+                    val shiftStartDt = LocalDateTime.of(
+                        shiftDate,
+                        LocalTime.of(slot.startMinute / 60, slot.startMinute % 60)
+                    )
+                    val durMins = rawDurationMinutes(slot.startMinute, slot.endMinute)
+                    val shiftEndDt = shiftStartDt.plusMinutes(durMins.toLong())
+                    val startMs = shiftStartDt.atZone(KOR_ZONE).toInstant().toEpochMilli()
+                    val endMs = shiftEndDt.atZone(KOR_ZONE).toInstant().toEpochMilli()
+                    val key = "${job.id}_$startMs"
+                    val runtime = runtimeByKey[key]
+                    if (runtime?.clockedOutAtEpochMillis != null && nowEpochMillis in startMs until endMs) {
+                        candidates += RecoverableShiftCandidate(
+                            runtimeKey = key,
+                            jobId = job.id,
+                            title = job.name,
+                            dateIso = dateIso,
+                            startEpochMillis = startMs,
+                            endEpochMillis = endMs
+                        )
+                    }
+                }
+            }
+        }
+        return candidates
     }
 
     private fun evaluateSingleLiveShift(

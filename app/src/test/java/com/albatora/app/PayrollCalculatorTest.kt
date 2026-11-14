@@ -290,4 +290,63 @@ class PayrollCalculatorTest {
         assertEquals(1, nov15Unpaid.size)
         assertEquals("rec_daily", nov15Unpaid.first().record.id)
     }
+
+    @Test
+    fun findsRecoverableClockedOutShiftOnlyWhenWithinWindowAndRecordDeleted() {
+        val shiftDate = LocalDate.of(2026, 11, 15) // Sunday = 7
+        val job = Job(
+            id = "job_recover",
+            name = "편의점 야간",
+            kind = JobKind.REGULAR,
+            payType = PayType.HOURLY,
+            baseAmount = 12_000L,
+            scheduleStartDate = "2026-11-01",
+            schedules = listOf(ScheduleSlot(dayOfWeek = 7, startMinute = 9 * 60, endMinute = 18 * 60))
+        )
+        val korZone = java.time.ZoneId.of("Asia/Seoul")
+        val startMs = LocalDateTime.of(shiftDate, java.time.LocalTime.of(9, 0))
+            .atZone(korZone).toInstant().toEpochMilli()
+        val inShiftNowMs = LocalDateTime.of(shiftDate, java.time.LocalTime.of(13, 30))
+            .atZone(korZone).toInstant().toEpochMilli()
+        val afterShiftNowMs = LocalDateTime.of(shiftDate, java.time.LocalTime.of(18, 30))
+            .atZone(korZone).toInstant().toEpochMilli()
+
+        val runtimeKey = "${job.id}_$startMs"
+        val clockedOutState = AlbaToraDataState.initialEmptyState().copy(
+            jobs = listOf(job),
+            scheduledRuntimes = listOf(
+                ScheduledShiftRuntime(
+                    key = runtimeKey,
+                    jobId = job.id,
+                    clockedOutAtEpochMillis = inShiftNowMs - 600_000L
+                )
+            )
+        )
+
+        // 1. Inside shift window & record deleted -> recoverable
+        val found = PayrollCalculator.findRecoverableClockedOutShifts(clockedOutState, inShiftNowMs)
+        assertEquals(1, found.size)
+        assertEquals(runtimeKey, found.first().runtimeKey)
+
+        // 2. Outside shift window -> not recoverable
+        assertTrue(PayrollCalculator.findRecoverableClockedOutShifts(clockedOutState, afterShiftNowMs).isEmpty())
+
+        // 3. Record still exists -> not recoverable
+        val withRecord = clockedOutState.copy(
+            records = listOf(
+                WorkRecord(
+                    id = "rec_saved",
+                    jobId = job.id,
+                    title = job.name,
+                    kind = JobKind.REGULAR,
+                    date = "2026-11-15",
+                    startMinute = 9 * 60,
+                    endMinute = 13 * 60 + 20,
+                    payType = PayType.HOURLY,
+                    unitAmount = 12_000L
+                )
+            )
+        )
+        assertTrue(PayrollCalculator.findRecoverableClockedOutShifts(withRecord, inShiftNowMs).isEmpty())
+    }
 }
