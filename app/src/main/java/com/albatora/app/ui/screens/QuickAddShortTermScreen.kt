@@ -5,6 +5,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -259,14 +265,20 @@ fun QuickAddShortTermScreen(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            if (errorMsg != null) {
-                item {
+            item(key = "error_banner") {
+                var stickyErrorMsg by remember { mutableStateOf("") }
+                errorMsg?.let { stickyErrorMsg = it }
+                AnimatedVisibility(
+                    visible = errorMsg != null,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.errorContainer),
                         insideMargin = PaddingValues(14.dp)
                     ) {
-                        Text(errorMsg!!, color = MiuixTheme.colorScheme.onErrorContainer, style = MiuixTheme.textStyles.body2)
+                        Text(stickyErrorMsg, color = MiuixTheme.colorScheme.onErrorContainer, style = MiuixTheme.textStyles.body2)
                     }
                 }
             }
@@ -421,7 +433,11 @@ fun QuickAddShortTermScreen(
                             )
                             Switch(checked = autoRecBreak, onCheckedChange = { autoRecBreak = it })
                         }
-                        if (!autoRecBreak) {
+                        AnimatedVisibility(
+                            visible = !autoRecBreak,
+                            enter = expandVertically() + fadeIn(),
+                            exit = shrinkVertically() + fadeOut()
+                        ) {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 TextField(
                                     value = breakMinText,
@@ -526,15 +542,26 @@ fun QuickAddShortTermScreen(
                         selectedIndex = taxOptions.indexOf(taxMode),
                         onSelectedIndexChange = { taxMode = taxOptions[it] }
                     )
-                    if (taxMode == TaxMode.DAILY_WORKER) {
-                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                        SwitchPreference(
-                            title = "지방소득세 포함 실효 2.97%",
-                            summary = "일 15만 원 비과세 공제 후 초과분에 적용 (끄면 2.7%)",
-                            checked = includeLocalTax,
-                            onCheckedChange = { includeLocalTax = it }
-                        )
-                    } else if (taxMode == TaxMode.CUSTOM) {
+                    AnimatedVisibility(
+                        visible = taxMode == TaxMode.DAILY_WORKER,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
+                        Column {
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                            SwitchPreference(
+                                title = "지방소득세 포함 실효 2.97%",
+                                summary = "일 15만 원 비과세 공제 후 초과분에 적용 (끄면 2.7%)",
+                                checked = includeLocalTax,
+                                onCheckedChange = { includeLocalTax = it }
+                            )
+                        }
+                    }
+                    AnimatedVisibility(
+                        visible = taxMode == TaxMode.CUSTOM,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
                         TextField(
                             value = customTaxText,
                             onValueChange = { customTaxText = it },
@@ -546,25 +573,31 @@ fun QuickAddShortTermScreen(
                                 .padding(horizontal = 16.dp, vertical = 8.dp)
                         )
                     }
-                    if (payType == PayType.HOURLY) {
-                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                        SwitchPreference(
-                            title = "야간수당 1.5배 (22:00~06:00)",
-                            checked = nightEnabled,
-                            onCheckedChange = { nightEnabled = it }
-                        )
-                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                        SwitchPreference(
-                            title = "연장수당 1.5배 (8시간 초과)",
-                            checked = overtimeEnabled,
-                            onCheckedChange = { overtimeEnabled = it }
-                        )
-                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                        SwitchPreference(
-                            title = "휴일수당 1.5배",
-                            checked = holidayEnabled,
-                            onCheckedChange = { holidayEnabled = it }
-                        )
+                    AnimatedVisibility(
+                        visible = payType == PayType.HOURLY,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
+                        Column {
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                            SwitchPreference(
+                                title = "야간수당 1.5배 (22:00~06:00)",
+                                checked = nightEnabled,
+                                onCheckedChange = { nightEnabled = it }
+                            )
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                            SwitchPreference(
+                                title = "연장수당 1.5배 (8시간 초과)",
+                                checked = overtimeEnabled,
+                                onCheckedChange = { overtimeEnabled = it }
+                            )
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                            SwitchPreference(
+                                title = "휴일수당 1.5배",
+                                checked = holidayEnabled,
+                                onCheckedChange = { holidayEnabled = it }
+                            )
+                        }
                     }
                     if (!isEditing) {
                         HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))

@@ -4,9 +4,11 @@ import android.graphics.Bitmap
 import android.graphics.ColorMatrix
 import android.graphics.ColorMatrixColorFilter
 import android.os.Build
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -329,6 +331,7 @@ private fun stretchOf(leftPx: Float, anchorPx: Float, itemWidthPx: Float): Float
 fun FloatingLiquidGlassNavBar(
     backdrop: LayerBackdrop?,
     selectedTab: Int,
+    isCenterAddSelected: Boolean = false,
     hasActiveShift: Boolean,
     unpaidCount: Int,
     onSelectTab: (Int) -> Unit,
@@ -371,6 +374,7 @@ fun FloatingLiquidGlassNavBar(
         LiquidGlassNavBarContent(
             slots = slots,
             selectedTab = selectedTab,
+            isCenterAddSelected = isCenterAddSelected,
             hasActiveShift = hasActiveShift,
             unpaidCount = unpaidCount,
             onSelectTab = onSelectTab,
@@ -388,6 +392,7 @@ fun FloatingLiquidGlassNavBar(
 private fun LiquidGlassNavBarContent(
     slots: List<NavSlot>,
     selectedTab: Int,
+    isCenterAddSelected: Boolean,
     hasActiveShift: Boolean,
     unpaidCount: Int,
     onSelectTab: (Int) -> Unit,
@@ -413,7 +418,7 @@ private fun LiquidGlassNavBarContent(
     val sliderWidthPx = if (itemWidthPx > 0f) itemWidthPx + horizontalOverhangPx * 2f else 0f
     val sliderHeightPx = (with(density) { contentHeight.toPx() } + verticalOverhangPx * 2f).coerceAtLeast(0f)
 
-    val targetSlot = tabToSlot(selectedTab.coerceIn(0, 3))
+    val targetSlot = if (isCenterAddSelected) 2 else tabToSlot(selectedTab.coerceIn(0, 3))
     val targetOffsetPx = itemWidthPx * targetSlot + baseOffsetPx
 
     val interactionSources = remember(slotCount) { List(slotCount) { MutableInteractionSource() } }
@@ -591,6 +596,23 @@ private fun LiquidGlassNavBarContent(
             ) {
                 slots.forEachIndexed { slotIdx, slot ->
                     if (slot.tabIndex == null) {
+                        val centerActive = isCenterAddSelected || dragHighlightSlot == 2
+                        val addIconRotation by animateFloatAsState(
+                            targetValue = if (centerActive) 45f else 0f,
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessMediumLow
+                            ),
+                            label = "centerAddRotation"
+                        )
+                        val addPillScale by animateFloatAsState(
+                            targetValue = if (centerActive) 1.07f else 1f,
+                            animationSpec = spring(
+                                dampingRatio = Spring.DampingRatioMediumBouncy,
+                                stiffness = Spring.StiffnessMedium
+                            ),
+                            label = "centerAddScale"
+                        )
                         // Emphasized centered '+' action button
                         Box(
                             modifier = Modifier
@@ -607,6 +629,10 @@ private fun LiquidGlassNavBarContent(
                             Box(
                                 modifier = Modifier
                                     .size(width = 50.dp, height = 44.dp)
+                                    .graphicsLayer {
+                                        scaleX = addPillScale
+                                        scaleY = addPillScale
+                                    }
                                     .squircleBackground(
                                         color = MiuixTheme.colorScheme.primary,
                                         cornerRadius = 22.dp
@@ -615,19 +641,25 @@ private fun LiquidGlassNavBarContent(
                             ) {
                                 Icon(
                                     imageVector = slot.icon,
-                                    contentDescription = "새 알바 등록 및 즉시 출근",
+                                    contentDescription = if (centerActive) "빠른 등록 메뉴 닫기" else "새 알바 등록 및 즉시 출근",
                                     tint = MiuixTheme.colorScheme.onPrimary,
-                                    modifier = Modifier.size(24.dp)
+                                    modifier = Modifier
+                                        .size(24.dp)
+                                        .graphicsLayer { rotationZ = addIconRotation }
                                 )
                             }
                         }
                     } else {
                         val selected = slotIdx == anchorSlot
-                        val tint = if (selected) {
-                            MiuixTheme.colorScheme.primary
-                        } else {
-                            MiuixTheme.colorScheme.onSurfaceVariantSummary
-                        }
+                        val tint by animateColorAsState(
+                            targetValue = if (selected) {
+                                MiuixTheme.colorScheme.primary
+                            } else {
+                                MiuixTheme.colorScheme.onSurfaceVariantSummary
+                            },
+                            animationSpec = tween(180),
+                            label = "navTint_$slotIdx"
+                        )
                         Column(
                             modifier = Modifier
                                 .weight(1f)

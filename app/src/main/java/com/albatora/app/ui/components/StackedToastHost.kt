@@ -285,22 +285,12 @@ private fun SwipeableToastCard(
             .heightIn(min = 24.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .size(24.dp)
-                .squircleBackground(
-                    color = MiuixTheme.colorScheme.primary.copy(alpha = 0.14f),
-                    cornerRadius = 8.dp
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = MiuixIcons.Ok,
-                contentDescription = null,
-                tint = MiuixTheme.colorScheme.primary,
-                modifier = Modifier.size(14.dp)
-            )
-        }
+        Icon(
+            imageVector = MiuixIcons.Ok,
+            contentDescription = null,
+            tint = MiuixTheme.colorScheme.primary,
+            modifier = Modifier.size(20.dp)
+        )
         Spacer(modifier = Modifier.width(10.dp))
         Text(
             text = message,

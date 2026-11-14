@@ -54,7 +54,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * Squircle icon badge using a neutral glass container and semantic icon tint.
+ * Clean semantic icon slot without an extra enclosing box; enlarged proportionally for crisp clarity.
  */
 @Composable
 fun MiuixGlassIcon(
@@ -66,30 +66,18 @@ fun MiuixGlassIcon(
     iconSize: Dp = 20.dp,
     cornerRadius: Dp = 12.dp
 ) {
-    val isDark = LocalIsDarkTheme.current
-    val containerTint = if (isDark) {
-        Color.White.copy(alpha = 0.08f)
-    } else {
-        MiuixTheme.colorScheme.onSurface.copy(alpha = 0.05f)
-    }
-    val borderTint = if (isDark) {
-        Color.White.copy(alpha = 0.12f)
-    } else {
-        MiuixTheme.colorScheme.onSurface.copy(alpha = 0.09f)
-    }
+    val resolvedIconSize = maxOf(iconSize * 1.42f, (size.value * 0.72f).dp)
+    val containerSize = maxOf(resolvedIconSize, (size.value * 0.80f).dp)
 
     Box(
-        modifier = modifier
-            .size(size)
-            .squircleBackground(containerTint, cornerRadius)
-            .squircleBorder(1.dp, borderTint, cornerRadius),
+        modifier = modifier.size(containerSize),
         contentAlignment = Alignment.Center
     ) {
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
             tint = accentColor,
-            modifier = Modifier.size(iconSize)
+            modifier = Modifier.size(resolvedIconSize)
         )
     }
 }

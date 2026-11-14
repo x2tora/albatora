@@ -23,19 +23,20 @@
         android:tint="@color/widget_border" />
 
     <LinearLayout
+        android:id="@+id/widget_compact_content"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingLeft="16dp"
-        android:paddingTop="10dp"
-        android:paddingRight="14dp"
-        android:paddingBottom="10dp">
+        android:paddingLeft="12dp"
+        android:paddingTop="7dp"
+        android:paddingRight="10dp"
+        android:paddingBottom="7dp">
 
         <ImageView
             android:id="@+id/widget_compact_dot"
-            android:layout_width="8dp"
-            android:layout_height="8dp"
+            android:layout_width="9dp"
+            android:layout_height="9dp"
             android:layout_marginEnd="8dp"
             android:importantForAccessibility="no"
             android:src="@drawable/widget_dot_base"
@@ -52,27 +53,30 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:ellipsize="end"
+                android:fontFeatureSettings="tnum"
+                android:letterSpacing="-0.02"
                 android:maxLines="1"
                 android:text="0원"
                 android:textColor="@color/widget_text_primary"
-                android:textSize="18sp"
+                android:textSize="21sp"
                 android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/widget_compact_sub"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="1dp"
                 android:ellipsize="end"
                 android:maxLines="1"
                 android:text="알바토라 · 대기 중"
                 android:textColor="@color/widget_text_secondary"
-                android:textSize="11sp" />
+                android:textSize="12.5sp" />
         </LinearLayout>
 
         <FrameLayout
             android:id="@+id/widget_compact_btn1_wrap"
             android:layout_width="wrap_content"
-            android:layout_height="32dp"
+            android:layout_height="38dp"
             android:layout_marginStart="6dp">
 
             <ImageView
@@ -90,18 +94,18 @@
                 android:layout_height="match_parent"
                 android:gravity="center"
                 android:maxLines="1"
-                android:paddingLeft="12dp"
-                android:paddingRight="12dp"
+                android:paddingLeft="13dp"
+                android:paddingRight="13dp"
                 android:text="휴게"
                 android:textColor="@color/widget_text_primary"
-                android:textSize="11sp"
+                android:textSize="13sp"
                 android:textStyle="bold" />
         </FrameLayout>
 
         <FrameLayout
             android:id="@+id/widget_compact_btn2_wrap"
             android:layout_width="wrap_content"
-            android:layout_height="32dp"
+            android:layout_height="38dp"
             android:layout_marginStart="6dp">
 
             <ImageView
@@ -119,11 +123,11 @@
                 android:layout_height="match_parent"
                 android:gravity="center"
                 android:maxLines="1"
-                android:paddingLeft="12dp"
-                android:paddingRight="12dp"
+                android:paddingLeft="13dp"
+                android:paddingRight="13dp"
                 android:text="출근"
                 android:textColor="@color/widget_on_accent"
-                android:textSize="11sp"
+                android:textSize="13sp"
                 android:textStyle="bold" />
         </FrameLayout>
     </LinearLayout>

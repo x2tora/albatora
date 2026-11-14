@@ -3,6 +3,12 @@ package com.albatora.app.ui.screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -103,15 +109,23 @@ fun RecordsScreen(
                         Icon(MiuixIcons.ChevronBackward, contentDescription = "이전 정산 기간")
                     }
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text(
-                            text = if (selectedJob != null) "${anchorMonth.year}년 ${anchorMonth.monthValue}월 급여 정산분" else "${anchorMonth.year}년 ${anchorMonth.monthValue}월",
-                            style = MiuixTheme.textStyles.body1.copy(fontWeight = FontWeight.Bold)
-                        )
-                        Text(
-                            text = "산정 기간: ${periodRange.first} ~ ${periodRange.second}",
-                            style = MiuixTheme.textStyles.footnote1,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                        )
+                        AnimatedContent(
+                            targetState = "${anchorMonth}_${selectedJobId}_${periodRange.first}_${periodRange.second}",
+                            transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(140)) },
+                            label = "records_period_title"
+                        ) { _ ->
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = if (selectedJob != null) "${anchorMonth.year}년 ${anchorMonth.monthValue}월 급여 정산분" else "${anchorMonth.year}년 ${anchorMonth.monthValue}월",
+                                    style = MiuixTheme.textStyles.body1.copy(fontWeight = FontWeight.Bold)
+                                )
+                                Text(
+                                    text = "산정 기간: ${periodRange.first} ~ ${periodRange.second}",
+                                    style = MiuixTheme.textStyles.footnote1,
+                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                                )
+                            }
+                        }
                     }
                     IconButton(onClick = { anchorMonth = anchorMonth.plusMonths(1) }) {
                         Icon(MiuixIcons.ChevronForward, contentDescription = "다음 정산 기간")
@@ -190,7 +204,9 @@ fun RecordsScreen(
 
     val statementCard: @Composable () -> Unit = {
         Card(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .animateContentSize(),
             insideMargin = PaddingValues(16.dp)
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -328,6 +344,7 @@ fun RecordsScreen(
                             items(summary.items, key = { it.record.id }) { item ->
                                 RecordDetailCard(
                                     item = item,
+                                    modifier = Modifier.animateItem(),
                                     onEdit = { onEditRecord(item.record) },
                                     onTogglePayment = {
                                         if (!item.isVirtualSchedule) {
@@ -352,6 +369,7 @@ fun RecordsScreen(
                             items(globalUnpaid.second, key = { it.record.id }) { item ->
                                 RecordDetailCard(
                                     item = item,
+                                    modifier = Modifier.animateItem(),
                                     onEdit = { onEditRecord(item.record) },
                                     onTogglePayment = { onTogglePaymentStatus(item.record.id) }
                                 )
@@ -364,6 +382,7 @@ fun RecordsScreen(
                             items(scheduledPending.second, key = { "sched_${it.record.id}" }) { item ->
                                 RecordDetailCard(
                                     item = item,
+                                    modifier = Modifier.animateItem(),
                                     onEdit = { onEditRecord(item.record) },
                                     onTogglePayment = { onTogglePaymentStatus(item.record.id) }
                                 )
@@ -401,6 +420,7 @@ fun RecordsScreen(
                         items(summary.items, key = { it.record.id }) { item ->
                             RecordDetailCard(
                                 item = item,
+                                modifier = Modifier.animateItem(),
                                 onEdit = { onEditRecord(item.record) },
                                 onTogglePayment = {
                                     if (!item.isVirtualSchedule) {
@@ -425,6 +445,7 @@ fun RecordsScreen(
                         items(globalUnpaid.second, key = { it.record.id }) { item ->
                             RecordDetailCard(
                                 item = item,
+                                modifier = Modifier.animateItem(),
                                 onEdit = { onEditRecord(item.record) },
                                 onTogglePayment = { onTogglePaymentStatus(item.record.id) }
                             )
@@ -437,6 +458,7 @@ fun RecordsScreen(
                         items(scheduledPending.second, key = { "sched_${it.record.id}" }) { item ->
                             RecordDetailCard(
                                 item = item,
+                                modifier = Modifier.animateItem(),
                                 onEdit = { onEditRecord(item.record) },
                                 onTogglePayment = { onTogglePaymentStatus(item.record.id) }
                             )
@@ -521,12 +543,15 @@ private fun StatementRow(
 private fun RecordDetailCard(
     item: ResolvedRecordItem,
     onEdit: () -> Unit,
-    onTogglePayment: () -> Unit
+    onTogglePayment: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val rec = item.record
     val br = item.breakdown
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .animateContentSize(),
         onClick = onEdit,
         insideMargin = PaddingValues(14.dp)
     ) {

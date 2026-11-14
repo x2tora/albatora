@@ -8,6 +8,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -205,8 +211,14 @@ fun AddEditRegularJobScreen(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            if (errorMsg != null) {
-                item {
+            item(key = "error_banner") {
+                var stickyErrorMsg by remember { mutableStateOf("") }
+                errorMsg?.let { stickyErrorMsg = it }
+                AnimatedVisibility(
+                    visible = errorMsg != null,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         colors = CardDefaults.defaultColors(
@@ -215,7 +227,7 @@ fun AddEditRegularJobScreen(
                         insideMargin = PaddingValues(14.dp)
                     ) {
                         Text(
-                            text = errorMsg!!,
+                            text = stickyErrorMsg,
                             style = MiuixTheme.textStyles.body2,
                             color = MiuixTheme.colorScheme.onErrorContainer
                         )
@@ -457,21 +469,27 @@ fun AddEditRegularJobScreen(
                         checked = whEnabled,
                         onCheckedChange = { whEnabled = it }
                     )
-                    if (whEnabled) {
-                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                        SwitchPreference(
-                            title = "결근·조퇴 시 해당 주 주휴수당 자동 제외",
-                            summary = "지정 근무일에 결근 또는 조퇴가 발생하면 해당 주 주휴수당을 제외합니다",
-                            checked = whExcludeAbsence,
-                            onCheckedChange = { whExcludeAbsence = it }
-                        )
-                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                        SwitchPreference(
-                            title = "주 15시간 미만도 주휴수당 강제 포함",
-                            summary = "매장별 별도 약정 시 주 15시간 미만 주에도 비례 주휴수당 포함",
-                            checked = whForceUnder15h,
-                            onCheckedChange = { whForceUnder15h = it }
-                        )
+                    AnimatedVisibility(
+                        visible = whEnabled,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
+                        Column {
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                            SwitchPreference(
+                                title = "결근·조퇴 시 해당 주 주휴수당 자동 제외",
+                                summary = "지정 근무일에 결근 또는 조퇴가 발생하면 해당 주 주휴수당을 제외합니다",
+                                checked = whExcludeAbsence,
+                                onCheckedChange = { whExcludeAbsence = it }
+                            )
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                            SwitchPreference(
+                                title = "주 15시간 미만도 주휴수당 강제 포함",
+                                summary = "매장별 별도 약정 시 주 15시간 미만 주에도 비례 주휴수당 포함",
+                                checked = whForceUnder15h,
+                                onCheckedChange = { whForceUnder15h = it }
+                            )
+                        }
                     }
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                     SwitchPreference(
@@ -494,14 +512,20 @@ fun AddEditRegularJobScreen(
                         checked = holidayEnabled,
                         onCheckedChange = { holidayEnabled = it }
                     )
-                    if (holidayEnabled) {
-                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                        SwitchPreference(
-                            title = "토요일·일요일 주말도 휴일수당 적용",
-                            summary = "공휴일 외 주말 근무에도 휴일수당 부스트를 적용하려면 켜세요",
-                            checked = holidayIncludesWeekends,
-                            onCheckedChange = { holidayIncludesWeekends = it }
-                        )
+                    AnimatedVisibility(
+                        visible = holidayEnabled,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
+                        Column {
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                            SwitchPreference(
+                                title = "토요일·일요일 주말도 휴일수당 적용",
+                                summary = "공휴일 외 주말 근무에도 휴일수당 부스트를 적용하려면 켜세요",
+                                checked = holidayIncludesWeekends,
+                                onCheckedChange = { holidayIncludesWeekends = it }
+                            )
+                        }
                     }
                 }
             }
@@ -518,7 +542,11 @@ fun AddEditRegularJobScreen(
                         selectedIndex = taxOptions.indexOf(taxMode),
                         onSelectedIndexChange = { taxMode = taxOptions[it] }
                     )
-                    if (taxMode == TaxMode.CUSTOM) {
+                    AnimatedVisibility(
+                        visible = taxMode == TaxMode.CUSTOM,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
                         TextField(
                             value = customTaxText,
                             onValueChange = { customTaxText = it },
@@ -530,14 +558,20 @@ fun AddEditRegularJobScreen(
                                 .padding(horizontal = 16.dp, vertical = 8.dp)
                         )
                     }
-                    if (taxMode == TaxMode.DAILY_WORKER) {
-                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                        SwitchPreference(
-                            title = "지방소득세 포함 (2.97%)",
-                            summary = "끄면 소득세만 2.7% 적용 (일 15만 원 비과세 공제)",
-                            checked = dailyIncludeLocalTax,
-                            onCheckedChange = { dailyIncludeLocalTax = it }
-                        )
+                    AnimatedVisibility(
+                        visible = taxMode == TaxMode.DAILY_WORKER,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
+                        Column {
+                            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                            SwitchPreference(
+                                title = "지방소득세 포함 (2.97%)",
+                                summary = "끄면 소득세만 2.7% 적용 (일 15만 원 비과세 공제)",
+                                checked = dailyIncludeLocalTax,
+                                onCheckedChange = { dailyIncludeLocalTax = it }
+                            )
+                        }
                     }
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                     val periodOptions = SettlementPeriodMode.entries
@@ -548,7 +582,11 @@ fun AddEditRegularJobScreen(
                         selectedIndex = periodOptions.indexOf(settlementMode),
                         onSelectedIndexChange = { settlementMode = periodOptions[it] }
                     )
-                    if (settlementMode == SettlementPeriodMode.PREV_N_PLUS_1_TO_N) {
+                    AnimatedVisibility(
+                        visible = settlementMode == SettlementPeriodMode.PREV_N_PLUS_1_TO_N,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
                         TextField(
                             value = settlementCutoffText,
                             onValueChange = { settlementCutoffText = it.filter(Char::isDigit) },
@@ -559,7 +597,12 @@ fun AddEditRegularJobScreen(
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp, vertical = 8.dp)
                         )
-                    } else if (settlementMode == SettlementPeriodMode.CUSTOM_RANGE) {
+                    }
+                    AnimatedVisibility(
+                        visible = settlementMode == SettlementPeriodMode.CUSTOM_RANGE,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()

@@ -8,8 +8,10 @@ import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Color
 import android.os.Build
+import android.util.TypedValue
 import android.view.View
 import android.widget.RemoteViews
+import kotlin.math.roundToInt
 import androidx.core.content.ContextCompat
 import com.albatora.app.MainActivity
 import com.albatora.app.R
@@ -182,19 +184,29 @@ object AlbaToraWidgetUpdater {
         val snapshot = PayrollCalculator.evaluateLiveDashboard(state, System.currentTimeMillis())
         val activeShifts = snapshot.activeShifts
 
-        val views = RemoteViews(context.packageName, R.layout.widget_live_earnings)
-        applyCardSurface(views, R.id.widget_bg_fill, R.id.widget_bg_stroke, palette)
-        views.setTextColor(R.id.widget_live_title, palette.textPrimary)
-        views.setTextColor(R.id.widget_live_amount, palette.textPrimary)
-        views.setTextColor(R.id.widget_live_sub, palette.textSecondary)
-        views.setOnClickPendingIntent(R.id.widget_root, openAppIntent(context, requestCode = 301, tab = 0))
-        views.setViewVisibility(R.id.widget_actions_row, if (cfg.showQuickActions) View.VISIBLE else View.GONE)
+        val amountStr: String
+        val titleText: String
+        val rateText: String
+        val subText: String
+        val dotColor: Int
+        val rateTextColor: Int
+        val rateBgColor: Int
+        val btn1Text: String
+        val btn1Bg: Int
+        val btn1Alpha: Int
+        val btn1TextColor: Int
+        val btn1Intent: PendingIntent
+        val btn2Text: String
+        val btn2Bg: Int
+        val btn2Alpha: Int
+        val btn2TextColor: Int
+        val btn2Intent: PendingIntent
 
         if (activeShifts.isNotEmpty()) {
             val first = activeShifts.first()
             val allPaused = activeShifts.all { it.isPaused }
-            val dotColor = if (allPaused) palette.amber else palette.green
-            val title = when {
+            dotColor = if (allPaused) palette.amber else palette.green
+            titleText = when {
                 activeShifts.size > 1 -> "동시 근무 ${activeShifts.size}건 진행 중"
                 allPaused -> "${first.title} · 휴게 중"
                 else -> "${first.title} · 근무 중"
@@ -202,11 +214,12 @@ object AlbaToraWidgetUpdater {
 
             val perMinute = (snapshot.totalPerSecondRateWon * 60.0).toLong()
             val boostText = if (snapshot.anyBoostActive) " · ${snapshot.maxBoostMultiplier}배" else ""
-            val rateText = if (allPaused) "일시정지" else "+${PayrollCalculator.formatWon(perMinute)}/분$boostText"
+            rateText = if (allPaused) "일시정지" else "+${PayrollCalculator.formatWon(perMinute)}/분$boostText"
+            rateTextColor = dotColor
+            rateBgColor = dotColor
 
             val elapsedSec = activeShifts.maxOf { it.elapsedWorkMillis } / 1000L
             val elapsedFormatted = formatElapsed(elapsedSec)
-
             val selectedTangible = state.tangibleItems.find { it.id == state.settings.selectedTangibleItemId }
                 ?: state.tangibleItems.firstOrNull()
             val tangibleSuffix = if (cfg.showTangibleConversion && selectedTangible != null && selectedTangible.unitPrice > 0L) {
@@ -214,75 +227,83 @@ object AlbaToraWidgetUpdater {
                 " · ${selectedTangible.name} ${String.format(Locale.US, "%.1f", qty)}개"
             } else ""
 
-            applyPillTint(views, R.id.widget_live_dot, dotColor)
-            views.setTextViewText(R.id.widget_live_title, title)
-            views.setTextViewText(R.id.widget_live_rate, rateText)
-            views.setTextColor(R.id.widget_live_rate, dotColor)
-            applyPillTint(views, R.id.widget_live_rate_bg, dotColor, palette.accentSoftAlpha)
-
-            views.setTextViewText(R.id.widget_live_amount, PayrollCalculator.formatWon(snapshot.totalEarnedWon.toLong()))
-            views.setTextViewText(R.id.widget_live_sub, "실근무 $elapsedFormatted$tangibleSuffix")
-
-            applyPillTint(views, R.id.widget_btn_primary_bg, palette.innerPillBg, 235)
-            views.setTextColor(R.id.widget_btn_primary, palette.textPrimary)
-            views.setTextViewText(R.id.widget_btn_primary, if (allPaused) "휴게 종료" else "휴게 시작")
-            views.setOnClickPendingIntent(
-                R.id.widget_btn_primary_wrap,
-                actionBroadcastIntent(context, 311, AlbaToraStateHolder.ACTION_TOGGLE_BREAK)
-            )
-
-            applyPillTint(views, R.id.widget_btn_secondary_bg, palette.accent, 255)
-            views.setTextColor(R.id.widget_btn_secondary, palette.onAccent)
-            views.setTextViewText(R.id.widget_btn_secondary, "퇴근 완료")
-            views.setOnClickPendingIntent(
-                R.id.widget_btn_secondary_wrap,
-                actionBroadcastIntent(context, 312, AlbaToraStateHolder.ACTION_CLOCK_OUT)
-            )
+            amountStr = PayrollCalculator.formatWon(snapshot.totalEarnedWon.toLong())
+            subText = "실근무 $elapsedFormatted$tangibleSuffix"
+            btn1Text = if (allPaused) "휴게 종료" else "휴게 시작"
+            btn1Bg = palette.innerPillBg
+            btn1Alpha = 235
+            btn1TextColor = palette.textPrimary
+            btn1Intent = actionBroadcastIntent(context, 311, AlbaToraStateHolder.ACTION_TOGGLE_BREAK)
+            btn2Text = "퇴근 완료"
+            btn2Bg = palette.accent
+            btn2Alpha = 255
+            btn2TextColor = palette.onAccent
+            btn2Intent = actionBroadcastIntent(context, 312, AlbaToraStateHolder.ACTION_CLOCK_OUT)
         } else {
             val month = YearMonth.now()
             val monthSummary = PayrollCalculator.calculateSettlementSummary(state, month.atDay(1), month.atEndOfMonth())
             val quickJob = state.jobs.find { it.id == cfg.defaultQuickJobId }
 
-            applyPillTint(views, R.id.widget_live_dot, palette.accent)
-            views.setTextViewText(R.id.widget_live_title, "알바토라 · 대기 중")
-            views.setTextViewText(R.id.widget_live_rate, "${month.monthValue}월 ${monthSummary.shiftCount}건")
-            views.setTextColor(R.id.widget_live_rate, palette.accent)
-            applyPillTint(views, R.id.widget_live_rate_bg, palette.accent, palette.accentSoftAlpha)
-
-            views.setTextViewText(R.id.widget_live_amount, PayrollCalculator.formatWon(monthSummary.totalNetPay))
-            val standbySub = if (quickJob != null) {
+            dotColor = palette.accent
+            titleText = "알바토라 · 대기 중"
+            rateText = "${month.monthValue}월 ${monthSummary.shiftCount}건"
+            rateTextColor = palette.accent
+            rateBgColor = palette.accent
+            amountStr = PayrollCalculator.formatWon(monthSummary.totalNetPay)
+            subText = if (quickJob != null) {
                 "이번 달 예상 누적 · '${quickJob.name}' 원탭 출근 대기"
             } else {
                 "이번 달 예상 누적 · 즉시 출근으로 타이머 시작"
             }
-            views.setTextViewText(R.id.widget_live_sub, standbySub)
 
-            applyPillTint(views, R.id.widget_btn_primary_bg, palette.accent, 255)
-            views.setTextColor(R.id.widget_btn_primary, palette.onAccent)
+            btn1Bg = palette.accent
+            btn1Alpha = 255
+            btn1TextColor = palette.onAccent
             if (quickJob != null) {
-                views.setTextViewText(R.id.widget_btn_primary, "${quickJob.name} 출근")
-                views.setOnClickPendingIntent(
-                    R.id.widget_btn_primary_wrap,
-                    actionBroadcastIntent(context, 315, AlbaToraStateHolder.ACTION_QUICK_CLOCK_IN)
-                )
+                btn1Text = "${quickJob.name} 출근"
+                btn1Intent = actionBroadcastIntent(context, 315, AlbaToraStateHolder.ACTION_QUICK_CLOCK_IN)
             } else {
-                views.setTextViewText(R.id.widget_btn_primary, "즉시 출근")
-                views.setOnClickPendingIntent(
-                    R.id.widget_btn_primary_wrap,
-                    openAppIntent(context, requestCode = 313, tab = 0, openStopwatch = true)
-                )
+                btn1Text = "즉시 출근"
+                btn1Intent = openAppIntent(context, requestCode = 313, tab = 0, openStopwatch = true)
             }
-
-            applyPillTint(views, R.id.widget_btn_secondary_bg, palette.innerPillBg, 235)
-            views.setTextColor(R.id.widget_btn_secondary, palette.textPrimary)
-            views.setTextViewText(R.id.widget_btn_secondary, "달력 보기")
-            views.setOnClickPendingIntent(
-                R.id.widget_btn_secondary_wrap,
-                openAppIntent(context, requestCode = 314, tab = 1)
-            )
+            btn2Text = "달력 보기"
+            btn2Bg = palette.innerPillBg
+            btn2Alpha = 235
+            btn2TextColor = palette.textPrimary
+            btn2Intent = openAppIntent(context, requestCode = 314, tab = 1)
         }
 
-        manager.updateAppWidget(ids, views)
+        for (widgetId in ids) {
+            val views = RemoteViews(context.packageName, R.layout.widget_live_earnings)
+            applyCardSurface(views, R.id.widget_bg_fill, R.id.widget_bg_stroke, palette)
+            views.setTextColor(R.id.widget_live_title, palette.textPrimary)
+            views.setTextColor(R.id.widget_live_amount, palette.textPrimary)
+            views.setTextColor(R.id.widget_live_sub, palette.textSecondary)
+            views.setOnClickPendingIntent(R.id.widget_root, openAppIntent(context, requestCode = 301, tab = 0))
+            views.setViewVisibility(R.id.widget_actions_row, if (cfg.showQuickActions) View.VISIBLE else View.GONE)
+
+            applyPillTint(views, R.id.widget_live_dot, dotColor)
+            views.setTextViewText(R.id.widget_live_title, titleText)
+            views.setTextViewText(R.id.widget_live_rate, rateText)
+            views.setTextColor(R.id.widget_live_rate, rateTextColor)
+            applyPillTint(views, R.id.widget_live_rate_bg, rateBgColor, palette.accentSoftAlpha)
+
+            views.setTextViewText(R.id.widget_live_amount, amountStr)
+            views.setTextViewText(R.id.widget_live_sub, subText)
+
+            applyPillTint(views, R.id.widget_btn_primary_bg, btn1Bg, btn1Alpha)
+            views.setTextColor(R.id.widget_btn_primary, btn1TextColor)
+            views.setTextViewText(R.id.widget_btn_primary, btn1Text)
+            views.setOnClickPendingIntent(R.id.widget_btn_primary_wrap, btn1Intent)
+
+            applyPillTint(views, R.id.widget_btn_secondary_bg, btn2Bg, btn2Alpha)
+            views.setTextColor(R.id.widget_btn_secondary, btn2TextColor)
+            views.setTextViewText(R.id.widget_btn_secondary, btn2Text)
+            views.setOnClickPendingIntent(R.id.widget_btn_secondary_wrap, btn2Intent)
+
+            applyResponsiveLiveSizing(context, manager, widgetId, views, amountStr)
+            manager.updateAppWidget(widgetId, views)
+        }
     }
 
     fun updateCompactLiveWidgets(
@@ -301,80 +322,83 @@ object AlbaToraWidgetUpdater {
         val snapshot = PayrollCalculator.evaluateLiveDashboard(state, System.currentTimeMillis())
         val activeShifts = snapshot.activeShifts
 
-        val views = RemoteViews(context.packageName, R.layout.widget_compact_live)
-        applyCardSurface(views, R.id.widget_compact_bg_fill, R.id.widget_compact_bg_stroke, palette)
-        views.setTextColor(R.id.widget_compact_amount, palette.textPrimary)
-        views.setTextColor(R.id.widget_compact_sub, palette.textSecondary)
-        views.setOnClickPendingIntent(R.id.widget_compact_root, openAppIntent(context, requestCode = 340, tab = 0))
+        val dotColor: Int
+        val amountStr: String
+        val subText: String
+        val showBtn1: Boolean
+        val showBtn2: Boolean
+        val btn1Text: String
+        val btn1Intent: PendingIntent
+        val btn2Text: String
+        val btn2Intent: PendingIntent
 
         if (activeShifts.isNotEmpty()) {
             val first = activeShifts.first()
             val allPaused = activeShifts.all { it.isPaused }
-            val dotColor = if (allPaused) palette.amber else palette.green
+            dotColor = if (allPaused) palette.amber else palette.green
             val elapsedFormatted = formatElapsed(activeShifts.maxOf { it.elapsedWorkMillis } / 1000L)
-            val label = if (activeShifts.size > 1) {
+            subText = if (activeShifts.size > 1) {
                 "동시 ${activeShifts.size}건 · $elapsedFormatted"
             } else if (allPaused) {
                 "${first.title} (휴게) · $elapsedFormatted"
             } else {
                 "${first.title} · $elapsedFormatted"
             }
-
-            applyPillTint(views, R.id.widget_compact_dot, dotColor)
-            views.setTextViewText(R.id.widget_compact_amount, PayrollCalculator.formatWon(snapshot.totalEarnedWon.toLong()))
-            views.setTextViewText(R.id.widget_compact_sub, label)
-
-            views.setViewVisibility(R.id.widget_compact_btn1_wrap, if (cfg.showQuickActions) View.VISIBLE else View.GONE)
-            views.setViewVisibility(R.id.widget_compact_btn2_wrap, if (cfg.showQuickActions) View.VISIBLE else View.GONE)
-
-            applyPillTint(views, R.id.widget_compact_btn1_bg, palette.innerPillBg, 235)
-            views.setTextColor(R.id.widget_compact_btn1, palette.textPrimary)
-            views.setTextViewText(R.id.widget_compact_btn1, if (allPaused) "재개" else "휴게")
-            views.setOnClickPendingIntent(
-                R.id.widget_compact_btn1_wrap,
-                actionBroadcastIntent(context, 341, AlbaToraStateHolder.ACTION_TOGGLE_BREAK)
-            )
-
-            applyPillTint(views, R.id.widget_compact_btn2_bg, palette.accent, 255)
-            views.setTextColor(R.id.widget_compact_btn2, palette.onAccent)
-            views.setTextViewText(R.id.widget_compact_btn2, "퇴근")
-            views.setOnClickPendingIntent(
-                R.id.widget_compact_btn2_wrap,
-                actionBroadcastIntent(context, 342, AlbaToraStateHolder.ACTION_CLOCK_OUT)
-            )
+            amountStr = PayrollCalculator.formatWon(snapshot.totalEarnedWon.toLong())
+            showBtn1 = cfg.showQuickActions
+            showBtn2 = cfg.showQuickActions
+            btn1Text = if (allPaused) "재개" else "휴게"
+            btn1Intent = actionBroadcastIntent(context, 341, AlbaToraStateHolder.ACTION_TOGGLE_BREAK)
+            btn2Text = "퇴근"
+            btn2Intent = actionBroadcastIntent(context, 342, AlbaToraStateHolder.ACTION_CLOCK_OUT)
         } else {
             val month = YearMonth.now()
             val monthSummary = PayrollCalculator.calculateSettlementSummary(state, month.atDay(1), month.atEndOfMonth())
             val quickJob = state.jobs.find { it.id == cfg.defaultQuickJobId }
 
-            applyPillTint(views, R.id.widget_compact_dot, palette.accent)
-            views.setTextViewText(R.id.widget_compact_amount, PayrollCalculator.formatWon(monthSummary.totalNetPay))
-            views.setTextViewText(
-                R.id.widget_compact_sub,
-                if (quickJob != null) "${month.monthValue}월 누적 · '${quickJob.name}' 대기" else "${month.monthValue}월 예상 누적"
-            )
-
-            views.setViewVisibility(R.id.widget_compact_btn1_wrap, View.GONE)
-            views.setViewVisibility(R.id.widget_compact_btn2_wrap, if (cfg.showQuickActions) View.VISIBLE else View.GONE)
-
-            applyPillTint(views, R.id.widget_compact_btn2_bg, palette.accent, 255)
-            views.setTextColor(R.id.widget_compact_btn2, palette.onAccent)
+            dotColor = palette.accent
+            amountStr = PayrollCalculator.formatWon(monthSummary.totalNetPay)
+            subText = if (quickJob != null) "${month.monthValue}월 누적 · '${quickJob.name}' 대기" else "${month.monthValue}월 예상 누적"
+            showBtn1 = false
+            showBtn2 = cfg.showQuickActions
+            btn1Text = "휴게"
+            btn1Intent = actionBroadcastIntent(context, 341, AlbaToraStateHolder.ACTION_TOGGLE_BREAK)
             if (quickJob != null) {
-                views.setTextViewText(R.id.widget_compact_btn2, "바로 출근")
-                views.setOnClickPendingIntent(
-                    R.id.widget_compact_btn2_wrap,
-                    actionBroadcastIntent(context, 343, AlbaToraStateHolder.ACTION_QUICK_CLOCK_IN)
-                )
+                btn2Text = "바로 출근"
+                btn2Intent = actionBroadcastIntent(context, 343, AlbaToraStateHolder.ACTION_QUICK_CLOCK_IN)
             } else {
-                views.setTextViewText(R.id.widget_compact_btn2, "출근")
-                views.setOnClickPendingIntent(
-                    R.id.widget_compact_btn2_wrap,
-                    openAppIntent(context, requestCode = 344, tab = 0, openStopwatch = true)
-                )
+                btn2Text = "출근"
+                btn2Intent = openAppIntent(context, requestCode = 344, tab = 0, openStopwatch = true)
             }
         }
 
-        manager.updateAppWidget(ids, views)
+        for (widgetId in ids) {
+            val views = RemoteViews(context.packageName, R.layout.widget_compact_live)
+            applyCardSurface(views, R.id.widget_compact_bg_fill, R.id.widget_compact_bg_stroke, palette)
+            views.setTextColor(R.id.widget_compact_amount, palette.textPrimary)
+            views.setTextColor(R.id.widget_compact_sub, palette.textSecondary)
+            views.setOnClickPendingIntent(R.id.widget_compact_root, openAppIntent(context, requestCode = 340, tab = 0))
+
+            applyPillTint(views, R.id.widget_compact_dot, dotColor)
+            views.setTextViewText(R.id.widget_compact_amount, amountStr)
+            views.setTextViewText(R.id.widget_compact_sub, subText)
+
+            views.setViewVisibility(R.id.widget_compact_btn1_wrap, if (showBtn1) View.VISIBLE else View.GONE)
+            views.setViewVisibility(R.id.widget_compact_btn2_wrap, if (showBtn2) View.VISIBLE else View.GONE)
+
+            applyPillTint(views, R.id.widget_compact_btn1_bg, palette.innerPillBg, 235)
+            views.setTextColor(R.id.widget_compact_btn1, palette.textPrimary)
+            views.setTextViewText(R.id.widget_compact_btn1, btn1Text)
+            views.setOnClickPendingIntent(R.id.widget_compact_btn1_wrap, btn1Intent)
+
+            applyPillTint(views, R.id.widget_compact_btn2_bg, palette.accent, 255)
+            views.setTextColor(R.id.widget_compact_btn2, palette.onAccent)
+            views.setTextViewText(R.id.widget_compact_btn2, btn2Text)
+            views.setOnClickPendingIntent(R.id.widget_compact_btn2_wrap, btn2Intent)
+
+            applyResponsiveCompactSizing(context, manager, widgetId, views, amountStr)
+            manager.updateAppWidget(widgetId, views)
+        }
     }
 
     fun updateWeeklyScheduleWidgets(
@@ -417,41 +441,50 @@ object AlbaToraWidgetUpdater {
             }
         }
 
-        val views = RemoteViews(context.packageName, R.layout.widget_weekly_schedule)
-        applyCardSurface(views, R.id.widget_weekly_bg_fill, R.id.widget_weekly_bg_stroke, palette)
-        views.setTextColor(R.id.widget_weekly_title, palette.textPrimary)
-        views.setTextColor(R.id.widget_weekly_range, palette.textSecondary)
-        views.setTextColor(R.id.widget_weekly_badge, palette.accent)
-        applyPillTint(views, R.id.widget_weekly_badge_bg, palette.accent, palette.accentSoftAlpha)
-
-        views.setOnClickPendingIntent(R.id.widget_weekly_root, openAppIntent(context, requestCode = 321, tab = 1))
-        views.setTextViewText(R.id.widget_weekly_badge, "${totalCount}건")
-        views.setTextViewText(
-            R.id.widget_weekly_range,
-            "${weekStart.monthValue}/${weekStart.dayOfMonth} ~ ${weekEnd.monthValue}/${weekEnd.dayOfMonth} 근무 일정"
-        )
-
         val lineIds = intArrayOf(
             R.id.widget_weekly_line1,
             R.id.widget_weekly_line2,
             R.id.widget_weekly_line3,
             R.id.widget_weekly_line4
         )
-        lineIds.forEachIndexed { idx, viewId ->
-            views.setTextColor(viewId, if (idx == 0) palette.textPrimary else palette.textSecondary)
-        }
-        if (upcomingLines.isEmpty()) {
-            views.setTextViewText(R.id.widget_weekly_line1, "이번 주 예정된 근무가 없습니다")
-            views.setTextViewText(R.id.widget_weekly_line2, "달력에서 원탭으로 단기·대타를 등록할 수 있어요")
-            views.setTextViewText(R.id.widget_weekly_line3, "")
-            views.setTextViewText(R.id.widget_weekly_line4, "")
+        val displayLines = if (upcomingLines.isEmpty()) {
+            listOf(
+                "이번 주 예정된 근무가 없습니다",
+                "달력에서 원탭으로 단기·대타를 등록할 수 있어요"
+            )
         } else {
-            lineIds.forEachIndexed { idx, viewId ->
-                views.setTextViewText(viewId, upcomingLines.getOrElse(idx) { "" })
-            }
+            upcomingLines.take(lineIds.size)
         }
 
-        manager.updateAppWidget(ids, views)
+        for (widgetId in ids) {
+            val views = RemoteViews(context.packageName, R.layout.widget_weekly_schedule)
+            applyCardSurface(views, R.id.widget_weekly_bg_fill, R.id.widget_weekly_bg_stroke, palette)
+            views.setTextColor(R.id.widget_weekly_title, palette.textPrimary)
+            views.setTextColor(R.id.widget_weekly_range, palette.textSecondary)
+            views.setTextColor(R.id.widget_weekly_badge, palette.accent)
+            applyPillTint(views, R.id.widget_weekly_badge_bg, palette.accent, palette.accentSoftAlpha)
+
+            views.setOnClickPendingIntent(R.id.widget_weekly_root, openAppIntent(context, requestCode = 321, tab = 1))
+            views.setTextViewText(R.id.widget_weekly_badge, "${totalCount}건")
+            views.setTextViewText(
+                R.id.widget_weekly_range,
+                "${weekStart.monthValue}/${weekStart.dayOfMonth} ~ ${weekEnd.monthValue}/${weekEnd.dayOfMonth} 근무 일정"
+            )
+
+            lineIds.forEachIndexed { idx, viewId ->
+                views.setTextColor(viewId, if (idx == 0) palette.textPrimary else palette.textSecondary)
+                val lineText = displayLines.getOrNull(idx)
+                if (lineText != null) {
+                    views.setViewVisibility(viewId, View.VISIBLE)
+                    views.setTextViewText(viewId, lineText)
+                } else {
+                    views.setViewVisibility(viewId, View.GONE)
+                }
+            }
+
+            applyResponsiveWeeklySizing(context, manager, widgetId, views, displayLines.size)
+            manager.updateAppWidget(widgetId, views)
+        }
     }
 
     fun updateMonthlySummaryWidgets(
@@ -475,44 +508,167 @@ object AlbaToraWidgetUpdater {
         val paydays = PayrollCalculator.calculateNextPaydays(state, LocalDate.now())
         val nearestPayday = paydays.firstOrNull()
 
-        val views = RemoteViews(context.packageName, R.layout.widget_monthly_summary)
-        applyCardSurface(views, R.id.widget_monthly_bg_fill, R.id.widget_monthly_bg_stroke, palette)
-        views.setTextColor(R.id.widget_monthly_title, palette.textSecondary)
-        views.setTextColor(R.id.widget_monthly_total, palette.textPrimary)
-        views.setTextColor(R.id.widget_monthly_meta, palette.textSecondary)
-
-        views.setOnClickPendingIntent(R.id.widget_monthly_root, openAppIntent(context, requestCode = 331, tab = 2))
-        views.setTextViewText(R.id.widget_monthly_title, "${month.monthValue}월 예상 누적")
-        views.setTextViewText(R.id.widget_monthly_total, PayrollCalculator.formatWon(totalWithLive))
-        views.setTextViewText(
-            R.id.widget_monthly_meta,
-            "완료 ${summary.shiftCount}건 · ${PayrollCalculator.formatDurationKorean(summary.totalWorkMinutes)}"
-        )
-
-        views.setViewVisibility(
-            R.id.widget_monthly_unpaid_wrap,
-            if (cfg.showMonthlyUnpaidBadge) View.VISIBLE else View.GONE
-        )
+        val totalFormatted = PayrollCalculator.formatWon(totalWithLive)
+        val metaText = "완료 ${summary.shiftCount}건 · ${PayrollCalculator.formatDurationKorean(summary.totalWorkMinutes)}"
+        val badgeText: String
+        val badgeColor: Int
         if (unpaid.first > 0L) {
-            views.setTextViewText(
-                R.id.widget_monthly_unpaid,
-                "미수금 ${unpaid.second.size}건 · ${PayrollCalculator.formatWon(unpaid.first)}"
-            )
-            views.setTextColor(R.id.widget_monthly_unpaid, palette.red)
-            applyPillTint(views, R.id.widget_monthly_unpaid_bg, palette.red, palette.accentSoftAlpha)
+            badgeText = "미수금 ${unpaid.second.size}건 · ${PayrollCalculator.formatWon(unpaid.first)}"
+            badgeColor = palette.red
         } else if (nearestPayday != null) {
             val dDay = nearestPayday.dDay.coerceAtLeast(0L)
-            val dDayText = if (dDay == 0L) "오늘 월급날" else "월급 D-$dDay"
-            views.setTextViewText(R.id.widget_monthly_unpaid, dDayText)
-            views.setTextColor(R.id.widget_monthly_unpaid, palette.accent)
-            applyPillTint(views, R.id.widget_monthly_unpaid_bg, palette.accent, palette.accentSoftAlpha)
+            badgeText = if (dDay == 0L) "오늘 월급날" else "월급 D-$dDay"
+            badgeColor = palette.accent
         } else {
-            views.setTextViewText(R.id.widget_monthly_unpaid, "미수금 없음")
-            views.setTextColor(R.id.widget_monthly_unpaid, palette.accent)
-            applyPillTint(views, R.id.widget_monthly_unpaid_bg, palette.accent, palette.accentSoftAlpha)
+            badgeText = "미수금 없음"
+            badgeColor = palette.accent
         }
 
-        manager.updateAppWidget(ids, views)
+        for (widgetId in ids) {
+            val views = RemoteViews(context.packageName, R.layout.widget_monthly_summary)
+            applyCardSurface(views, R.id.widget_monthly_bg_fill, R.id.widget_monthly_bg_stroke, palette)
+            views.setTextColor(R.id.widget_monthly_title, palette.textSecondary)
+            views.setTextColor(R.id.widget_monthly_total, palette.textPrimary)
+            views.setTextColor(R.id.widget_monthly_meta, palette.textSecondary)
+
+            views.setOnClickPendingIntent(R.id.widget_monthly_root, openAppIntent(context, requestCode = 331, tab = 2))
+            views.setTextViewText(R.id.widget_monthly_title, "${month.monthValue}월 예상 누적")
+            views.setTextViewText(R.id.widget_monthly_total, totalFormatted)
+            views.setTextViewText(R.id.widget_monthly_meta, metaText)
+
+            views.setViewVisibility(
+                R.id.widget_monthly_unpaid_wrap,
+                if (cfg.showMonthlyUnpaidBadge) View.VISIBLE else View.GONE
+            )
+            views.setTextViewText(R.id.widget_monthly_unpaid, badgeText)
+            views.setTextColor(R.id.widget_monthly_unpaid, badgeColor)
+            applyPillTint(views, R.id.widget_monthly_unpaid_bg, badgeColor, palette.accentSoftAlpha)
+
+            applyResponsiveMonthlySizing(context, manager, widgetId, views, totalFormatted)
+            manager.updateAppWidget(widgetId, views)
+        }
+    }
+
+    private fun readWidgetSizeDp(manager: AppWidgetManager, widgetId: Int): Pair<Float, Float>? {
+        val opts = manager.getAppWidgetOptions(widgetId)
+        val minW = opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 0)
+        val minH = opts.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0)
+        if (minW <= 0 || minH <= 0) return null
+        return minW.toFloat() to minH.toFloat()
+    }
+
+    private fun dpToPx(context: Context, dp: Float): Int =
+        TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp, context.resources.displayMetrics)
+            .roundToInt()
+            .coerceAtLeast(0)
+
+    private fun applyResponsiveLiveSizing(
+        context: Context,
+        manager: AppWidgetManager,
+        widgetId: Int,
+        views: RemoteViews,
+        amountText: String
+    ) {
+        val (w, h) = readWidgetSizeDp(manager, widgetId) ?: return
+        val wScale = (w / 270f).coerceIn(0.92f, 1.32f)
+        val hScale = (h / 122f).coerceIn(0.94f, 1.38f)
+        val scale = (0.55f * wScale + 0.45f * hScale).coerceIn(0.94f, 1.35f)
+        val hPad = dpToPx(context, (w * 0.042f).coerceIn(10f, 18f))
+        val vPad = dpToPx(context, (h * 0.075f).coerceIn(9f, 16f))
+        views.setViewPadding(R.id.widget_live_content, hPad, vPad, hPad, vPad)
+
+        val charBudgetWidth = (w - 28f).coerceAtLeast(120f)
+        val maxAmountForWidth = charBudgetWidth / (amountText.length.coerceAtLeast(4) * 0.62f)
+        val amountSp = minOf(32f * scale, maxAmountForWidth).coerceIn(24f, 44f)
+
+        views.setTextViewTextSize(R.id.widget_live_title, TypedValue.COMPLEX_UNIT_SP, (15f * scale).coerceIn(14f, 19f))
+        views.setTextViewTextSize(R.id.widget_live_rate, TypedValue.COMPLEX_UNIT_SP, (12.5f * scale).coerceIn(11.5f, 15.5f))
+        views.setTextViewTextSize(R.id.widget_live_amount, TypedValue.COMPLEX_UNIT_SP, amountSp)
+        views.setTextViewTextSize(R.id.widget_live_sub, TypedValue.COMPLEX_UNIT_SP, (13.5f * scale).coerceIn(12.5f, 16.5f))
+        val btnSp = (14f * scale).coerceIn(13f, 17f)
+        views.setTextViewTextSize(R.id.widget_btn_primary, TypedValue.COMPLEX_UNIT_SP, btnSp)
+        views.setTextViewTextSize(R.id.widget_btn_secondary, TypedValue.COMPLEX_UNIT_SP, btnSp)
+    }
+
+    private fun applyResponsiveCompactSizing(
+        context: Context,
+        manager: AppWidgetManager,
+        widgetId: Int,
+        views: RemoteViews,
+        amountText: String
+    ) {
+        val (w, h) = readWidgetSizeDp(manager, widgetId) ?: return
+        val wScale = (w / 270f).coerceIn(0.90f, 1.25f)
+        val hScale = (h / 56f).coerceIn(0.94f, 1.25f)
+        val scale = minOf(wScale, hScale).coerceIn(0.92f, 1.24f)
+        val hPad = dpToPx(context, (w * 0.038f).coerceIn(9f, 15f))
+        val vPad = dpToPx(context, (h * 0.10f).coerceIn(5f, 11f))
+        views.setViewPadding(R.id.widget_compact_content, hPad, vPad, (hPad * 0.85f).roundToInt(), vPad)
+
+        val charBudgetWidth = (w * 0.48f).coerceAtLeast(90f)
+        val maxAmountForWidth = charBudgetWidth / (amountText.length.coerceAtLeast(4) * 0.62f)
+        val amountSp = minOf(21f * scale, maxAmountForWidth).coerceIn(17.5f, 26f)
+
+        views.setTextViewTextSize(R.id.widget_compact_amount, TypedValue.COMPLEX_UNIT_SP, amountSp)
+        views.setTextViewTextSize(R.id.widget_compact_sub, TypedValue.COMPLEX_UNIT_SP, (12.5f * scale).coerceIn(11.5f, 15f))
+        val btnSp = (13f * scale).coerceIn(12f, 15.5f)
+        views.setTextViewTextSize(R.id.widget_compact_btn1, TypedValue.COMPLEX_UNIT_SP, btnSp)
+        views.setTextViewTextSize(R.id.widget_compact_btn2, TypedValue.COMPLEX_UNIT_SP, btnSp)
+    }
+
+    private fun applyResponsiveWeeklySizing(
+        context: Context,
+        manager: AppWidgetManager,
+        widgetId: Int,
+        views: RemoteViews,
+        visibleLineCount: Int
+    ) {
+        val (w, h) = readWidgetSizeDp(manager, widgetId) ?: return
+        val wScale = (w / 270f).coerceIn(0.94f, 1.28f)
+        val hScale = (h / 122f).coerceIn(0.94f, 1.38f)
+        val scale = (0.5f * wScale + 0.5f * hScale).coerceIn(0.94f, 1.32f)
+        val sparseBoost = if (visibleLineCount <= 2) 1.07f else 1.0f
+        val hPad = dpToPx(context, (w * 0.042f).coerceIn(10f, 18f))
+        val vPad = dpToPx(context, (h * 0.075f).coerceIn(9f, 16f))
+        views.setViewPadding(R.id.widget_weekly_content, hPad, vPad, hPad, vPad)
+
+        views.setTextViewTextSize(R.id.widget_weekly_title, TypedValue.COMPLEX_UNIT_SP, (16f * scale).coerceIn(15f, 20f))
+        views.setTextViewTextSize(R.id.widget_weekly_badge, TypedValue.COMPLEX_UNIT_SP, (12.5f * scale).coerceIn(12f, 15.5f))
+        views.setTextViewTextSize(R.id.widget_weekly_range, TypedValue.COMPLEX_UNIT_SP, (12.5f * scale).coerceIn(12f, 15.5f))
+        views.setTextViewTextSize(
+            R.id.widget_weekly_line1,
+            TypedValue.COMPLEX_UNIT_SP,
+            (14.5f * scale * sparseBoost).coerceIn(13.5f, 18.5f)
+        )
+        val subLineSp = (14f * scale * sparseBoost).coerceIn(13f, 17.5f)
+        views.setTextViewTextSize(R.id.widget_weekly_line2, TypedValue.COMPLEX_UNIT_SP, subLineSp)
+        views.setTextViewTextSize(R.id.widget_weekly_line3, TypedValue.COMPLEX_UNIT_SP, subLineSp)
+        views.setTextViewTextSize(R.id.widget_weekly_line4, TypedValue.COMPLEX_UNIT_SP, subLineSp)
+    }
+
+    private fun applyResponsiveMonthlySizing(
+        context: Context,
+        manager: AppWidgetManager,
+        widgetId: Int,
+        views: RemoteViews,
+        totalText: String
+    ) {
+        val (w, h) = readWidgetSizeDp(manager, widgetId) ?: return
+        val wScale = (w / 135f).coerceIn(0.94f, 1.38f)
+        val hScale = (h / 122f).coerceIn(0.94f, 1.38f)
+        val scale = (0.55f * wScale + 0.45f * hScale).coerceIn(0.94f, 1.34f)
+        val hPad = dpToPx(context, (w * 0.075f).coerceIn(9f, 16f))
+        val vPad = dpToPx(context, (h * 0.075f).coerceIn(9f, 16f))
+        views.setViewPadding(R.id.widget_monthly_content, hPad, vPad, hPad, vPad)
+
+        val charBudgetWidth = (w - 22f).coerceAtLeast(80f)
+        val maxTotalForWidth = charBudgetWidth / (totalText.length.coerceAtLeast(4) * 0.60f)
+        val totalSp = minOf(26f * scale, maxTotalForWidth).coerceIn(21f, 36f)
+
+        views.setTextViewTextSize(R.id.widget_monthly_title, TypedValue.COMPLEX_UNIT_SP, (14f * scale).coerceIn(13f, 18f))
+        views.setTextViewTextSize(R.id.widget_monthly_total, TypedValue.COMPLEX_UNIT_SP, totalSp)
+        views.setTextViewTextSize(R.id.widget_monthly_meta, TypedValue.COMPLEX_UNIT_SP, (12.5f * scale).coerceIn(12f, 16f))
+        views.setTextViewTextSize(R.id.widget_monthly_unpaid, TypedValue.COMPLEX_UNIT_SP, (12.5f * scale).coerceIn(12f, 16f))
     }
 
     private fun formatElapsed(elapsedSec: Long): String {

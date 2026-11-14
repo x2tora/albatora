@@ -23,10 +23,14 @@
         android:tint="@color/widget_border" />
 
     <LinearLayout
+        android:id="@+id/widget_monthly_content"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:padding="15dp">
+        android:paddingLeft="12dp"
+        android:paddingTop="11dp"
+        android:paddingRight="12dp"
+        android:paddingBottom="11dp">
 
         <TextView
             android:id="@+id/widget_monthly_title"
@@ -36,32 +40,43 @@
             android:maxLines="1"
             android:text="이번 달 예상 누적"
             android:textColor="@color/widget_text_secondary"
-            android:textSize="12sp"
+            android:textSize="13.5sp"
             android:textStyle="bold" />
 
-        <TextView
-            android:id="@+id/widget_monthly_total"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="5dp"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:text="0원"
-            android:textColor="@color/widget_text_primary"
-            android:textSize="22sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/widget_monthly_meta"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_marginTop="4dp"
             android:layout_weight="1"
-            android:ellipsize="end"
-            android:maxLines="2"
-            android:text="완료 0건 · 0시간"
-            android:textColor="@color/widget_text_secondary"
-            android:textSize="11sp" />
+            android:gravity="center_vertical"
+            android:orientation="vertical"
+            android:paddingTop="2dp"
+            android:paddingBottom="2dp">
+
+            <TextView
+                android:id="@+id/widget_monthly_total"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:fontFeatureSettings="tnum"
+                android:letterSpacing="-0.02"
+                android:maxLines="1"
+                android:text="0원"
+                android:textColor="@color/widget_text_primary"
+                android:textSize="26sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/widget_monthly_meta"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="3dp"
+                android:ellipsize="end"
+                android:lineSpacingMultiplier="1.1"
+                android:maxLines="2"
+                android:text="완료 0건 · 0시간"
+                android:textColor="@color/widget_text_secondary"
+                android:textSize="12.5sp" />
+        </LinearLayout>
 
         <FrameLayout
             android:id="@+id/widget_monthly_unpaid_wrap"
@@ -84,13 +99,13 @@
                 android:ellipsize="end"
                 android:gravity="center"
                 android:maxLines="1"
-                android:paddingLeft="8dp"
-                android:paddingTop="5dp"
-                android:paddingRight="8dp"
-                android:paddingBottom="5dp"
+                android:paddingLeft="10dp"
+                android:paddingTop="7dp"
+                android:paddingRight="10dp"
+                android:paddingBottom="7dp"
                 android:text="미수금 없음"
                 android:textColor="@color/widget_accent"
-                android:textSize="11sp"
+                android:textSize="12.5sp"
                 android:textStyle="bold" />
         </FrameLayout>
     </LinearLayout>

@@ -9,34 +9,63 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.albatora.app.domain.LiveDashboardSnapshot
 import com.albatora.app.domain.PayrollCalculator
 import com.albatora.app.model.ThemeColorStyle
 import com.albatora.app.service.BatteryOptimizationHelper
 import com.albatora.app.ui.components.AppUpdateDialog
 import com.albatora.app.ui.components.FloatingLiquidGlassNavBar
+import com.albatora.app.ui.components.LiveStatusDot
+import com.albatora.app.ui.components.OdometerCurrencyText
+import com.albatora.app.ui.components.SquirclePillBadge
 import com.albatora.app.ui.components.StackedToastHost
 import com.albatora.app.ui.components.StackedToastState
 import com.albatora.app.ui.components.rememberStackedToastState
+import com.albatora.app.ui.theme.AlbaIconCatalog
 import com.albatora.app.ui.theme.LocalAppBackdrop
+import com.albatora.app.ui.theme.LocalIsDarkTheme
 import com.albatora.app.viewmodel.AlbaToraViewModel
 import kotlinx.serialization.Serializable
 import top.yukonga.miuix.kmp.basic.*
@@ -50,15 +79,23 @@ import top.yukonga.miuix.kmp.blur.progressiveTextureBlur
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Back
+import top.yukonga.miuix.kmp.icon.extended.ChevronForward
 import top.yukonga.miuix.kmp.icon.extended.Settings
+import top.yukonga.miuix.kmp.icon.extended.Stopwatch
+import top.yukonga.miuix.kmp.icon.extended.Store
+import top.yukonga.miuix.kmp.icon.extended.Timer
 import top.yukonga.miuix.kmp.nav.core.NavDisplay
 import top.yukonga.miuix.kmp.nav.core.NavKey
 import top.yukonga.miuix.kmp.nav.core.rememberNavBackStack
 import top.yukonga.miuix.kmp.nav.transition.NavTransitions
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.shader.isRuntimeShaderSupported
+import top.yukonga.miuix.kmp.squircle.squircleBackground
+import top.yukonga.miuix.kmp.squircle.squircleBorder
+import top.yukonga.miuix.kmp.squircle.squircleClip
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.time.LocalDate
+import java.util.Locale
 
 @Serializable
 sealed interface AppRoute : NavKey {
@@ -262,11 +299,18 @@ private fun MainTabsHost(
     var isFullscreenFocus by remember { mutableStateOf(false) }
     var showHomeQuickMenu by remember { mutableStateOf(false) }
     var openStopwatchTrigger by remember { mutableIntStateOf(0) }
+    var homeLiveCollapseProgress by remember { mutableFloatStateOf(0f) }
+    var scrollHomeToTopTrigger by remember { mutableIntStateOf(0) }
+    var measuredTopBarHeightDp by remember { mutableStateOf(0.dp) }
     val hostContext = LocalContext.current
+    val density = LocalDensity.current
     var lastBackPressedAtMs by remember { mutableLongStateOf(0L) }
 
-    BackHandler(enabled = !showHomeQuickMenu) {
+    BackHandler {
         when {
+            showHomeQuickMenu -> {
+                showHomeQuickMenu = false
+            }
             isFullscreenFocus && selectedTab == 0 -> {
                 isFullscreenFocus = false
             }
@@ -290,6 +334,7 @@ private fun MainTabsHost(
     LaunchedEffect(launchActionNonce) {
         if (launchActionNonce > 0) {
             selectedTab = launchTargetTab.coerceIn(0, 3)
+            showHomeQuickMenu = false
             if (launchOpenStopwatch) {
                 selectedTab = 0
                 openStopwatchTrigger++
@@ -300,6 +345,7 @@ private fun MainTabsHost(
     LaunchedEffect(liveDashboard.activeShifts.isEmpty()) {
         if (liveDashboard.activeShifts.isEmpty()) {
             isFullscreenFocus = false
+            homeLiveCollapseProgress = 0f
         }
     }
 
@@ -315,65 +361,54 @@ private fun MainTabsHost(
     val useShader = isRuntimeShaderSupported()
     val barOverlayColor = MiuixTheme.colorScheme.surface.copy(alpha = if (useShader) 0.72f else 0.96f)
     val showChrome = !(isFullscreenFocus && selectedTab == 0 && liveDashboard.activeShifts.isNotEmpty())
+    val defaultTopBarHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 56.dp
+    val resolvedTopBarInset = if (measuredTopBarHeightDp > 0.dp) measuredTopBarHeightDp else defaultTopBarHeight
+
+    LaunchedEffect(showChrome) {
+        if (!showChrome) {
+            showHomeQuickMenu = false
+        }
+    }
+
+    val quickMenuMorphProgress = remember { Animatable(0f) }
+    var isQuickMenuMounted by remember { mutableStateOf(false) }
+    LaunchedEffect(showHomeQuickMenu) {
+        if (showHomeQuickMenu) {
+            isQuickMenuMounted = true
+            quickMenuMorphProgress.animateTo(
+                targetValue = 1f,
+                animationSpec = spring(
+                    dampingRatio = 0.80f,
+                    stiffness = Spring.StiffnessMediumLow
+                )
+            )
+        } else {
+            quickMenuMorphProgress.animateTo(
+                targetValue = 0f,
+                animationSpec = spring(
+                    dampingRatio = 0.92f,
+                    stiffness = Spring.StiffnessMedium
+                )
+            )
+            isQuickMenuMounted = false
+        }
+    }
 
     val tabTitles = listOf("알바토라", "근무 달력", "정산 · 명세서", "급여 계산기")
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        containerColor = Color.Transparent,
-        topBar = {
-            if (showChrome) {
-                val topBlurMod = if (useShader) {
-                    Modifier.progressiveTextureBlur(
-                        backdrop = barBackdrop,
-                        shape = RectangleShape,
-                        blurRadius = 16f,
-                        gradient = ProgressiveBlur.Top,
-                        colors = BlurDefaults.blurColors(
-                            blendColors = listOf(BlendColorEntry(barOverlayColor, BlurBlendMode.SrcOver))
-                        )
-                    )
-                } else {
-                    Modifier.background(barOverlayColor)
-                }
-                Box(modifier = topBlurMod) {
-                    SmallTopAppBar(
-                        title = tabTitles[selectedTab],
-                        color = Color.Transparent,
-                        scrollBehavior = scrollBehavior,
-                        actions = {
-                            IconButton(onClick = onOpenSettings) {
-                                Icon(
-                                    imageVector = MiuixIcons.Regular.Settings,
-                                    contentDescription = "더보기 및 설정",
-                                    tint = MiuixTheme.colorScheme.onSurface
-                                )
-                            }
-                        }
-                    )
-                }
-            }
-        }
-    ) { paddingValues ->
+        containerColor = Color.Transparent
+    ) { _ ->
         Box(modifier = Modifier.fillMaxSize()) {
-            // ① Capture layer ONLY: surface background + scrolling pages (no glass dock inside!)
+            // ① Capture layer ONLY: surface background + scrolling pages (no glass dock / top bar inside!)
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .layerBackdrop(barBackdrop)
                     .background(surfaceBg)
             ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .let {
-                            if (showChrome) {
-                                it.padding(top = paddingValues.calculateTopPadding())
-                            } else {
-                                it
-                            }
-                        }
-                ) {
+                Box(modifier = Modifier.fillMaxSize()) {
                     AnimatedContent(
                         targetState = selectedTab,
                         transitionSpec = {
@@ -446,99 +481,213 @@ private fun MainTabsHost(
                                 onDeleteArchivedGoal = viewModel::deleteArchivedGoal,
                                 onOpenCalendar = { selectedTab = 1 },
                                 onOpenCalculator = { selectedTab = 3 },
-                                onOpenWidgetStudio = onOpenWidgetStudio
+                                onOpenWidgetStudio = onOpenWidgetStudio,
+                                topBarInset = resolvedTopBarInset,
+                                scrollToTopTrigger = scrollHomeToTopTrigger,
+                                onLiveHeaderCollapseChange = { homeLiveCollapseProgress = it }
                             )
-                            1 -> CalendarScreen(
-                                state = state,
-                                selectedDate = calendarSelectedDate,
-                                onSelectedDateChange = { calendarSelectedDate = it },
-                                scrollBehavior = scrollBehavior,
-                                onQuickAddShortTermForDate = { dateIso ->
-                                    onOpenQuickShortTerm(null, dateIso)
-                                },
-                                onEditRecord = { rec ->
-                                    if (rec.id.startsWith("cal_") || rec.id.startsWith("virtual_")) {
-                                        val realized = rec.copy(
-                                            id = java.util.UUID.randomUUID().toString(),
-                                            isScheduledOverride = true
-                                        )
-                                        viewModel.upsertRecord(realized)
-                                        onOpenQuickShortTerm(realized.id, realized.date)
-                                    } else {
-                                        onOpenQuickShortTerm(rec.id, rec.date)
-                                    }
-                                },
-                                onTogglePaymentStatus = viewModel::togglePaymentStatus,
-                                onExtendOneHour = viewModel::extendOneHour,
-                                onMarkEarlyLeave = { viewModel.markEarlyLeave(it, 60) },
-                                onMarkAbsent = viewModel::markAbsent,
-                                onAddSubstituteFromJob = viewModel::addSubstituteFromJob,
-                                onStampTemplateOnDate = viewModel::stampTemplateOnDate,
-                                onNotify = notify
-                            )
-                            2 -> RecordsScreen(
-                                state = state,
-                                initialOnlyUnpaid = recordsOpenUnpaid,
-                                scrollBehavior = scrollBehavior,
-                                onEditRecord = { rec ->
-                                    if (rec.isScheduledOverride || !rec.id.startsWith("virtual_")) {
-                                        onOpenQuickShortTerm(rec.id, rec.date)
-                                    } else {
-                                        val realized = rec.copy(
-                                            id = java.util.UUID.randomUUID().toString(),
-                                            isScheduledOverride = true
-                                        )
-                                        viewModel.upsertRecord(realized)
-                                        onOpenQuickShortTerm(realized.id, realized.date)
-                                    }
-                                },
-                                onTogglePaymentStatus = viewModel::togglePaymentStatus,
-                                onAddShortTerm = {
-                                    onOpenQuickShortTerm(null, PayrollCalculator.formatDate(LocalDate.now()))
-                                },
-                                onNotify = notify
-                            )
-                            else -> CalculatorScreen(
-                                defaultMinWage = state.settings.defaultMinWage,
-                                scrollBehavior = scrollBehavior,
-                                onCreateJobWithWage = { wage -> onOpenAddRegularJob(null, wage) }
-                            )
+                            1 -> Box(modifier = Modifier.fillMaxSize().padding(top = resolvedTopBarInset)) {
+                                CalendarScreen(
+                                    state = state,
+                                    selectedDate = calendarSelectedDate,
+                                    onSelectedDateChange = { calendarSelectedDate = it },
+                                    scrollBehavior = scrollBehavior,
+                                    onQuickAddShortTermForDate = { dateIso ->
+                                        onOpenQuickShortTerm(null, dateIso)
+                                    },
+                                    onEditRecord = { rec ->
+                                        if (rec.id.startsWith("cal_") || rec.id.startsWith("virtual_")) {
+                                            val realized = rec.copy(
+                                                id = java.util.UUID.randomUUID().toString(),
+                                                isScheduledOverride = true
+                                            )
+                                            viewModel.upsertRecord(realized)
+                                            onOpenQuickShortTerm(realized.id, realized.date)
+                                        } else {
+                                            onOpenQuickShortTerm(rec.id, rec.date)
+                                        }
+                                    },
+                                    onTogglePaymentStatus = viewModel::togglePaymentStatus,
+                                    onExtendOneHour = viewModel::extendOneHour,
+                                    onMarkEarlyLeave = { viewModel.markEarlyLeave(it, 60) },
+                                    onMarkAbsent = viewModel::markAbsent,
+                                    onAddSubstituteFromJob = viewModel::addSubstituteFromJob,
+                                    onStampTemplateOnDate = viewModel::stampTemplateOnDate,
+                                    onNotify = notify
+                                )
+                            }
+                            2 -> Box(modifier = Modifier.fillMaxSize().padding(top = resolvedTopBarInset)) {
+                                RecordsScreen(
+                                    state = state,
+                                    initialOnlyUnpaid = recordsOpenUnpaid,
+                                    scrollBehavior = scrollBehavior,
+                                    onEditRecord = { rec ->
+                                        if (rec.isScheduledOverride || !rec.id.startsWith("virtual_")) {
+                                            onOpenQuickShortTerm(rec.id, rec.date)
+                                        } else {
+                                            val realized = rec.copy(
+                                                id = java.util.UUID.randomUUID().toString(),
+                                                isScheduledOverride = true
+                                            )
+                                            viewModel.upsertRecord(realized)
+                                            onOpenQuickShortTerm(realized.id, realized.date)
+                                        }
+                                    },
+                                    onTogglePaymentStatus = viewModel::togglePaymentStatus,
+                                    onAddShortTerm = {
+                                        onOpenQuickShortTerm(null, PayrollCalculator.formatDate(LocalDate.now()))
+                                    },
+                                    onNotify = notify
+                                )
+                            }
+                            else -> Box(modifier = Modifier.fillMaxSize().padding(top = resolvedTopBarInset)) {
+                                CalculatorScreen(
+                                    defaultMinWage = state.settings.defaultMinWage,
+                                    scrollBehavior = scrollBehavior,
+                                    onCreateJobWithWage = { wage -> onOpenAddRegularJob(null, wage) }
+                                )
+                            }
                         }
                     }
                 }
             }
 
-            // ② Floating overlay layer (strictly OUTSIDE layerBackdrop capture box)
-            if (showChrome) {
-                StackedToastHost(
-                    state = toastState,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .widthIn(max = 400.dp)
-                        .fillMaxWidth()
-                        .navigationBarsPadding()
-                        .padding(start = 16.dp, end = 16.dp, bottom = 92.dp)
+            // ② Floating frosted top bar with smooth collapsing live earnings header ticker
+            AnimatedVisibility(
+                visible = showChrome,
+                enter = slideInVertically(
+                    animationSpec = spring(dampingRatio = 0.88f, stiffness = Spring.StiffnessMediumLow),
+                    initialOffsetY = { -it }
+                ) + fadeIn(tween(240)),
+                exit = slideOutVertically(
+                    animationSpec = spring(dampingRatio = 0.95f, stiffness = Spring.StiffnessMedium),
+                    targetOffsetY = { -it }
+                ) + fadeOut(tween(180)),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .onSizeChanged {
+                        if (it.height > 0) {
+                            val measured = with(density) { it.height.toDp() }
+                            if (measured > 0.dp) measuredTopBarHeightDp = measured
+                        }
+                    }
+            ) {
+                val topBlurMod = if (useShader) {
+                    Modifier.progressiveTextureBlur(
+                        backdrop = barBackdrop,
+                        shape = RectangleShape,
+                        blurRadius = 16f,
+                        gradient = ProgressiveBlur.Top,
+                        colors = BlurDefaults.blurColors(
+                            blendColors = listOf(BlendColorEntry(barOverlayColor, BlurBlendMode.SrcOver))
+                        )
+                    )
+                } else {
+                    Modifier.background(barOverlayColor)
+                }
+                val showLiveHeader = selectedTab == 0 && liveDashboard.activeShifts.isNotEmpty()
+                val liveTickerProgress by animateFloatAsState(
+                    targetValue = if (showLiveHeader && !isFullscreenFocus) homeLiveCollapseProgress else 0f,
+                    animationSpec = spring(dampingRatio = 0.90f, stiffness = Spring.StiffnessMedium),
+                    label = "top_header_live_ticker"
                 )
+                val titleAlpha = if (showLiveHeader) (1f - liveTickerProgress * 1.55f).coerceIn(0f, 1f) else 1f
 
-                FloatingLiquidGlassNavBar(
-                    backdrop = barBackdrop,
-                    selectedTab = selectedTab,
-                    hasActiveShift = liveDashboard.activeShifts.isNotEmpty(),
-                    unpaidCount = unpaidCount,
-                    onSelectTab = { tab ->
-                        if (tab == 2) recordsOpenUnpaid = false
-                        selectedTab = tab
-                    },
-                    onCenterAddClick = { showHomeQuickMenu = true },
-                    useLensTint = state.settings.resolvedColorStyle() != ThemeColorStyle.DEFAULT,
+                Box(modifier = topBlurMod) {
+                    SmallTopAppBar(
+                        title = tabTitles[selectedTab],
+                        titleColor = MiuixTheme.colorScheme.onSurface.copy(alpha = titleAlpha),
+                        color = Color.Transparent,
+                        scrollBehavior = scrollBehavior,
+                        actions = {
+                            IconButton(onClick = onOpenSettings) {
+                                Icon(
+                                    imageVector = MiuixIcons.Regular.Settings,
+                                    contentDescription = "더보기 및 설정",
+                                    tint = MiuixTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    )
+
+                    if (showLiveHeader && liveTickerProgress > 0.02f) {
+                        PinnedHeaderLiveTicker(
+                            snapshot = liveDashboard,
+                            progress = liveTickerProgress,
+                            onScrollToTop = { scrollHomeToTopTrigger++ },
+                            onOpenFullscreen = { isFullscreenFocus = true },
+                            modifier = Modifier
+                                .matchParentSize()
+                                .statusBarsPadding()
+                                .padding(start = 16.dp, end = 60.dp)
+                        )
+                    }
+                }
+            }
+
+            // ③ Quick-add dim scrim positioned BELOW the navigation dock so the lens on '+' stays crisp & lit
+            if (isQuickMenuMounted) {
+                val scrimAlpha = 0.44f * quickMenuMorphProgress.value.coerceIn(0f, 1f)
+                Box(
                     modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .widthIn(max = 384.dp)
-                        .fillMaxWidth()
-                        .navigationBarsPadding()
-                        .padding(horizontal = 16.dp, vertical = 14.dp)
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = scrimAlpha))
+                        .pointerInput(showHomeQuickMenu) {
+                            if (showHomeQuickMenu) {
+                                detectTapGestures { showHomeQuickMenu = false }
+                            }
+                        }
                 )
-            } else {
+            }
+
+            // ④ Floating Liquid Glass nav dock & Toasts (strictly OUTSIDE layerBackdrop capture box)
+            AnimatedVisibility(
+                visible = showChrome,
+                enter = slideInVertically(
+                    animationSpec = spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow),
+                    initialOffsetY = { it }
+                ) + fadeIn(tween(240)),
+                exit = slideOutVertically(
+                    animationSpec = spring(dampingRatio = 0.94f, stiffness = Spring.StiffnessMedium),
+                    targetOffsetY = { it }
+                ) + fadeOut(tween(180)),
+                modifier = Modifier.align(Alignment.BottomCenter)
+            ) {
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    StackedToastHost(
+                        state = toastState,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .widthIn(max = 400.dp)
+                            .fillMaxWidth()
+                            .navigationBarsPadding()
+                            .padding(start = 16.dp, end = 16.dp, bottom = 92.dp)
+                    )
+
+                    FloatingLiquidGlassNavBar(
+                        backdrop = barBackdrop,
+                        selectedTab = selectedTab,
+                        isCenterAddSelected = showHomeQuickMenu,
+                        hasActiveShift = liveDashboard.activeShifts.isNotEmpty(),
+                        unpaidCount = unpaidCount,
+                        onSelectTab = { tab ->
+                            showHomeQuickMenu = false
+                            if (tab == 2) recordsOpenUnpaid = false
+                            selectedTab = tab
+                        },
+                        onCenterAddClick = { showHomeQuickMenu = !showHomeQuickMenu },
+                        useLensTint = state.settings.resolvedColorStyle() != ThemeColorStyle.DEFAULT,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .widthIn(max = 384.dp)
+                            .fillMaxWidth()
+                            .navigationBarsPadding()
+                            .padding(horizontal = 16.dp, vertical = 14.dp)
+                    )
+                }
+            }
+
+            if (!showChrome) {
                 StackedToastHost(
                     state = toastState,
                     modifier = Modifier
@@ -550,41 +699,26 @@ private fun MainTabsHost(
                 )
             }
 
-            // Mount Miuix OverlayDialogs inside Scaffold scope so PopupHost is always active
-            OverlayDialog(
-                show = showHomeQuickMenu,
-                title = "빠른 등록 · 즉시 출근",
-                onDismissRequest = { showHomeQuickMenu = false }
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(
-                        text = "정규/고정 알바 추가",
-                        onClick = {
-                            showHomeQuickMenu = false
-                            onOpenAddRegularJob(null, null)
-                        },
-                        colors = ButtonDefaults.textButtonColorsPrimary(),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    TextButton(
-                        text = "단기/일용직 10초 등록",
-                        onClick = {
-                            showHomeQuickMenu = false
-                            val prefillDate = if (selectedTab == 1) calendarSelectedDate else LocalDate.now()
-                            onOpenQuickShortTerm(null, PayrollCalculator.formatDate(prefillDate))
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    TextButton(
-                        text = "즉시 출근 스톱워치 시작",
-                        onClick = {
-                            showHomeQuickMenu = false
-                            selectedTab = 0
-                            openStopwatchTrigger++
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
+            // ⑤ Morphing Quick-Add menu expanding directly from the center '+' capsule
+            if (isQuickMenuMounted) {
+                ExpandableQuickAddMenuOverlay(
+                    morphProgress = quickMenuMorphProgress.value,
+                    interactive = showHomeQuickMenu,
+                    onAddRegularJob = {
+                        showHomeQuickMenu = false
+                        onOpenAddRegularJob(null, null)
+                    },
+                    onQuickAddShortTerm = {
+                        showHomeQuickMenu = false
+                        val prefillDate = if (selectedTab == 1) calendarSelectedDate else LocalDate.now()
+                        onOpenQuickShortTerm(null, PayrollCalculator.formatDate(prefillDate))
+                    },
+                    onStartStopwatch = {
+                        showHomeQuickMenu = false
+                        selectedTab = 0
+                        openStopwatchTrigger++
+                    }
+                )
             }
 
             AppUpdateDialog(
@@ -730,4 +864,303 @@ private fun SettingsScreenHost(
             )
         }
     }
+}
+
+@Composable
+private fun PinnedHeaderLiveTicker(
+    snapshot: LiveDashboardSnapshot,
+    progress: Float,
+    onScrollToTop: () -> Unit,
+    onOpenFullscreen: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val p = progress.coerceIn(0f, 1f)
+    val density = LocalDensity.current
+    val primaryShift = snapshot.activeShifts.firstOrNull() ?: return
+    val allPaused = snapshot.activeShifts.all { it.isPaused }
+    val statusColor = if (allPaused) {
+        MiuixTheme.colorScheme.onSurfaceVariantActions
+    } else {
+        MiuixTheme.colorScheme.primary
+    }
+    val shiftLabel = if (snapshot.activeShifts.size > 1) {
+        "${primaryShift.title} 외 ${snapshot.activeShifts.size - 1}건"
+    } else {
+        primaryShift.title
+    }
+    val elapsedText = PayrollCalculator.formatCountdown(primaryShift.elapsedWorkMillis)
+
+    Row(
+        modifier = modifier
+            .fillMaxHeight()
+            .graphicsLayer {
+                alpha = p
+                translationY = (1f - p) * with(density) { 10.dp.toPx() }
+                scaleX = lerpFloat(0.95f, 1f, p)
+                scaleY = lerpFloat(0.95f, 1f, p)
+            }
+            .clickable(
+                interactionSource = null,
+                indication = null,
+                onClick = onScrollToTop
+            ),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .squircleBackground(
+                    color = MiuixTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.88f),
+                    cornerRadius = 15.dp
+                )
+                .squircleBorder(
+                    width = 1.dp,
+                    color = statusColor.copy(alpha = 0.24f),
+                    cornerRadius = 15.dp
+                )
+                .padding(horizontal = 11.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            LiveStatusDot(
+                color = statusColor,
+                size = 8.dp
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(1.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Text(
+                        text = shiftLabel,
+                        style = MiuixTheme.textStyles.footnote1.copy(fontWeight = FontWeight.SemiBold),
+                        color = MiuixTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    Text(
+                        text = if (allPaused) "휴게 · $elapsedText" else elapsedText,
+                        style = MiuixTheme.textStyles.footnote2.copy(
+                            fontSize = 10.5.sp,
+                            fontFeatureSettings = "tnum"
+                        ),
+                        color = statusColor,
+                        maxLines = 1
+                    )
+                }
+                OdometerCurrencyText(
+                    amountWon = snapshot.totalEarnedWon,
+                    textStyle = MiuixTheme.textStyles.subtitle.copy(
+                        fontSize = 15.5.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    ),
+                    color = MiuixTheme.colorScheme.onSurface
+                )
+            }
+            SquirclePillBadge(
+                text = "전체",
+                backgroundColor = statusColor.copy(alpha = 0.14f),
+                contentColor = statusColor,
+                onClick = onOpenFullscreen
+            )
+        }
+    }
+}
+
+@Composable
+private fun ExpandableQuickAddMenuOverlay(
+    morphProgress: Float,
+    interactive: Boolean,
+    onAddRegularJob: () -> Unit,
+    onQuickAddShortTerm: () -> Unit,
+    onStartStopwatch: () -> Unit
+) {
+    val isDark = LocalIsDarkTheme.current
+    val density = LocalDensity.current
+    val raw = morphProgress.coerceAtLeast(0f)
+    val clamped = raw.coerceIn(0f, 1f)
+    val liftProgress = smoothStep(0f, 0.72f, clamped) + (raw - clamped) * 0.35f
+    val sizeProgress = smoothStep(0.02f, 0.85f, clamped) + (raw - clamped) * 0.18f
+    val colorBlend = smoothStep(0.06f, 0.58f, clamped)
+    val contentFade = smoothStep(0.32f, 0.84f, clamped)
+
+    val cardColor = androidx.compose.ui.graphics.lerp(
+        MiuixTheme.colorScheme.primary,
+        if (isDark) MiuixTheme.colorScheme.surfaceContainerHigh else Color.White,
+        colorBlend
+    )
+    val borderColor = MiuixTheme.colorScheme.onSurface.copy(
+        alpha = lerpFloat(0f, if (isDark) 0.12f else 0.08f, clamped)
+    )
+    val bottomOffset = androidx.compose.ui.unit.lerp(22.dp, 88.dp, liftProgress.coerceAtLeast(0f))
+    val cornerRadius = androidx.compose.ui.unit.lerp(22.dp, 26.dp, clamped)
+
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxSize()
+            .navigationBarsPadding(),
+        contentAlignment = Alignment.BottomCenter
+    ) {
+        val targetWidthDp = (maxWidth - 40.dp).coerceIn(264.dp, 340.dp)
+        val targetWidthPx = with(density) { targetWidthDp.roundToPx() }
+        val minWidthPx = with(density) { 50.dp.roundToPx() }
+        val minHeightPx = with(density) { 44.dp.roundToPx() }
+        val cardShape = RoundedCornerShape(cornerRadius)
+
+        Box(
+            modifier = Modifier
+                .padding(bottom = bottomOffset)
+                .shadow(
+                    elevation = lerpFloat(2f, 22f, clamped).dp,
+                    shape = cardShape,
+                    ambientColor = Color.Black.copy(alpha = lerpFloat(0.08f, 0.28f, clamped)),
+                    spotColor = Color.Black.copy(alpha = lerpFloat(0.10f, 0.32f, clamped))
+                )
+                .clip(cardShape)
+                .background(cardColor)
+                .squircleBorder(1.dp, borderColor, cornerRadius)
+                .pointerInput(interactive) {
+                    if (interactive) {
+                        detectTapGestures { /* keep taps inside menu from falling through to dismiss scrim */ }
+                    }
+                }
+                .layout { measurable, constraints ->
+                    val childConstraints = constraints.copy(
+                        minWidth = targetWidthPx,
+                        maxWidth = targetWidthPx,
+                        minHeight = 0
+                    )
+                    val placeable = measurable.measure(childConstraints)
+                    val curW = lerpFloat(minWidthPx.toFloat(), targetWidthPx.toFloat(), sizeProgress)
+                        .roundToInt()
+                        .coerceAtLeast(1)
+                    val curH = lerpFloat(minHeightPx.toFloat(), placeable.height.toFloat(), sizeProgress)
+                        .roundToInt()
+                        .coerceAtLeast(1)
+                    layout(curW, curH) {
+                        placeable.placeRelative(
+                            x = (curW - placeable.width) / 2,
+                            y = (curH - placeable.height) / 2
+                        )
+                    }
+                }
+        ) {
+            Column(
+                modifier = Modifier
+                    .width(targetWidthDp)
+                    .padding(horizontal = 8.dp, vertical = 10.dp)
+                    .graphicsLayer {
+                        alpha = contentFade
+                    }
+            ) {
+                Text(
+                    text = "빠른 추가",
+                    style = MiuixTheme.textStyles.footnote1.copy(fontWeight = FontWeight.SemiBold),
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    modifier = Modifier.padding(start = 12.dp, top = 4.dp, bottom = 6.dp)
+                )
+                QuickAddMorphActionRow(
+                    icon = MiuixIcons.Store,
+                    iconTint = MiuixTheme.colorScheme.primary,
+                    title = "고정 근무(매장) 추가",
+                    subtitle = "반복 스케줄 · 주휴수당 · 세금 프리셋",
+                    revealProgress = smoothStep(0.28f, 0.78f, clamped),
+                    enabled = interactive,
+                    onClick = onAddRegularJob
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                QuickAddMorphActionRow(
+                    icon = MiuixIcons.Timer,
+                    iconTint = Color(0xFF00A86B),
+                    title = "단기 알바 · 일당 추가",
+                    subtitle = "하루 행사, 대타, 일당 근무 빠르게 기록",
+                    revealProgress = smoothStep(0.36f, 0.86f, clamped),
+                    enabled = interactive,
+                    onClick = onQuickAddShortTerm
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
+                QuickAddMorphActionRow(
+                    icon = MiuixIcons.Stopwatch,
+                    iconTint = Color(0xFFE07A18),
+                    title = "즉석 스톱워치 출근",
+                    subtitle = "매장 등록 없이 지금 바로 시급 카운트 시작",
+                    revealProgress = smoothStep(0.44f, 0.94f, clamped),
+                    enabled = interactive,
+                    onClick = onStartStopwatch
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun QuickAddMorphActionRow(
+    icon: ImageVector,
+    iconTint: Color,
+    title: String,
+    subtitle: String,
+    revealProgress: Float,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    val density = LocalDensity.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(enabled = enabled, onClick = onClick)
+            .graphicsLayer {
+                alpha = revealProgress
+                translationY = (1f - revealProgress) * with(density) { 12.dp.toPx() }
+            }
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = title,
+            tint = iconTint,
+            modifier = Modifier.size(26.dp)
+        )
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                text = title,
+                style = MiuixTheme.textStyles.headline2.copy(fontWeight = FontWeight.SemiBold),
+                color = MiuixTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = subtitle,
+                style = MiuixTheme.textStyles.footnote1,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Icon(
+            imageVector = MiuixIcons.ChevronForward,
+            contentDescription = null,
+            tint = MiuixTheme.colorScheme.onSurfaceVariantActions,
+            modifier = Modifier.size(16.dp)
+        )
+    }
+}
+
+private fun lerpFloat(start: Float, end: Float, fraction: Float): Float =
+    start + (end - start) * fraction
+
+private fun smoothStep(edge0: Float, edge1: Float, x: Float): Float {
+    if (edge1 <= edge0) return if (x >= edge1) 1f else 0f
+    val t = ((x - edge0) / (edge1 - edge0)).coerceIn(0f, 1f)
+    return t * t * (3f - 2f * t)
 }

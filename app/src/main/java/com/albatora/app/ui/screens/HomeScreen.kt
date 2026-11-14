@@ -1,21 +1,40 @@
 package com.albatora.app.ui.screens
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.albatora.app.domain.*
@@ -79,7 +98,10 @@ fun HomeScreen(
     onDeleteArchivedGoal: (String) -> Unit = {},
     onOpenCalendar: () -> Unit = {},
     onOpenCalculator: () -> Unit = {},
-    onOpenWidgetStudio: () -> Unit = {}
+    onOpenWidgetStudio: () -> Unit = {},
+    topBarInset: Dp = 0.dp,
+    scrollToTopTrigger: Int = 0,
+    onLiveHeaderCollapseChange: (Float) -> Unit = {}
 ) {
     val isDark = LocalIsDarkTheme.current
     val currentMonth = remember { YearMonth.now() }
@@ -143,10 +165,45 @@ fun HomeScreen(
         val isWide = maxWidth >= 600.dp
         val navBottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
         val bottomPad = 116.dp + navBottomInset
+        val phoneListState = rememberLazyListState()
+        val wideLeftListState = rememberLazyListState()
+        val activeListState = if (isWide) wideLeftListState else phoneListState
+
+        LaunchedEffect(scrollToTopTrigger) {
+            if (scrollToTopTrigger > 0) {
+                activeListState.animateScrollToItem(0)
+            }
+        }
+
+        val rawCollapseFraction by remember(liveDashboard.activeShifts.isNotEmpty(), activeListState) {
+            derivedStateOf {
+                if (liveDashboard.activeShifts.isEmpty()) {
+                    0f
+                } else if (activeListState.firstVisibleItemIndex > 0) {
+                    1f
+                } else {
+                    val firstItem = activeListState.layoutInfo.visibleItemsInfo.firstOrNull()
+                    val itemHeight = (firstItem?.size ?: 1).coerceAtLeast(1).toFloat()
+                    val startPx = itemHeight * 0.22f
+                    val endPx = itemHeight * 0.68f
+                    ((activeListState.firstVisibleItemScrollOffset - startPx) / (endPx - startPx).coerceAtLeast(1f))
+                        .coerceIn(0f, 1f)
+                }
+            }
+        }
+
+        LaunchedEffect(rawCollapseFraction) {
+            onLiveHeaderCollapseChange(rawCollapseFraction)
+        }
+        DisposableEffect(Unit) {
+            onDispose { onLiveHeaderCollapseChange(0f) }
+        }
 
         val focusSection: androidx.compose.foundation.lazy.LazyListScope.() -> Unit = {
             if (liveDashboard.activeShifts.isNotEmpty()) {
                 item(key = "live_focus_stage") {
+                    val cardScrollScale = 1f - 0.12f * rawCollapseFraction
+                    val cardScrollAlpha = (1f - rawCollapseFraction * 0.95f).coerceIn(0.12f, 1f)
                     FocusTimerStage(
                         snapshot = liveDashboard,
                         selectedTab = selectedLiveTab,
@@ -159,7 +216,15 @@ fun HomeScreen(
                         onClockOut = onClockOut,
                         isFullscreen = false,
                         onToggleFullscreen = { onToggleFullscreenFocus(true) },
-                        modifier = Modifier.heightIn(min = 380.dp, max = 490.dp)
+                        modifier = Modifier
+                            .animateItem()
+                            .heightIn(min = 380.dp, max = 490.dp)
+                            .graphicsLayer {
+                                scaleX = cardScrollScale
+                                scaleY = cardScrollScale
+                                transformOrigin = TransformOrigin(0.5f, 0.08f)
+                                alpha = cardScrollAlpha
+                            }
                     )
                 }
             } else if (completelyEmpty) {
@@ -474,8 +539,18 @@ fun HomeScreen(
                             val pct = if (goal.targetAmount > 0L) {
                                 (liveCumulative / goal.targetAmount.toDouble()).toFloat().coerceIn(0f, 1f)
                             } else 0f
+                            val animatedPct by animateFloatAsState(
+                                targetValue = pct,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioNoBouncy,
+                                    stiffness = Spring.StiffnessMediumLow
+                                ),
+                                label = "wishlist_pct_${goal.id}"
+                            )
                             Card(
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .animateContentSize(),
                                 onClick = {
                                     editingGoal = goal
                                     showGoalSheet = true
@@ -508,7 +583,7 @@ fun HomeScreen(
                                             )
                                         }
                                         Text(
-                                            text = "${String.format(Locale.US, "%.1f", pct * 100f)}%",
+                                            text = "${String.format(Locale.US, "%.1f", animatedPct * 100f)}%",
                                             style = MiuixTheme.textStyles.body2.copy(
                                                 fontWeight = FontWeight.SemiBold,
                                                 fontFeatureSettings = "tnum"
@@ -517,7 +592,7 @@ fun HomeScreen(
                                         )
                                     }
                                     LinearProgressIndicator(
-                                        progress = pct,
+                                        progress = animatedPct,
                                         modifier = Modifier.fillMaxWidth()
                                     )
                                     Row(
@@ -694,12 +769,13 @@ fun HomeScreen(
                 horizontalArrangement = Arrangement.spacedBy(20.dp)
             ) {
                 LazyColumn(
+                    state = wideLeftListState,
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight()
                         .overScrollVertical()
                         .nestedScroll(scrollBehavior.nestedScrollConnection),
-                    contentPadding = PaddingValues(top = 12.dp, bottom = bottomPad),
+                    contentPadding = PaddingValues(top = topBarInset + 12.dp, bottom = bottomPad),
                     verticalArrangement = Arrangement.spacedBy(18.dp),
                     content = focusSection
                 )
@@ -709,18 +785,24 @@ fun HomeScreen(
                         .fillMaxHeight()
                         .overScrollVertical()
                         .nestedScroll(scrollBehavior.nestedScrollConnection),
-                    contentPadding = PaddingValues(top = 12.dp, bottom = bottomPad),
+                    contentPadding = PaddingValues(top = topBarInset + 12.dp, bottom = bottomPad),
                     verticalArrangement = Arrangement.spacedBy(18.dp),
                     content = hubAndDetailsSection
                 )
             }
         } else {
             LazyColumn(
+                state = phoneListState,
                 modifier = Modifier
                     .fillMaxSize()
                     .overScrollVertical()
                     .nestedScroll(scrollBehavior.nestedScrollConnection),
-                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = bottomPad),
+                contentPadding = PaddingValues(
+                    start = 20.dp,
+                    end = 20.dp,
+                    top = topBarInset + 12.dp,
+                    bottom = bottomPad
+                ),
                 verticalArrangement = Arrangement.spacedBy(20.dp)
             ) {
                 focusSection()
@@ -728,12 +810,33 @@ fun HomeScreen(
             }
         }
 
-        // Fullscreen focus mode overlay
-        if (isFullscreenFocus && liveDashboard.activeShifts.isNotEmpty()) {
+        // Smooth animated Fullscreen focus mode overlay
+        AnimatedVisibility(
+            visible = isFullscreenFocus && liveDashboard.activeShifts.isNotEmpty(),
+            enter = fadeIn(tween(260, easing = FastOutSlowInEasing)) +
+                scaleIn(
+                    initialScale = 0.88f,
+                    transformOrigin = TransformOrigin(0.5f, 0.22f),
+                    animationSpec = spring(
+                        dampingRatio = 0.86f,
+                        stiffness = Spring.StiffnessMediumLow
+                    )
+                ),
+            exit = fadeOut(tween(200, easing = FastOutSlowInEasing)) +
+                scaleOut(
+                    targetScale = 0.88f,
+                    transformOrigin = TransformOrigin(0.5f, 0.22f),
+                    animationSpec = spring(
+                        dampingRatio = 0.90f,
+                        stiffness = Spring.StiffnessMedium
+                    )
+                )
+        ) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .squircleBackground(MiuixTheme.colorScheme.surface, 0.dp)
+                    .clickable(enabled = true, onClick = {})
                     .systemBarsPadding()
                     .padding(16.dp)
             ) {
@@ -893,12 +996,26 @@ private fun WeeklyHolidayAndPaydayCard(
 ) {
     val weekHours = weekWorkedMinutes / 60f
     val progress = (weekWorkedMinutes / 900f).coerceIn(0f, 1f)
+    val animatedProgress by animateFloatAsState(
+        targetValue = progress,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "weekly_holiday_progress"
+    )
     val achieved = weekWorkedMinutes >= 900
     val remainingMins = (900 - weekWorkedMinutes).coerceAtLeast(0)
-    val holidayColor = if (achieved) Color(0xFF16A34A) else MiuixTheme.colorScheme.primary
+    val holidayColor by animateColorAsState(
+        targetValue = if (achieved) Color(0xFF16A34A) else MiuixTheme.colorScheme.primary,
+        animationSpec = tween(250),
+        label = "weekly_holiday_color"
+    )
 
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(),
         cornerRadius = 18.dp,
         insideMargin = PaddingValues(16.dp)
     ) {
@@ -945,7 +1062,7 @@ private fun WeeklyHolidayAndPaydayCard(
             }
 
             LinearProgressIndicator(
-                progress = progress,
+                progress = animatedProgress,
                 modifier = Modifier.fillMaxWidth()
             )
 
@@ -1309,9 +1426,28 @@ private fun FocusTimerStage(
     val showBoost = if (isCombinedView) snapshot.anyBoostActive else focusedShift.isBoostActive
     val boostMult = if (isCombinedView) snapshot.maxBoostMultiplier else focusedShift.boostMultiplier
 
-    val accentColor = if (isCombinedView) MiuixTheme.colorScheme.primary else Color(focusedShift.colorHex)
+    val rawAccentColor = if (isCombinedView) MiuixTheme.colorScheme.primary else Color(focusedShift.colorHex)
+    val accentColor by animateColorAsState(
+        targetValue = rawAccentColor,
+        animationSpec = tween(240),
+        label = "focus_accent_color"
+    )
     val isPaused = !isCombinedView && focusedShift.isPaused
-    val statusDotColor = if (isPaused) Color(0xFFD97706) else Color(0xFF16A34A)
+    val statusDotColor by animateColorAsState(
+        targetValue = if (isPaused) Color(0xFFD97706) else Color(0xFF16A34A),
+        animationSpec = tween(220),
+        label = "focus_status_dot"
+    )
+    val stageCornerRadius by animateDpAsState(
+        targetValue = if (isFullscreen) 24.dp else 22.dp,
+        animationSpec = spring(dampingRatio = 0.88f, stiffness = Spring.StiffnessMediumLow),
+        label = "focus_corner"
+    )
+    val ringSize by animateDpAsState(
+        targetValue = if (isFullscreen) 292.dp else 256.dp,
+        animationSpec = spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow),
+        label = "focus_ring_size"
+    )
     val secondFraction = ((focusedShift.elapsedWorkMillis % 60_000L) / 60_000f).coerceIn(0f, 1f)
     var pendingBreakTarget by remember { mutableStateOf<LiveShiftSnapshot?>(null) }
     var pendingClockOutTarget by remember { mutableStateOf<LiveShiftSnapshot?>(null) }
@@ -1319,7 +1455,8 @@ private fun FocusTimerStage(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .miuixGlassSurface(cornerRadius = if (isFullscreen) 24.dp else 22.dp)
+            .miuixGlassSurface(cornerRadius = stageCornerRadius)
+            .animateContentSize()
             .padding(20.dp)
     ) {
         Column(
@@ -1387,7 +1524,11 @@ private fun FocusTimerStage(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        if (showBoost) {
+                        AnimatedVisibility(
+                            visible = showBoost,
+                            enter = fadeIn(tween(200)) + scaleIn(initialScale = 0.85f),
+                            exit = fadeOut(tween(150)) + scaleOut(targetScale = 0.85f)
+                        ) {
                             val multStr = if (boostMult == 1.5) "1.5" else String.format(Locale.US, "%.1f", boostMult)
                             SquirclePillBadge(
                                 text = "${multStr}배 수당 부스트",
@@ -1395,12 +1536,21 @@ private fun FocusTimerStage(
                                 contentColor = Color(0xFFEA580C)
                             )
                         }
-                        SquirclePillBadge(
-                            text = if (isFullscreen) "축소" else "전체 화면",
-                            backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
-                            contentColor = MiuixTheme.colorScheme.onSurfaceVariantActions,
-                            onClick = onToggleFullscreen
-                        )
+                        AnimatedContent(
+                            targetState = isFullscreen,
+                            transitionSpec = {
+                                (fadeIn(tween(180)) + scaleIn(initialScale = 0.92f))
+                                    .togetherWith(fadeOut(tween(150)) + scaleOut(targetScale = 0.92f))
+                            },
+                            label = "fullscreen_toggle_label"
+                        ) { full ->
+                            SquirclePillBadge(
+                                text = if (full) "축소" else "전체 화면",
+                                backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
+                                contentColor = MiuixTheme.colorScheme.onSurfaceVariantActions,
+                                onClick = onToggleFullscreen
+                            )
+                        }
                     }
                 }
             }
@@ -1410,7 +1560,7 @@ private fun FocusTimerStage(
                 modifier = Modifier
                     .weight(1f, fill = false)
                     .padding(vertical = 8.dp)
-                    .size(if (isFullscreen) 292.dp else 256.dp),
+                    .size(ringSize),
                 contentAlignment = Alignment.Center
             ) {
                 FocusTimerRingCanvas(

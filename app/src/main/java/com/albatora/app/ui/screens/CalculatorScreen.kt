@@ -3,6 +3,15 @@ package com.albatora.app.ui.screens
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -50,11 +59,27 @@ fun CalculatorScreen(
             )
         }
 
-        when (selectedTab) {
-            0 -> item { HourlyMonthlyCalculator(defaultMinWage, onCreateJobWithWage) }
-            1 -> item { WeeklyHolidayCalculator(defaultMinWage, onCreateJobWithWage) }
-            2 -> item { DailyWorkerNetCalculator() }
-            3 -> item { SeveranceCalculator() }
+        item {
+            AnimatedContent(
+                targetState = selectedTab,
+                transitionSpec = {
+                    val forward = targetState >= initialState
+                    (slideInHorizontally(animationSpec = tween(220)) { w -> if (forward) w / 8 else -w / 8 } +
+                        fadeIn(tween(200)))
+                        .togetherWith(
+                            slideOutHorizontally(animationSpec = tween(180)) { w -> if (forward) -w / 8 else w / 8 } +
+                                fadeOut(tween(150))
+                        )
+                },
+                label = "calculator_subtab"
+            ) { tab ->
+                when (tab) {
+                    0 -> HourlyMonthlyCalculator(defaultMinWage, onCreateJobWithWage)
+                    1 -> WeeklyHolidayCalculator(defaultMinWage, onCreateJobWithWage)
+                    2 -> DailyWorkerNetCalculator()
+                    else -> SeveranceCalculator()
+                }
+            }
         }
     }
 }
@@ -510,11 +535,19 @@ private fun SeveranceCalculator() {
             }
         }
 
+        val resultContainerColor by animateColorAsState(
+            targetValue = if (eligible) MiuixTheme.colorScheme.secondaryContainer else MiuixTheme.colorScheme.errorContainer,
+            label = "severance_container"
+        )
+        val resultAccentColor by animateColorAsState(
+            targetValue = if (eligible) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.error,
+            label = "severance_accent"
+        )
         Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.defaultColors(
-                color = if (eligible) MiuixTheme.colorScheme.secondaryContainer else MiuixTheme.colorScheme.errorContainer
-            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .animateContentSize(),
+            colors = CardDefaults.defaultColors(color = resultContainerColor),
             insideMargin = PaddingValues(16.dp)
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -522,7 +555,7 @@ private fun SeveranceCalculator() {
                 Text(
                     PayrollCalculator.formatWon(severance),
                     style = MiuixTheme.textStyles.title2.copy(fontWeight = FontWeight.Bold),
-                    color = if (eligible) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.error
+                    color = resultAccentColor
                 )
                 Text(
                     text = reason,

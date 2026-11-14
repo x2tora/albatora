@@ -12,6 +12,16 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -174,47 +184,57 @@ fun WidgetStudioScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(18.dp),
+                                .padding(18.dp)
+                                .animateContentSize(),
                             contentAlignment = Alignment.Center
                         ) {
-                            when (previewTab) {
-                                0 -> OneUiLivePreviewCard(
-                                    cfg = cfg,
-                                    cardBg = previewCardColor,
-                                    stroke = previewStroke,
-                                    pillInner = previewPillInner,
-                                    textPrimary = previewTextPrimary,
-                                    textSecondary = previewTextSecondary,
-                                    accent = previewAccent,
-                                    onAccent = previewOnAccent,
-                                    quickJobName = state.jobs.find { it.id == cfg.defaultQuickJobId }?.name
-                                )
-                                1 -> OneUiCompactPreviewBar(
-                                    cfg = cfg,
-                                    cardBg = previewCardColor,
-                                    stroke = previewStroke,
-                                    pillInner = previewPillInner,
-                                    textPrimary = previewTextPrimary,
-                                    textSecondary = previewTextSecondary,
-                                    accent = previewAccent,
-                                    onAccent = previewOnAccent
-                                )
-                                2 -> OneUiWeeklyPreviewCard(
-                                    cfg = cfg,
-                                    cardBg = previewCardColor,
-                                    stroke = previewStroke,
-                                    textPrimary = previewTextPrimary,
-                                    textSecondary = previewTextSecondary,
-                                    accent = previewAccent
-                                )
-                                else -> OneUiMonthlyPreviewCard(
-                                    cfg = cfg,
-                                    cardBg = previewCardColor,
-                                    stroke = previewStroke,
-                                    textPrimary = previewTextPrimary,
-                                    textSecondary = previewTextSecondary,
-                                    accent = previewAccent
-                                )
+                            AnimatedContent(
+                                targetState = previewTab,
+                                transitionSpec = {
+                                    (fadeIn(tween(200)) + scaleIn(initialScale = 0.96f, animationSpec = tween(220)))
+                                        .togetherWith(fadeOut(tween(150)))
+                                },
+                                label = "widget_preview_tab"
+                            ) { tab ->
+                                when (tab) {
+                                    0 -> OneUiLivePreviewCard(
+                                        cfg = cfg,
+                                        cardBg = previewCardColor,
+                                        stroke = previewStroke,
+                                        pillInner = previewPillInner,
+                                        textPrimary = previewTextPrimary,
+                                        textSecondary = previewTextSecondary,
+                                        accent = previewAccent,
+                                        onAccent = previewOnAccent,
+                                        quickJobName = state.jobs.find { it.id == cfg.defaultQuickJobId }?.name
+                                    )
+                                    1 -> OneUiCompactPreviewBar(
+                                        cfg = cfg,
+                                        cardBg = previewCardColor,
+                                        stroke = previewStroke,
+                                        pillInner = previewPillInner,
+                                        textPrimary = previewTextPrimary,
+                                        textSecondary = previewTextSecondary,
+                                        accent = previewAccent,
+                                        onAccent = previewOnAccent
+                                    )
+                                    2 -> OneUiWeeklyPreviewCard(
+                                        cfg = cfg,
+                                        cardBg = previewCardColor,
+                                        stroke = previewStroke,
+                                        textPrimary = previewTextPrimary,
+                                        textSecondary = previewTextSecondary,
+                                        accent = previewAccent
+                                    )
+                                    else -> OneUiMonthlyPreviewCard(
+                                        cfg = cfg,
+                                        cardBg = previewCardColor,
+                                        stroke = previewStroke,
+                                        textPrimary = previewTextPrimary,
+                                        textSecondary = previewTextSecondary,
+                                        accent = previewAccent
+                                    )
+                                }
                             }
                         }
                     }
@@ -333,46 +353,52 @@ fun WidgetStudioScreen(
                         }
                     )
 
-                    if (!cfg.useAppAccent) {
-                        HorizontalDivider()
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                    AnimatedVisibility(
+                        visible = !cfg.useAppAccent,
+                        enter = expandVertically() + fadeIn(),
+                        exit = shrinkVertically() + fadeOut()
+                    ) {
+                        Column {
+                            HorizontalDivider()
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
-                                Text(
-                                    text = "위젯 전용 포인트 색상 (${formatRgbHex(cfg.customAccentHex)})",
-                                    style = MiuixTheme.textStyles.body2.copy(fontWeight = FontWeight.Medium)
-                                )
-                                SquirclePillBadge(
-                                    text = "직접 지정",
-                                    backgroundColor = Color(cfg.customAccentHex).copy(alpha = 0.16f),
-                                    contentColor = Color(cfg.customAccentHex),
-                                    onClick = { showAccentPicker = true }
-                                )
-                            }
-                            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                items(JobAccentPalette) { (_, hex) ->
-                                    val selected = (hex and 0x00FFFFFFL) == (cfg.customAccentHex and 0x00FFFFFFL)
-                                    Box(
-                                        modifier = Modifier
-                                            .size(28.dp)
-                                            .clip(CircleShape)
-                                            .background(Color(hex))
-                                            .then(
-                                                if (selected) Modifier.border(2.5.dp, MiuixTheme.colorScheme.onSurface, CircleShape)
-                                                else Modifier
-                                            )
-                                            .clickable {
-                                                onUpdateWidgetConfig { it.copy(customAccentHex = hex) }
-                                            }
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "위젯 전용 포인트 색상 (${formatRgbHex(cfg.customAccentHex)})",
+                                        style = MiuixTheme.textStyles.body2.copy(fontWeight = FontWeight.Medium)
                                     )
+                                    SquirclePillBadge(
+                                        text = "직접 지정",
+                                        backgroundColor = Color(cfg.customAccentHex).copy(alpha = 0.16f),
+                                        contentColor = Color(cfg.customAccentHex),
+                                        onClick = { showAccentPicker = true }
+                                    )
+                                }
+                                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    items(JobAccentPalette) { (_, hex) ->
+                                        val selected = (hex and 0x00FFFFFFL) == (cfg.customAccentHex and 0x00FFFFFFL)
+                                        Box(
+                                            modifier = Modifier
+                                                .size(28.dp)
+                                                .clip(CircleShape)
+                                                .background(Color(hex))
+                                                .then(
+                                                    if (selected) Modifier.border(2.5.dp, MiuixTheme.colorScheme.onSurface, CircleShape)
+                                                    else Modifier
+                                                )
+                                                .clickable {
+                                                    onUpdateWidgetConfig { it.copy(customAccentHex = hex) }
+                                                }
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -465,10 +491,10 @@ private fun OneUiLivePreviewCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(26.dp))
+            .clip(RoundedCornerShape(22.dp))
             .background(cardBg)
-            .border(1.dp, stroke, RoundedCornerShape(26.dp))
-            .padding(16.dp),
+            .border(1.dp, stroke, RoundedCornerShape(22.dp))
+            .padding(horizontal = 13.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Row(
@@ -477,14 +503,14 @@ private fun OneUiLivePreviewCard(
         ) {
             Box(
                 modifier = Modifier
-                    .size(8.dp)
+                    .size(10.dp)
                     .clip(CircleShape)
                     .background(Color(0xFF16A34A))
             )
-            Spacer(modifier = Modifier.width(6.dp))
+            Spacer(modifier = Modifier.width(7.dp))
             Text(
                 text = "${quickJobName ?: "카페 알바"} · 근무 중",
-                style = MiuixTheme.textStyles.body2.copy(fontWeight = FontWeight.Bold),
+                style = MiuixTheme.textStyles.body1.copy(fontSize = 15.sp, fontWeight = FontWeight.Bold),
                 color = textPrimary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -494,25 +520,25 @@ private fun OneUiLivePreviewCard(
                 modifier = Modifier
                     .clip(CircleShape)
                     .background(Color(0xFF16A34A).copy(alpha = 0.16f))
-                    .padding(horizontal = 9.dp, vertical = 3.dp)
+                    .padding(horizontal = 10.dp, vertical = 4.dp)
             ) {
                 Text(
                     text = "+206원/분",
-                    style = MiuixTheme.textStyles.footnote2.copy(fontWeight = FontWeight.Bold),
+                    style = MiuixTheme.textStyles.footnote1.copy(fontSize = 12.5.sp, fontWeight = FontWeight.Bold),
                     color = Color(0xFF16A34A)
                 )
             }
         }
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
             Text(
                 text = "37,080원",
-                fontSize = 25.sp,
+                fontSize = 31.sp,
                 fontWeight = FontWeight.Bold,
                 color = textPrimary
             )
             Text(
                 text = if (cfg.showTangibleConversion) "실근무 03:00:00 · 아메리카노 8.2개" else "실근무 03:00:00",
-                style = MiuixTheme.textStyles.footnote2,
+                style = MiuixTheme.textStyles.footnote1.copy(fontSize = 13.5.sp),
                 color = textSecondary
             )
         }
@@ -521,28 +547,28 @@ private fun OneUiLivePreviewCard(
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .height(34.dp)
+                        .height(40.dp)
                         .clip(CircleShape)
                         .background(pillInner),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = "휴게 시작",
-                        style = MiuixTheme.textStyles.footnote1.copy(fontWeight = FontWeight.Bold),
+                        style = MiuixTheme.textStyles.body2.copy(fontSize = 14.sp, fontWeight = FontWeight.Bold),
                         color = textPrimary
                     )
                 }
                 Box(
                     modifier = Modifier
                         .weight(1f)
-                        .height(34.dp)
+                        .height(40.dp)
                         .clip(CircleShape)
                         .background(accent),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
                         text = "퇴근 완료",
-                        style = MiuixTheme.textStyles.footnote1.copy(fontWeight = FontWeight.Bold),
+                        style = MiuixTheme.textStyles.body2.copy(fontSize = 14.sp, fontWeight = FontWeight.Bold),
                         color = onAccent
                     )
                 }
@@ -565,15 +591,15 @@ private fun OneUiCompactPreviewBar(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(26.dp))
+            .clip(RoundedCornerShape(22.dp))
             .background(cardBg)
-            .border(1.dp, stroke, RoundedCornerShape(26.dp))
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .border(1.dp, stroke, RoundedCornerShape(22.dp))
+            .padding(horizontal = 12.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
-                .size(8.dp)
+                .size(9.dp)
                 .clip(CircleShape)
                 .background(Color(0xFF16A34A))
         )
@@ -581,43 +607,43 @@ private fun OneUiCompactPreviewBar(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = "37,080원",
-                fontSize = 18.sp,
+                fontSize = 21.sp,
                 fontWeight = FontWeight.Bold,
                 color = textPrimary
             )
             Text(
                 text = "카페 알바 · 03:00:00",
-                style = MiuixTheme.textStyles.footnote2,
+                style = MiuixTheme.textStyles.footnote1.copy(fontSize = 12.5.sp),
                 color = textSecondary
             )
         }
         if (cfg.showQuickActions) {
             Box(
                 modifier = Modifier
-                    .height(32.dp)
+                    .height(38.dp)
                     .clip(CircleShape)
                     .background(pillInner)
-                    .padding(horizontal = 12.dp),
+                    .padding(horizontal = 13.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = "휴게",
-                    style = MiuixTheme.textStyles.footnote2.copy(fontWeight = FontWeight.Bold),
+                    style = MiuixTheme.textStyles.footnote1.copy(fontSize = 13.sp, fontWeight = FontWeight.Bold),
                     color = textPrimary
                 )
             }
             Spacer(modifier = Modifier.width(6.dp))
             Box(
                 modifier = Modifier
-                    .height(32.dp)
+                    .height(38.dp)
                     .clip(CircleShape)
                     .background(accent)
-                    .padding(horizontal = 12.dp),
+                    .padding(horizontal = 13.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = "퇴근",
-                    style = MiuixTheme.textStyles.footnote2.copy(fontWeight = FontWeight.Bold),
+                    style = MiuixTheme.textStyles.footnote1.copy(fontSize = 13.sp, fontWeight = FontWeight.Bold),
                     color = onAccent
                 )
             }
@@ -637,11 +663,11 @@ private fun OneUiWeeklyPreviewCard(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(26.dp))
+            .clip(RoundedCornerShape(22.dp))
             .background(cardBg)
-            .border(1.dp, stroke, RoundedCornerShape(26.dp))
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(5.dp)
+            .border(1.dp, stroke, RoundedCornerShape(22.dp))
+            .padding(horizontal = 13.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(7.dp)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -650,32 +676,44 @@ private fun OneUiWeeklyPreviewCard(
         ) {
             Text(
                 text = "이번 주 스케줄",
-                style = MiuixTheme.textStyles.body2.copy(fontWeight = FontWeight.Bold),
+                style = MiuixTheme.textStyles.body1.copy(fontSize = 16.sp, fontWeight = FontWeight.Bold),
                 color = textPrimary
             )
             Box(
                 modifier = Modifier
                     .clip(CircleShape)
                     .background(accent.copy(alpha = 0.16f))
-                    .padding(horizontal = 9.dp, vertical = 3.dp)
+                    .padding(horizontal = 11.dp, vertical = 4.dp)
             ) {
                 Text(
                     text = "4건",
-                    style = MiuixTheme.textStyles.footnote2.copy(fontWeight = FontWeight.Bold),
+                    style = MiuixTheme.textStyles.footnote1.copy(fontSize = 12.5.sp, fontWeight = FontWeight.Bold),
                     color = accent
                 )
             }
         }
         Text(
             text = "이번 주 근무 일정",
-            style = MiuixTheme.textStyles.footnote2,
+            style = MiuixTheme.textStyles.footnote1.copy(fontSize = 12.5.sp),
             color = textSecondary
         )
         if (!cfg.weeklyHidePastDays) {
-            Text("어제(완) · 카페 알바 · 14:00~19:00", style = MiuixTheme.textStyles.footnote1, color = textSecondary)
+            Text(
+                "어제(완) · 카페 알바 · 14:00~19:00",
+                style = MiuixTheme.textStyles.body2.copy(fontSize = 14.sp),
+                color = textSecondary
+            )
         }
-        Text("오늘 · 카페 알바 · 14:00~20:00 · 진행 중", style = MiuixTheme.textStyles.footnote1, color = textPrimary)
-        Text("토 · 편의점 대타 · 09:00~15:00", style = MiuixTheme.textStyles.footnote1, color = textSecondary)
+        Text(
+            "오늘 · 카페 알바 · 14:00~20:00 · 진행 중",
+            style = MiuixTheme.textStyles.body2.copy(fontSize = 14.sp, fontWeight = FontWeight.Bold),
+            color = textPrimary
+        )
+        Text(
+            "토 · 편의점 대타 · 09:00~15:00",
+            style = MiuixTheme.textStyles.body2.copy(fontSize = 14.sp),
+            color = textSecondary
+        )
     }
 }
 
@@ -690,28 +728,28 @@ private fun OneUiMonthlyPreviewCard(
 ) {
     Column(
         modifier = Modifier
-            .widthIn(max = 200.dp)
+            .widthIn(max = 220.dp)
             .fillMaxWidth()
-            .clip(RoundedCornerShape(26.dp))
+            .clip(RoundedCornerShape(22.dp))
             .background(cardBg)
-            .border(1.dp, stroke, RoundedCornerShape(26.dp))
-            .padding(15.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+            .border(1.dp, stroke, RoundedCornerShape(22.dp))
+            .padding(horizontal = 12.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         Text(
             text = "11월 예상 누적",
-            style = MiuixTheme.textStyles.footnote1.copy(fontWeight = FontWeight.Bold),
+            style = MiuixTheme.textStyles.body2.copy(fontSize = 13.5.sp, fontWeight = FontWeight.Bold),
             color = textSecondary
         )
         Text(
             text = "1,482,000원",
-            fontSize = 21.sp,
+            fontSize = 26.sp,
             fontWeight = FontWeight.Bold,
             color = textPrimary
         )
         Text(
             text = "완료 14건 · 98시간 30분",
-            style = MiuixTheme.textStyles.footnote2,
+            style = MiuixTheme.textStyles.footnote1.copy(fontSize = 12.5.sp),
             color = textSecondary
         )
         if (cfg.showMonthlyUnpaidBadge) {
@@ -720,12 +758,12 @@ private fun OneUiMonthlyPreviewCard(
                     .fillMaxWidth()
                     .clip(CircleShape)
                     .background(accent.copy(alpha = 0.16f))
-                    .padding(vertical = 5.dp),
+                    .padding(vertical = 7.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = "월급 D-4",
-                    style = MiuixTheme.textStyles.footnote2.copy(fontWeight = FontWeight.Bold),
+                    style = MiuixTheme.textStyles.footnote1.copy(fontSize = 12.5.sp, fontWeight = FontWeight.Bold),
                     color = accent
                 )
             }

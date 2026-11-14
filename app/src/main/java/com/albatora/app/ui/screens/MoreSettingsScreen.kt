@@ -2,7 +2,14 @@ package com.albatora.app.ui.screens
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -36,8 +43,6 @@ import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
-import top.yukonga.miuix.kmp.squircle.squircleBackground
-import top.yukonga.miuix.kmp.squircle.squircleBorder
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import java.time.LocalDate
@@ -165,23 +170,30 @@ fun MoreSettingsScreen(
                         PreferenceStartIcon(MiuixIcons.Favorites, Color(0xFF7C5CFF))
                     }
                 )
-                if (colorStyle == ThemeColorStyle.CUSTOM) {
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                AnimatedVisibility(
+                    visible = colorStyle == ThemeColorStyle.CUSTOM,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut()
+                ) {
                     val previewHex = state.settings.customKeyColorHex ?: 0xFF3482FF
-                    ArrowPreference(
-                        title = "커스텀 포인트 색상 지정",
-                        summary = "현재 ${formatRgbHex(previewHex)} 적용 중 · 탭하여 변경",
-                        onClick = { showAppColorDialog = true },
-                        startAction = {
-                            Box(
-                                modifier = Modifier
-                                    .padding(end = 6.dp)
-                                    .size(38.dp)
-                                    .squircleBackground(Color(previewHex), 11.dp)
-                                    .squircleBorder(1.dp, MiuixTheme.colorScheme.onSurface.copy(alpha = 0.16f), 11.dp)
-                            )
-                        }
-                    )
+                    Column {
+                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                        ArrowPreference(
+                            title = "커스텀 포인트 색상 지정",
+                            summary = "현재 ${formatRgbHex(previewHex)} 적용 중 · 탭하여 변경",
+                            onClick = { showAppColorDialog = true },
+                            startAction = {
+                                Box(
+                                    modifier = Modifier
+                                        .padding(end = 8.dp)
+                                        .size(30.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(previewHex))
+                                        .border(1.dp, MiuixTheme.colorScheme.onSurface.copy(alpha = 0.16f), CircleShape)
+                                )
+                            }
+                        )
+                    }
                 }
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 ArrowPreference(

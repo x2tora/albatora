@@ -9,6 +9,13 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -243,11 +250,16 @@ fun CalendarScreen(
                                         val dayNet = items.filter { it.status != ShiftStatus.ABSENT }.sumOf { it.estimatedNetPay }
                                         val hasUnpaid = items.any { it.paymentStatus == PaymentStatus.UNPAID }
 
-                                        val cellBg = when {
+                                        val targetCellBg = when {
                                             isSelected -> MiuixTheme.colorScheme.primary.copy(alpha = 0.16f)
                                             isToday -> MiuixTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f)
                                             else -> Color.Transparent
                                         }
+                                        val cellBg by animateColorAsState(
+                                            targetValue = targetCellBg,
+                                            animationSpec = tween(durationMillis = 180),
+                                            label = "calendar_cell_bg"
+                                        )
 
                                         Column(
                                             modifier = Modifier
@@ -426,9 +438,12 @@ fun CalendarScreen(
 
         // Selected Day Shift Cards
         if (selectedItems.isEmpty()) {
-            item {
+            item(key = "calendar_empty") {
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .animateItem()
+                        .animateContentSize(),
                     insideMargin = PaddingValues(18.dp),
                     onClick = { onQuickAddShortTermForDate(PayrollCalculator.formatDate(selectedDate)) }
                 ) {
@@ -459,9 +474,13 @@ fun CalendarScreen(
                 }
             }
         } else {
-            items(selectedItems) { item ->
+            items(
+                items = selectedItems,
+                key = { item -> item.record?.id ?: "virtual_${item.jobId}_${item.title}_${item.startMinute}_${item.endMinute}_${item.isVirtualFuture}" }
+            ) { item ->
                 CalendarDayShiftCard(
                     item = item,
+                    modifier = Modifier.animateItem(),
                     onClick = {
                         item.record?.let { rec ->
                             onEditRecord(rec)
@@ -573,10 +592,13 @@ fun CalendarScreen(
 private fun CalendarDayShiftCard(
     item: CalendarDayScheduleItem,
     onClick: () -> Unit,
-    onTogglePayment: () -> Unit
+    onTogglePayment: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .animateContentSize(),
         onClick = onClick,
         insideMargin = PaddingValues(14.dp)
     ) {
