@@ -19,6 +19,35 @@ enum class ThemeColorStyle(val label: String, val description: String) {
 }
 
 @Serializable
+enum class WidgetThemeStyle(val label: String, val description: String) {
+    AUTO("시스템 자동", "OneUI 다크/라이트 모드에 맞춰 자동 전환"),
+    LIGHT("밝은 카드", "낮·밤 관계없이 깔끔한 화이트 톤 유지"),
+    DARK("어두운 카드", "낮·밤 관계없이 깊은 다크 톤 유지"),
+    GLASS("글래스 반투명", "홈 화면 배경화면에 부드럽게 어우러지는 반투명")
+}
+
+@Serializable
+enum class WidgetOpacity(val label: String, val percent: Int) {
+    SOLID("100%", 100),
+    HIGH("80%", 80),
+    MEDIUM("55%", 55),
+    LOW("35%", 35)
+}
+
+@Serializable
+data class WidgetConfig(
+    val themeStyle: WidgetThemeStyle = WidgetThemeStyle.AUTO,
+    val opacity: WidgetOpacity = WidgetOpacity.HIGH,
+    val useAppAccent: Boolean = true,
+    val customAccentHex: Long = 0xFF3482FF,
+    val showTangibleConversion: Boolean = true,
+    val showQuickActions: Boolean = true,
+    val weeklyHidePastDays: Boolean = true,
+    val showMonthlyUnpaidBadge: Boolean = true,
+    val defaultQuickJobId: String? = null
+)
+
+@Serializable
 enum class JobKind(val label: String) {
     REGULAR("정규/고정"),
     SHORT_TERM("단기/일용직")
@@ -269,7 +298,8 @@ data class AppSettings(
     val customKeyColorHex: Long? = null,
     val ongoingNotificationEnabled: Boolean = true,
     val defaultMinWage: Long = DEFAULT_2026_MIN_WAGE,
-    val selectedTangibleItemId: String = "tangible_americano"
+    val selectedTangibleItemId: String = "tangible_americano",
+    val widgetConfig: WidgetConfig = WidgetConfig()
 ) {
     fun resolvedColorStyle(): ThemeColorStyle {
         if (themeColorStyle != null) return themeColorStyle
@@ -298,21 +328,21 @@ data class AlbaToraDataState(
             TangibleItem(
                 id = "tangible_americano",
                 name = "아메리카노",
-                emoji = "\u2615",
+                emoji = "store",
                 unitPrice = 4500L,
                 isDefault = true
             ),
             TangibleItem(
                 id = "tangible_gukbap",
                 name = "국밥",
-                emoji = "\uD83C\uDF5C",
+                emoji = "promotions",
                 unitPrice = 10000L,
                 isDefault = true
             ),
             TangibleItem(
                 id = "tangible_chicken",
                 name = "치킨",
-                emoji = "\uD83C\uDF57",
+                emoji = "favorites_fill",
                 unitPrice = 22000L,
                 isDefault = true
             )

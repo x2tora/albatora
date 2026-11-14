@@ -31,6 +31,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.albatora.app.ui.theme.AlbaIconCatalog
 import com.albatora.app.ui.theme.LocalAppBackdrop
 import com.albatora.app.ui.theme.LocalIsDarkTheme
 import top.yukonga.miuix.kmp.basic.*
@@ -86,7 +87,7 @@ fun MiuixGlassIcon(
 }
 
 /**
- * Displays a user-selected emoji inside a squircle badge, falling back to [MiuixGlassIcon] when blank.
+ * Displays a user-selected icon key (or mapped legacy emoji) inside a unified [MiuixGlassIcon] container.
  */
 @Composable
 fun MiuixEntityBadge(
@@ -98,35 +99,15 @@ fun MiuixEntityBadge(
     cornerRadius: Dp = 12.dp,
     contentDescription: String? = null
 ) {
-    if (emoji.isBlank()) {
-        MiuixGlassIcon(
-            icon = fallbackIcon,
-            contentDescription = contentDescription,
-            accentColor = accentColor,
-            modifier = modifier,
-            size = size,
-            iconSize = (size.value * 0.48f).dp,
-            cornerRadius = cornerRadius
-        )
-    } else {
-        val isDark = LocalIsDarkTheme.current
-        val containerTint = accentColor.copy(alpha = if (isDark) 0.18f else 0.11f)
-        val borderTint = accentColor.copy(alpha = if (isDark) 0.30f else 0.18f)
-        Box(
-            modifier = modifier
-                .size(size)
-                .squircleBackground(containerTint, cornerRadius)
-                .squircleBorder(1.dp, borderTint, cornerRadius),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = emoji,
-                fontSize = (size.value * 0.48f).sp,
-                textAlign = TextAlign.Center,
-                maxLines = 1
-            )
-        }
-    }
+    MiuixGlassIcon(
+        icon = AlbaIconCatalog.resolveIcon(emoji, fallbackIcon),
+        contentDescription = contentDescription,
+        accentColor = accentColor,
+        modifier = modifier,
+        size = size,
+        iconSize = (size.value * 0.48f).dp,
+        cornerRadius = cornerRadius
+    )
 }
 
 /**
@@ -312,6 +293,7 @@ fun SquirclePillBadge(
     backgroundColor: Color,
     contentColor: Color,
     modifier: Modifier = Modifier,
+    leadingIcon: ImageVector? = null,
     onClick: (() -> Unit)? = null
 ) {
     val base = modifier
@@ -326,13 +308,26 @@ fun SquirclePillBadge(
         modifier = finalModifier.padding(horizontal = 10.dp, vertical = 5.dp),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = text,
-            style = MiuixTheme.textStyles.footnote1.copy(fontWeight = FontWeight.SemiBold),
-            color = contentColor,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(5.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (leadingIcon != null) {
+                Icon(
+                    imageVector = leadingIcon,
+                    contentDescription = null,
+                    tint = contentColor,
+                    modifier = Modifier.size(13.dp)
+                )
+            }
+            Text(
+                text = text,
+                style = MiuixTheme.textStyles.footnote1.copy(fontWeight = FontWeight.SemiBold),
+                color = contentColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }
 

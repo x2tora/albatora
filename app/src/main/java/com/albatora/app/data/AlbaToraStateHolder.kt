@@ -445,6 +445,28 @@ class AlbaToraStateHolder private constructor(context: Context) {
     }
 
     fun handleNotificationAction(action: String) {
+        if (action == ACTION_QUICK_CLOCK_IN) {
+            val st = _state.value
+            val jobId = st.settings.widgetConfig.defaultQuickJobId
+            val targetJob = st.jobs.find { it.id == jobId } ?: st.jobs.firstOrNull()
+            if (targetJob != null) {
+                val wage = PayrollCalculator.effectiveJobWage(targetJob, LocalDate.now())
+                startManualStopwatch(
+                    title = targetJob.name,
+                    emoji = targetJob.emoji,
+                    kind = targetJob.kind,
+                    payType = targetJob.payType,
+                    unitAmount = wage,
+                    jobId = targetJob.id,
+                    colorHex = targetJob.colorHex,
+                    allowance = targetJob.allowance,
+                    taxMode = targetJob.taxMode,
+                    customTaxRatePercent = targetJob.customTaxRatePercent,
+                    dailyWorkerIncludeLocalTax = targetJob.dailyWorkerIncludeLocalTax
+                )
+            }
+            return
+        }
         val live = PayrollCalculator.evaluateLiveDashboard(_state.value, System.currentTimeMillis())
         val target = live.activeShifts.firstOrNull() ?: return
         when (action) {
@@ -535,6 +557,7 @@ class AlbaToraStateHolder private constructor(context: Context) {
     companion object {
         const val ACTION_TOGGLE_BREAK = "com.albatora.app.ACTION_TOGGLE_BREAK"
         const val ACTION_CLOCK_OUT = "com.albatora.app.ACTION_CLOCK_OUT"
+        const val ACTION_QUICK_CLOCK_IN = "com.albatora.app.ACTION_QUICK_CLOCK_IN"
 
         @Volatile
         private var INSTANCE: AlbaToraStateHolder? = null

@@ -44,6 +44,15 @@
             android:enabled="true"
             android:exported="false" />
 
+        <activity
+            android:name=".widget.WidgetConfigureActivity"
+            android:exported="true"
+            android:theme="@style/Theme.AlbaTora">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
         <receiver
             android:name=".widget.LiveEarningsWidgetProvider"
             android:exported="true"
@@ -54,6 +63,18 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_live_earnings_info" />
+        </receiver>
+
+        <receiver
+            android:name=".widget.CompactLiveWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_compact_live_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_compact_live_info" />
         </receiver>
 
         <receiver

@@ -20,12 +20,14 @@ import com.albatora.app.ui.components.EmojiAndColorIdentityRow
 import com.albatora.app.ui.components.MiuixDatePickerDialog
 import com.albatora.app.ui.components.MiuixTimePickerDialog
 import com.albatora.app.ui.components.SquirclePillBadge
+import com.albatora.app.ui.theme.AlbaIconCatalog
 import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.AddCircle
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.icon.extended.Ok
+import top.yukonga.miuix.kmp.icon.extended.Timer
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
@@ -269,11 +271,11 @@ fun QuickAddShortTermScreen(
                     SmallTitle(text = "원탭 단기 프리셋 불러오기")
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(templates, key = { it.id }) { tpl ->
-                            val labelPrefix = if (tpl.emoji.isNotBlank()) "${tpl.emoji} " else ""
                             SquirclePillBadge(
-                                text = "$labelPrefix${tpl.name} · ${PayrollCalculator.formatWon(tpl.unitAmount)}",
+                                text = "${tpl.name} · ${PayrollCalculator.formatWon(tpl.unitAmount)}",
                                 backgroundColor = Color(tpl.colorHex).copy(alpha = 0.16f),
                                 contentColor = Color(tpl.colorHex),
+                                leadingIcon = AlbaIconCatalog.resolveIcon(tpl.emoji, MiuixIcons.Timer),
                                 onClick = {
                                     title = tpl.name
                                     emoji = tpl.emoji

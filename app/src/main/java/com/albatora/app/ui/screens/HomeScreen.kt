@@ -10,6 +10,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -20,6 +21,7 @@ import androidx.compose.ui.unit.sp
 import com.albatora.app.domain.*
 import com.albatora.app.model.*
 import com.albatora.app.ui.components.*
+import com.albatora.app.ui.theme.AlbaIconCatalog
 import com.albatora.app.ui.theme.LocalIsDarkTheme
 import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.icon.MiuixIcons
@@ -30,8 +32,11 @@ import top.yukonga.miuix.kmp.squircle.squircleBorder
 import top.yukonga.miuix.kmp.squircle.squircleClip
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
+import java.time.DayOfWeek
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.YearMonth
+import java.time.temporal.TemporalAdjusters
 import java.util.Locale
 import java.util.UUID
 
@@ -66,7 +71,10 @@ fun HomeScreen(
     onUpsertTangibleItem: (TangibleItem) -> Unit,
     onDeleteTangibleItem: (String) -> Unit,
     onUpsertWishlistGoal: (WishlistGoal) -> Unit,
-    onDeleteWishlistGoal: (String) -> Unit
+    onDeleteWishlistGoal: (String) -> Unit,
+    onOpenCalendar: () -> Unit = {},
+    onOpenCalculator: () -> Unit = {},
+    onOpenWidgetStudio: () -> Unit = {}
 ) {
     val isDark = LocalIsDarkTheme.current
     val currentMonth = remember { YearMonth.now() }
@@ -103,17 +111,33 @@ fun HomeScreen(
         state.templates.isEmpty() &&
         liveDashboard.activeShifts.isEmpty()
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    val currentWeekWorkMinutes = remember(state) {
+        val today = LocalDate.now()
+        val nowDt = LocalDateTime.now()
+        val weekStart = today.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+        (0..6).sumOf { offset ->
+            PayrollCalculator.resolveCalendarDayItems(state, weekStart.plusDays(offset.toLong()), nowDt)
+                .filter { it.status != ShiftStatus.ABSENT }
+                .sumOf { item ->
+                    val rec = item.record
+                    if (rec != null) {
+                        val raw = PayrollCalculator.rawDurationMinutes(rec.startMinute, rec.endMinute)
+                        if (rec.breakPayType == BreakPayType.UNPAID) (raw - rec.breakMinutes).coerceAtLeast(0) else raw
+                    } else {
+                        val slot = item.scheduleSlot
+                        val raw = PayrollCalculator.rawDurationMinutes(item.startMinute, item.endMinute)
+                        if (slot != null && slot.breakPayType == BreakPayType.UNPAID) (raw - slot.breakMinutes).coerceAtLeast(0) else raw
+                    }
+                }
+        }
+    }
+
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val isWide = maxWidth >= 600.dp
         val navBottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .overScrollVertical()
-                .nestedScroll(scrollBehavior.nestedScrollConnection),
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 116.dp + navBottomInset),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
-        ) {
-            // 1. Live Earnings Focus Timer Stage (fills primary viewport when active)
+        val bottomPad = 116.dp + navBottomInset
+
+        val focusSection: androidx.compose.foundation.lazy.LazyListScope.() -> Unit = {
             if (liveDashboard.activeShifts.isNotEmpty()) {
                 item(key = "live_focus_stage") {
                     FocusTimerStage(
@@ -128,22 +152,20 @@ fun HomeScreen(
                         onClockOut = onClockOut,
                         isFullscreen = false,
                         onToggleFullscreen = { onToggleFullscreenFocus(true) },
-                        modifier = Modifier.fillParentMaxHeight(0.84f)
+                        modifier = Modifier.heightIn(min = 380.dp, max = 490.dp)
                     )
                 }
             } else if (completelyEmpty) {
-                // Single clean empty onboarding stage without duplicate launcher grid below
                 item(key = "empty_focus_welcome") {
                     EmptyOnboardingFocusCard(
                         defaultMinWage = state.settings.defaultMinWage,
                         onAddRegularJob = onAddRegularJob,
                         onQuickAddShortTerm = onQuickAddShortTerm,
                         onOpenStopwatch = { showStopwatchSheet = true },
-                        modifier = Modifier.fillParentMaxHeight(0.68f)
+                        modifier = Modifier.heightIn(min = 290.dp)
                     )
                 }
             } else {
-                // Standby Focus Card when user has jobs/records but no active shift right now
                 item(key = "standby_focus_card") {
                     StandbyFocusCard(
                         jobs = state.jobs,
@@ -189,7 +211,39 @@ fun HomeScreen(
                 }
             }
 
-            // 2. Monthly Earnings Summary (only when data exists)
+            if (!completelyEmpty) {
+                item(key = "weekly_holiday_progress") {
+                    WeeklyHolidayAndPaydayCard(
+                        weekWorkedMinutes = currentWeekWorkMinutes,
+                        nearestPayday = paydays.firstOrNull(),
+                        unpaidAmount = unpaidPair.first,
+                        unpaidCount = unpaidPair.second.size,
+                        onOpenUnpaid = onOpenUnpaidRecords,
+                        onOpenJob = { jobId -> onEditRegularJob(jobId) }
+                    )
+                }
+            }
+        }
+
+        val hubAndDetailsSection: androidx.compose.foundation.lazy.LazyListScope.() -> Unit = {
+            item(key = "quick_action_hub") {
+                SmallTitle(text = "자주 사용하는 기능")
+                HomeActionHubGrid(
+                    unpaidCount = unpaidPair.second.size,
+                    onStopwatch = { showStopwatchSheet = true },
+                    onQuickShortTerm = onQuickAddShortTerm,
+                    onAddRegularJob = onAddRegularJob,
+                    onOpenCalendar = onOpenCalendar,
+                    onOpenUnpaid = onOpenUnpaidRecords,
+                    onOpenCalculator = onOpenCalculator,
+                    onOpenWidgetStudio = onOpenWidgetStudio,
+                    onAddWishlist = {
+                        editingGoal = null
+                        showGoalSheet = true
+                    }
+                )
+            }
+
             if (!completelyEmpty) {
                 item(key = "monthly_overview") {
                     val livePlusMonth = monthSummary.totalNetPay + liveDashboard.totalEarnedWon.toLong()
@@ -249,18 +303,29 @@ fun HomeScreen(
                             }
                             if (selectedTangible.unitPrice > 0L && livePlusMonth > 0L) {
                                 val count = livePlusMonth.toDouble() / selectedTangible.unitPrice.toDouble()
-                                Text(
-                                    text = "${selectedTangible.emoji} 이번 달 ${selectedTangible.name} 약 ${String.format(Locale.US, "%.1f", count)}개 상당",
-                                    style = MiuixTheme.textStyles.footnote1.copy(fontFeatureSettings = "tnum"),
-                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                                )
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    MiuixEntityBadge(
+                                        emoji = selectedTangible.emoji,
+                                        fallbackIcon = MiuixIcons.Store,
+                                        accentColor = MiuixTheme.colorScheme.primary,
+                                        size = 24.dp,
+                                        cornerRadius = 7.dp
+                                    )
+                                    Text(
+                                        text = "이번 달 ${selectedTangible.name} 약 ${String.format(Locale.US, "%.1f", count)}개 상당",
+                                        style = MiuixTheme.textStyles.footnote1.copy(fontFeatureSettings = "tnum"),
+                                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
 
-            // 3. Unpaid Alert Card
             if (unpaidPair.first > 0L) {
                 item(key = "unpaid_alert") {
                     Card(
@@ -281,7 +346,14 @@ fun HomeScreen(
                                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                LiveStatusDot(color = MiuixTheme.colorScheme.error, size = 8.dp)
+                                MiuixGlassIcon(
+                                    icon = MiuixIcons.Alarm,
+                                    contentDescription = null,
+                                    accentColor = MiuixTheme.colorScheme.error,
+                                    size = 36.dp,
+                                    iconSize = 18.dp,
+                                    cornerRadius = 11.dp
+                                )
                                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                     Text(
                                         text = "입금 대기 중인 미수금 ${unpaidPair.second.size}건",
@@ -308,7 +380,6 @@ fun HomeScreen(
                 }
             }
 
-            // 4. Wishlist Goals Live Progress Gauge
             item(key = "wishlist_section") {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -392,8 +463,8 @@ fun HomeScreen(
                                                 emoji = goal.emoji,
                                                 fallbackIcon = MiuixIcons.Favorites,
                                                 accentColor = MiuixTheme.colorScheme.primary,
-                                                size = 36.dp,
-                                                cornerRadius = 10.dp
+                                                size = 38.dp,
+                                                cornerRadius = 11.dp
                                             )
                                             Text(
                                                 text = goal.title,
@@ -437,7 +508,6 @@ fun HomeScreen(
                 }
             }
 
-            // 5. Payday D-Day & Holiday Adjustment Cards
             if (paydays.isNotEmpty()) {
                 item(key = "paydays_section") {
                     SmallTitle(text = "다가오는 월급날 D-Day")
@@ -453,36 +523,44 @@ fun HomeScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Column(
+                                    Row(
                                         modifier = Modifier.weight(1f),
-                                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                        ) {
-                                            Text(
-                                                text = info.jobName,
-                                                style = MiuixTheme.textStyles.body1.copy(fontWeight = FontWeight.Medium)
-                                            )
-                                            if (info.wasAdjusted) {
-                                                SquirclePillBadge(
-                                                    text = "주말·공휴일 보정",
-                                                    backgroundColor = Color(0xFFD97706).copy(alpha = 0.14f),
-                                                    contentColor = Color(0xFFD97706)
-                                                )
-                                            }
-                                        }
-                                        val dateText = if (info.wasAdjusted) {
-                                            "예정 ${info.nominalPayday} → 실제 지급 ${info.adjustedPayday}"
-                                        } else {
-                                            "지급 예정일 ${info.adjustedPayday}"
-                                        }
-                                        Text(
-                                            text = "$dateText · 예상 ${PayrollCalculator.formatWon(info.estimatedPeriodNetPay)}",
-                                            style = MiuixTheme.textStyles.footnote2.copy(fontFeatureSettings = "tnum"),
-                                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                                        MiuixGlassIcon(
+                                            icon = MiuixIcons.Months,
+                                            contentDescription = null,
+                                            accentColor = Color(info.colorHex)
                                         )
+                                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            Row(
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                Text(
+                                                    text = info.jobName,
+                                                    style = MiuixTheme.textStyles.body1.copy(fontWeight = FontWeight.Medium)
+                                                )
+                                                if (info.wasAdjusted) {
+                                                    SquirclePillBadge(
+                                                        text = "주말·공휴일 보정",
+                                                        backgroundColor = Color(0xFFD97706).copy(alpha = 0.14f),
+                                                        contentColor = Color(0xFFD97706)
+                                                    )
+                                                }
+                                            }
+                                            val dateText = if (info.wasAdjusted) {
+                                                "예정 ${info.nominalPayday} → 실제 지급 ${info.adjustedPayday}"
+                                            } else {
+                                                "지급 예정일 ${info.adjustedPayday}"
+                                            }
+                                            Text(
+                                                text = "$dateText · 예상 ${PayrollCalculator.formatWon(info.estimatedPeriodNetPay)}",
+                                                style = MiuixTheme.textStyles.footnote2.copy(fontFeatureSettings = "tnum"),
+                                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                                            )
+                                        }
                                     }
                                     SquirclePillBadge(
                                         text = if (info.dDay == 0L) "D-DAY" else "D-${info.dDay}",
@@ -496,7 +574,6 @@ fun HomeScreen(
                 }
             }
 
-            // 6. Registered Jobs list
             if (state.jobs.isNotEmpty()) {
                 item(key = "registered_jobs") {
                     Row(
@@ -561,6 +638,48 @@ fun HomeScreen(
                         }
                     }
                 }
+            }
+        }
+
+        if (isWide) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .overScrollVertical()
+                        .nestedScroll(scrollBehavior.nestedScrollConnection),
+                    contentPadding = PaddingValues(top = 12.dp, bottom = bottomPad),
+                    verticalArrangement = Arrangement.spacedBy(18.dp),
+                    content = focusSection
+                )
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .overScrollVertical()
+                        .nestedScroll(scrollBehavior.nestedScrollConnection),
+                    contentPadding = PaddingValues(top = 12.dp, bottom = bottomPad),
+                    verticalArrangement = Arrangement.spacedBy(18.dp),
+                    content = hubAndDetailsSection
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .overScrollVertical()
+                    .nestedScroll(scrollBehavior.nestedScrollConnection),
+                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = bottomPad),
+                verticalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
+                focusSection()
+                hubAndDetailsSection()
             }
         }
 
@@ -712,6 +831,247 @@ private fun EmptyOnboardingFocusCard(
 }
 
 @Composable
+private fun WeeklyHolidayAndPaydayCard(
+    weekWorkedMinutes: Int,
+    nearestPayday: PaydayCountdownInfo?,
+    unpaidAmount: Long,
+    unpaidCount: Int,
+    onOpenUnpaid: () -> Unit,
+    onOpenJob: (String) -> Unit
+) {
+    val weekHours = weekWorkedMinutes / 60f
+    val progress = (weekWorkedMinutes / 900f).coerceIn(0f, 1f)
+    val achieved = weekWorkedMinutes >= 900
+    val remainingMins = (900 - weekWorkedMinutes).coerceAtLeast(0)
+    val holidayColor = if (achieved) Color(0xFF16A34A) else MiuixTheme.colorScheme.primary
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        cornerRadius = 18.dp,
+        insideMargin = PaddingValues(16.dp)
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    MiuixGlassIcon(
+                        icon = MiuixIcons.Weeks,
+                        contentDescription = null,
+                        accentColor = holidayColor,
+                        size = 38.dp,
+                        iconSize = 18.dp,
+                        cornerRadius = 11.dp
+                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(
+                            text = "이번 주 근무 ${PayrollCalculator.formatDurationKorean(weekWorkedMinutes)}",
+                            style = MiuixTheme.textStyles.body1.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                fontFeatureSettings = "tnum"
+                            )
+                        )
+                        Text(
+                            text = if (achieved) "주 15시간 달성 · 주휴수당 발생 조건 충족"
+                            else "주휴 15시간까지 ${PayrollCalculator.formatDurationKorean(remainingMins)} 남음",
+                            style = MiuixTheme.textStyles.footnote2,
+                            color = if (achieved) Color(0xFF16A34A) else MiuixTheme.colorScheme.onSurfaceVariantSummary
+                        )
+                    }
+                }
+                SquirclePillBadge(
+                    text = if (achieved) "15h 달성" else "${String.format(Locale.US, "%.1f", weekHours)}/15h",
+                    backgroundColor = holidayColor.copy(alpha = 0.14f),
+                    contentColor = holidayColor
+                )
+            }
+
+            LinearProgressIndicator(
+                progress = progress,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            if (nearestPayday != null || unpaidAmount > 0L) {
+                HorizontalDivider()
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    if (nearestPayday != null) {
+                        Row(
+                            modifier = Modifier
+                                .weight(1f)
+                                .squircleBackground(MiuixTheme.colorScheme.surfaceContainer, 12.dp)
+                                .squircleClip(12.dp)
+                                .clickable { onOpenJob(nearestPayday.jobId) }
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            MiuixGlassIcon(
+                                icon = MiuixIcons.Months,
+                                contentDescription = null,
+                                accentColor = Color(nearestPayday.colorHex),
+                                size = 30.dp,
+                                iconSize = 15.dp,
+                                cornerRadius = 9.dp
+                            )
+                            Column {
+                                Text(
+                                    text = "${nearestPayday.jobName} 월급",
+                                    style = MiuixTheme.textStyles.footnote2,
+                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = if (nearestPayday.dDay == 0L) "오늘 입금일" else "D-${nearestPayday.dDay}",
+                                    style = MiuixTheme.textStyles.body2.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        fontFeatureSettings = "tnum"
+                                    ),
+                                    color = Color(nearestPayday.colorHex)
+                                )
+                            }
+                        }
+                    }
+                    if (unpaidAmount > 0L) {
+                        Row(
+                            modifier = Modifier
+                                .weight(1f)
+                                .squircleBackground(MiuixTheme.colorScheme.errorContainer.copy(alpha = 0.45f), 12.dp)
+                                .squircleClip(12.dp)
+                                .clickable(onClick = onOpenUnpaid)
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            MiuixGlassIcon(
+                                icon = MiuixIcons.Alarm,
+                                contentDescription = null,
+                                accentColor = MiuixTheme.colorScheme.error,
+                                size = 30.dp,
+                                iconSize = 15.dp,
+                                cornerRadius = 9.dp
+                            )
+                            Column {
+                                Text(
+                                    text = "미수금 ${unpaidCount}건",
+                                    style = MiuixTheme.textStyles.footnote2,
+                                    color = MiuixTheme.colorScheme.onErrorContainer,
+                                    maxLines = 1
+                                )
+                                Text(
+                                    text = PayrollCalculator.formatWon(unpaidAmount),
+                                    style = MiuixTheme.textStyles.body2.copy(fontWeight = FontWeight.Bold),
+                                    color = MiuixTheme.colorScheme.error,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private data class HomeHubTileSpec(
+    val title: String,
+    val subtitle: String,
+    val icon: ImageVector,
+    val color: Color,
+    val onClick: () -> Unit
+)
+
+@Composable
+private fun HomeActionHubGrid(
+    unpaidCount: Int,
+    onStopwatch: () -> Unit,
+    onQuickShortTerm: () -> Unit,
+    onAddRegularJob: () -> Unit,
+    onOpenCalendar: () -> Unit,
+    onOpenUnpaid: () -> Unit,
+    onOpenCalculator: () -> Unit,
+    onOpenWidgetStudio: () -> Unit,
+    onAddWishlist: () -> Unit
+) {
+    val tiles = listOf(
+        HomeHubTileSpec("즉시 출근", "실시간 타이머", MiuixIcons.Stopwatch, MiuixTheme.colorScheme.primary, onStopwatch),
+        HomeHubTileSpec("단기·대타 등록", "10초 퀵 입력", MiuixIcons.Timer, Color(0xFF0EA5E9), onQuickShortTerm),
+        HomeHubTileSpec("정규 알바 추가", "시급·주차 설정", MiuixIcons.Store, Color(0xFF10B981), onAddRegularJob),
+        HomeHubTileSpec("근무 달력", "연장·조퇴·대타", MiuixIcons.Months, Color(0xFF6366F1), onOpenCalendar),
+        HomeHubTileSpec(
+            "미수금·정산",
+            if (unpaidCount > 0) "대기 ${unpaidCount}건" else "급여 명세서",
+            MiuixIcons.BankCards,
+            if (unpaidCount > 0) MiuixTheme.colorScheme.error else Color(0xFFF59E0B),
+            onOpenUnpaid
+        ),
+        HomeHubTileSpec("급여 계산기", "주휴·일용직·퇴직금", MiuixIcons.Tune, Color(0xFFEC4899), onOpenCalculator),
+        HomeHubTileSpec("위젯 꾸미기", "OneUI 4종 설정", MiuixIcons.Layers, Color(0xFF14B8A6), onOpenWidgetStudio),
+        HomeHubTileSpec("목표 추가", "위시리스트 게이지", MiuixIcons.FavoritesFill, Color(0xFF8B5CF6), onAddWishlist)
+    )
+
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        tiles.chunked(2).forEach { rowTiles ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                rowTiles.forEach { spec ->
+                    Card(
+                        modifier = Modifier.weight(1f),
+                        cornerRadius = 16.dp,
+                        insideMargin = PaddingValues(14.dp),
+                        onClick = spec.onClick
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(11.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            MiuixGlassIcon(
+                                icon = spec.icon,
+                                contentDescription = spec.title,
+                                accentColor = spec.color,
+                                size = 42.dp,
+                                iconSize = 20.dp,
+                                cornerRadius = 12.dp
+                            )
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                Text(
+                                    text = spec.title,
+                                    style = MiuixTheme.textStyles.body2.copy(fontWeight = FontWeight.SemiBold),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = spec.subtitle,
+                                    style = MiuixTheme.textStyles.footnote2,
+                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun StandbyFocusCard(
     jobs: List<Job>,
     templates: List<ShortTermTemplate>,
@@ -732,7 +1092,8 @@ private fun StandbyFocusCard(
             ) {
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
                 ) {
                     LiveStatusDot(
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.45f),
@@ -744,7 +1105,7 @@ private fun StandbyFocusCard(
                             style = MiuixTheme.textStyles.body1.copy(fontWeight = FontWeight.SemiBold)
                         )
                         Text(
-                            text = "대타·연장·단기 출근 시 즉시 스톱워치를 켤 수 있습니다",
+                            text = "아래 근무지를 누르면 바로 실시간 출근이 시작됩니다",
                             style = MiuixTheme.textStyles.footnote2,
                             color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                         )
@@ -759,30 +1120,105 @@ private fun StandbyFocusCard(
             }
 
             if (jobs.isNotEmpty() || templates.isNotEmpty()) {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(jobs, key = { "job_${it.id}" }) { job ->
-                        val prefix = if (job.emoji.isNotBlank()) "${job.emoji} " else ""
-                        SquirclePillBadge(
-                            text = "$prefix${job.name} 바로 출근",
-                            backgroundColor = Color(job.colorHex).copy(alpha = 0.14f),
-                            contentColor = Color(job.colorHex),
-                            onClick = { onQuickStartJob(job) }
-                        )
+                val quickEntries: List<@Composable (Modifier) -> Unit> = buildList {
+                    jobs.forEach { job ->
+                        val wage = PayrollCalculator.effectiveJobWage(job, LocalDate.now())
+                        add { mod ->
+                            Row(
+                                modifier = mod
+                                    .squircleBackground(Color(job.colorHex).copy(alpha = 0.11f), 14.dp)
+                                    .squircleBorder(1.dp, Color(job.colorHex).copy(alpha = 0.24f), 14.dp)
+                                    .squircleClip(14.dp)
+                                    .clickable { onQuickStartJob(job) }
+                                    .padding(horizontal = 10.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.spacedBy(9.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                MiuixEntityBadge(
+                                    emoji = job.emoji,
+                                    fallbackIcon = MiuixIcons.Store,
+                                    accentColor = Color(job.colorHex),
+                                    size = 34.dp,
+                                    cornerRadius = 10.dp
+                                )
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = job.name,
+                                        style = MiuixTheme.textStyles.footnote1.copy(fontWeight = FontWeight.SemiBold),
+                                        color = MiuixTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = "${job.payType.label} ${PayrollCalculator.formatWon(wage)}",
+                                        style = MiuixTheme.textStyles.footnote2.copy(fontFeatureSettings = "tnum"),
+                                        color = Color(job.colorHex),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                        }
                     }
-                    items(templates, key = { "tpl_${it.id}" }) { tpl ->
-                        val prefix = if (tpl.emoji.isNotBlank()) "${tpl.emoji} " else ""
-                        SquirclePillBadge(
-                            text = "$prefix${tpl.name} 프리셋 출근",
-                            backgroundColor = Color(tpl.colorHex).copy(alpha = 0.14f),
-                            contentColor = Color(tpl.colorHex),
-                            onClick = { onQuickStartTemplate(tpl) }
-                        )
+                    templates.forEach { tpl ->
+                        add { mod ->
+                            Row(
+                                modifier = mod
+                                    .squircleBackground(Color(tpl.colorHex).copy(alpha = 0.11f), 14.dp)
+                                    .squircleBorder(1.dp, Color(tpl.colorHex).copy(alpha = 0.24f), 14.dp)
+                                    .squircleClip(14.dp)
+                                    .clickable { onQuickStartTemplate(tpl) }
+                                    .padding(horizontal = 10.dp, vertical = 10.dp),
+                                horizontalArrangement = Arrangement.spacedBy(9.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                MiuixEntityBadge(
+                                    emoji = tpl.emoji,
+                                    fallbackIcon = MiuixIcons.Timer,
+                                    accentColor = Color(tpl.colorHex),
+                                    size = 34.dp,
+                                    cornerRadius = 10.dp
+                                )
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = tpl.name,
+                                        style = MiuixTheme.textStyles.footnote1.copy(fontWeight = FontWeight.SemiBold),
+                                        color = MiuixTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = "프리셋 · ${PayrollCalculator.formatWon(tpl.unitAmount)}",
+                                        style = MiuixTheme.textStyles.footnote2.copy(fontFeatureSettings = "tnum"),
+                                        color = Color(tpl.colorHex),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    quickEntries.chunked(2).forEach { pair ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            pair.forEach { entryContent ->
+                                entryContent(Modifier.weight(1f))
+                            }
+                            if (pair.size == 1) {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
                     }
                 }
             }
 
             TextButton(
-                text = "즉시 출근 스톱워치 시작",
+                text = "새 근무 직접 스톱워치 시작",
                 onClick = onStartStopwatch,
                 colors = ButtonDefaults.textButtonColorsPrimary(),
                 modifier = Modifier.fillMaxWidth()
@@ -845,10 +1281,7 @@ private fun FocusTimerStage(
                 if (hasMultiple) {
                     val tabLabels = buildList {
                         add("통합 (${snapshot.activeShifts.size})")
-                        snapshot.activeShifts.forEach {
-                            val prefix = if (it.emoji.isNotBlank()) "${it.emoji} " else ""
-                            add("$prefix${it.title}")
-                        }
+                        snapshot.activeShifts.forEach { add(it.title) }
                     }
                     TabRowWithContour(
                         tabs = tabLabels,
@@ -868,8 +1301,14 @@ private fun FocusTimerStage(
                         modifier = Modifier.weight(1f)
                     ) {
                         LiveStatusDot(color = statusDotColor, size = 8.dp)
-                        if (!isCombinedView && focusedShift.emoji.isNotBlank()) {
-                            Text(text = focusedShift.emoji, fontSize = 18.sp)
+                        if (!isCombinedView) {
+                            MiuixEntityBadge(
+                                emoji = focusedShift.emoji,
+                                fallbackIcon = MiuixIcons.Stopwatch,
+                                accentColor = accentColor,
+                                size = 34.dp,
+                                cornerRadius = 10.dp
+                            )
                         }
                         Column {
                             Text(
@@ -992,14 +1431,26 @@ private fun FocusTimerStage(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "${selectedTangible.emoji} ${selectedTangible.name} ${String.format(Locale.US, "%.2f", qty)}개",
-                            style = MiuixTheme.textStyles.body2.copy(
-                                fontWeight = FontWeight.Medium,
-                                fontFeatureSettings = "tnum"
-                            ),
-                            color = MiuixTheme.colorScheme.onSurface
-                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            MiuixEntityBadge(
+                                emoji = selectedTangible.emoji,
+                                fallbackIcon = MiuixIcons.Store,
+                                accentColor = accentColor,
+                                size = 24.dp,
+                                cornerRadius = 7.dp
+                            )
+                            Text(
+                                text = "${selectedTangible.name} ${String.format(Locale.US, "%.2f", qty)}개",
+                                style = MiuixTheme.textStyles.body2.copy(
+                                    fontWeight = FontWeight.Medium,
+                                    fontFeatureSettings = "tnum"
+                                ),
+                                color = MiuixTheme.colorScheme.onSurface
+                            )
+                        }
                         Text(
                             text = "체감 항목 관리",
                             style = MiuixTheme.textStyles.footnote1.copy(fontWeight = FontWeight.Medium),
@@ -1014,9 +1465,10 @@ private fun FocusTimerStage(
                         items(allTangibles, key = { it.id }) { item ->
                             val active = item.id == selectedTangible.id
                             SquirclePillBadge(
-                                text = "${item.emoji} ${item.name}",
+                                text = item.name,
                                 backgroundColor = if (active) accentColor else MiuixTheme.colorScheme.secondaryContainer,
                                 contentColor = if (active) Color.White else MiuixTheme.colorScheme.onSecondaryContainer,
+                                leadingIcon = AlbaIconCatalog.resolveIcon(item.emoji, MiuixIcons.Store),
                                 onClick = { onSelectTangible(item.id) }
                             )
                         }
@@ -1096,11 +1548,11 @@ private fun ManualStopwatchBottomSheet(
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(jobs, key = { it.id }) { job ->
                         val picked = selectedJobId == job.id
-                        val prefix = if (job.emoji.isNotBlank()) "${job.emoji} " else ""
                         SquirclePillBadge(
-                            text = "$prefix${job.name}",
+                            text = job.name,
                             backgroundColor = if (picked) Color(job.colorHex) else Color(job.colorHex).copy(alpha = 0.14f),
                             contentColor = if (picked) Color.White else Color(job.colorHex),
+                            leadingIcon = AlbaIconCatalog.resolveIcon(job.emoji, MiuixIcons.Store),
                             onClick = {
                                 selectedJobId = job.id
                                 title = job.name
@@ -1222,7 +1674,7 @@ private fun TangibleItemsManagerSheet(
 ) {
     var editingItem by remember(show) { mutableStateOf<TangibleItem?>(null) }
     var nameText by remember(show) { mutableStateOf("") }
-    var emojiText by remember(show) { mutableStateOf("🍕") }
+    var emojiText by remember(show) { mutableStateOf("store") }
     var priceText by remember(show) { mutableStateOf("") }
     var showEmojiPicker by remember { mutableStateOf(false) }
 
@@ -1257,7 +1709,13 @@ private fun TangibleItemsManagerSheet(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.weight(1f)
                     ) {
-                        Text(item.emoji, fontSize = 20.sp)
+                        MiuixEntityBadge(
+                            emoji = item.emoji,
+                            fallbackIcon = MiuixIcons.Store,
+                            accentColor = MiuixTheme.colorScheme.primary,
+                            size = 34.dp,
+                            cornerRadius = 10.dp
+                        )
                         Column {
                             Text(
                                 item.name,
@@ -1299,13 +1757,16 @@ private fun TangibleItemsManagerSheet(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(52.dp)
-                        .squircleBackground(MiuixTheme.colorScheme.secondaryContainer, 12.dp)
                         .squircleClip(12.dp)
-                        .clickable { showEmojiPicker = true },
-                    contentAlignment = Alignment.Center
+                        .clickable { showEmojiPicker = true }
                 ) {
-                    Text(emojiText.ifBlank { "🎁" }, fontSize = 24.sp)
+                    MiuixEntityBadge(
+                        emoji = emojiText,
+                        fallbackIcon = MiuixIcons.Store,
+                        accentColor = MiuixTheme.colorScheme.primary,
+                        size = 52.dp,
+                        cornerRadius = 12.dp
+                    )
                 }
                 TextField(
                     value = nameText,
@@ -1332,7 +1793,7 @@ private fun TangibleItemsManagerSheet(
                         val next = TangibleItem(
                             id = editingItem?.id ?: UUID.randomUUID().toString(),
                             name = clean,
-                            emoji = emojiText.ifBlank { "🎁" },
+                            emoji = emojiText.ifBlank { "promotions" },
                             unitPrice = price,
                             isDefault = editingItem?.isDefault ?: false
                         )
@@ -1349,13 +1810,13 @@ private fun TangibleItemsManagerSheet(
         }
     }
 
-    MiuixEmojiPickerSheet(
+    MiuixIconPickerSheet(
         show = showEmojiPicker,
-        title = "아이템 이모지 선택",
-        currentEmoji = emojiText,
+        title = "아이템 아이콘 선택",
+        currentIconKey = emojiText,
         allowClear = false,
         onDismiss = { showEmojiPicker = false },
-        onSelect = { emojiText = it.ifBlank { "🎁" } }
+        onSelect = { emojiText = it.ifBlank { "promotions" } }
     )
 }
 
@@ -1368,7 +1829,7 @@ private fun WishlistGoalEditSheet(
     onDelete: (String) -> Unit
 ) {
     var titleText by remember(show, existingGoal) { mutableStateOf(existingGoal?.title ?: "") }
-    var emojiText by remember(show, existingGoal) { mutableStateOf(existingGoal?.emoji ?: "🎯") }
+    var emojiText by remember(show, existingGoal) { mutableStateOf(existingGoal?.emoji ?: "update") }
     var targetText by remember(show, existingGoal) { mutableStateOf(existingGoal?.targetAmount?.toString() ?: "") }
     var showEmojiPicker by remember { mutableStateOf(false) }
 
@@ -1389,13 +1850,16 @@ private fun WishlistGoalEditSheet(
             ) {
                 Box(
                     modifier = Modifier
-                        .size(54.dp)
-                        .squircleBackground(MiuixTheme.colorScheme.secondaryContainer, 14.dp)
                         .squircleClip(14.dp)
-                        .clickable { showEmojiPicker = true },
-                    contentAlignment = Alignment.Center
+                        .clickable { showEmojiPicker = true }
                 ) {
-                    Text(emojiText.ifBlank { "🎯" }, fontSize = 24.sp)
+                    MiuixEntityBadge(
+                        emoji = emojiText,
+                        fallbackIcon = MiuixIcons.Update,
+                        accentColor = MiuixTheme.colorScheme.primary,
+                        size = 54.dp,
+                        cornerRadius = 14.dp
+                    )
                 }
                 TextField(
                     value = titleText,
@@ -1406,7 +1870,7 @@ private fun WishlistGoalEditSheet(
                 )
             }
             Text(
-                text = "왼쪽 아이콘을 눌러 원하는 이모지를 선택할 수 있습니다",
+                text = "왼쪽 아이콘을 눌러 원하는 아이콘을 선택할 수 있습니다",
                 style = MiuixTheme.textStyles.footnote2,
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary
             )
@@ -1436,7 +1900,7 @@ private fun WishlistGoalEditSheet(
                                 WishlistGoal(
                                     id = existingGoal?.id ?: UUID.randomUUID().toString(),
                                     title = clean,
-                                    emoji = emojiText.ifBlank { "🎯" },
+                                    emoji = emojiText.ifBlank { "update" },
                                     targetAmount = target,
                                     createdAtMillis = existingGoal?.createdAtMillis ?: System.currentTimeMillis()
                                 )
@@ -1451,12 +1915,12 @@ private fun WishlistGoalEditSheet(
         }
     }
 
-    MiuixEmojiPickerSheet(
+    MiuixIconPickerSheet(
         show = showEmojiPicker,
-        title = "목표 이모지 선택",
-        currentEmoji = emojiText,
+        title = "목표 아이콘 선택",
+        currentIconKey = emojiText,
         allowClear = false,
         onDismiss = { showEmojiPicker = false },
-        onSelect = { emojiText = it.ifBlank { "🎯" } }
+        onSelect = { emojiText = it.ifBlank { "update" } }
     )
 }

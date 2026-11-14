@@ -47,6 +47,7 @@ import java.util.UUID
 fun AddEditRegularJobScreen(
     existingJob: Job?,
     defaultMinWage: Long,
+    prefillHourlyWage: Long? = null,
     onBack: () -> Unit,
     onSave: (Job) -> Unit,
     onDelete: ((String) -> Unit)? = null
@@ -58,7 +59,7 @@ fun AddEditRegularJobScreen(
     var emoji by remember { mutableStateOf(existingJob?.emoji ?: "") }
     var colorHex by remember { mutableLongStateOf(existingJob?.colorHex ?: JobAccentPalette.first().second) }
     var payType by remember { mutableStateOf(existingJob?.payType ?: PayType.HOURLY) }
-    var baseAmountText by remember { mutableStateOf((existingJob?.baseAmount ?: defaultMinWage).toString()) }
+    var baseAmountText by remember { mutableStateOf((existingJob?.baseAmount ?: prefillHourlyWage ?: defaultMinWage).toString()) }
     var scheduleStartDate by remember {
         mutableStateOf(
             existingJob?.scheduleStartDate?.takeIf { it.isNotBlank() }

@@ -28,6 +28,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.albatora.app.ui.theme.AlbaIconCatalog
 import com.albatora.app.ui.theme.JobAccentPalette
 import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.icon.MiuixIcons
@@ -40,61 +41,24 @@ import top.yukonga.miuix.kmp.squircle.squircleClip
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.util.Locale
 
-private data class EmojiCategory(
-    val label: String,
-    val emojis: List<String>
-)
-
-private val EMOJI_CATEGORIES = listOf(
-    EmojiCategory(
-        label = "매장",
-        emojis = listOf(
-            "☕", "🍵", "🧋", "🥐", "🍰", "🍔", "🍟", "🍕", "🍗", "🍜", "🍱", "🏪",
-            "🛒", "🛍️", "💳", "🧾", "🧁", "🍦", "🥖", "🍻"
-        )
-    ),
-    EmojiCategory(
-        label = "현장",
-        emojis = listOf(
-            "📦", "🚚", "🛵", "🚲", "🏗️", "🔧", "🔨", "🦺", "🧹", "🪴", "🎪", "🎫",
-            "🎤", "📸", "🎬", "🏋️", "⛳", "🚗", "⛽", "🏭"
-        )
-    ),
-    EmojiCategory(
-        label = "사무",
-        emojis = listOf(
-            "💻", "⌨️", "📊", "📝", "📚", "🎓", "✏️", "📐", "🎨", "🎧", "📞", "🗂️",
-            "🏢", "💼", "🧪", "🏥", "💊", "🐶", "🐱", "👶"
-        )
-    ),
-    EmojiCategory(
-        label = "목표",
-        emojis = listOf(
-            "🎯", "✈️", "🏝️", "📱", "🎧", "⌚", "🎮", "👟", "👜", "💍", "🎸", "🏠",
-            "🚘", "💎", "💰", "🥂", "🎁", "🌟", "🔥", "💪"
-        )
-    )
-)
-
 /**
- * Categorized bottom sheet emoji picker with 1-tap selection and optional custom input.
+ * Categorized bottom sheet Miuix icon picker with 1-tap selection.
  */
 @Composable
-fun MiuixEmojiPickerSheet(
+fun MiuixIconPickerSheet(
     show: Boolean,
-    title: String = "이모지 선택",
-    currentEmoji: String,
+    title: String = "아이콘 선택",
+    currentIconKey: String,
     allowClear: Boolean = true,
     onDismiss: () -> Unit,
     onSelect: (String) -> Unit
 ) {
     var categoryIdx by remember(show) { mutableIntStateOf(0) }
-    var customInput by remember(show, currentEmoji) { mutableStateOf(currentEmoji) }
+    val normalizedCurrent = remember(currentIconKey) { AlbaIconCatalog.normalizeId(currentIconKey) }
 
-    val allEmojis = remember { EMOJI_CATEGORIES.flatMap { it.emojis }.distinct() }
-    val tabLabels = remember { listOf("전체") + EMOJI_CATEGORIES.map { it.label } }
-    val visibleEmojis = remember(categoryIdx) {
-        if (categoryIdx == 0) allEmojis else EMOJI_CATEGORIES[categoryIdx - 1].emojis
+    val tabLabels = remember { listOf("전체") + AlbaIconCatalog.categories.map { it.label } }
+    val visibleIcons = remember(categoryIdx) {
+        if (categoryIdx == 0) AlbaIconCatalog.allSpecs else AlbaIconCatalog.categories[categoryIdx - 1].items
     }
 
     OverlayBottomSheet(
@@ -115,76 +79,66 @@ fun MiuixEmojiPickerSheet(
             )
 
             LazyVerticalGrid(
-                columns = GridCells.Fixed(6),
+                columns = GridCells.Fixed(4),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(236.dp),
+                    .height(276.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                items(visibleEmojis, key = { it }) { emoji ->
-                    val selected = emoji == currentEmoji
-                    Box(
+                items(visibleIcons, key = { it.id }) { spec ->
+                    val selected = spec.id == normalizedCurrent
+                    Column(
                         modifier = Modifier
-                            .aspectRatio(1f)
+                            .fillMaxWidth()
                             .squircleBackground(
                                 color = if (selected) {
-                                    MiuixTheme.colorScheme.primary.copy(alpha = 0.16f)
+                                    MiuixTheme.colorScheme.primary.copy(alpha = 0.14f)
                                 } else {
                                     MiuixTheme.colorScheme.surfaceContainer
                                 },
-                                cornerRadius = 12.dp
+                                cornerRadius = 14.dp
                             )
                             .then(
                                 if (selected) {
                                     Modifier.squircleBorder(
                                         1.5.dp,
                                         MiuixTheme.colorScheme.primary,
-                                        12.dp
+                                        14.dp
                                     )
                                 } else Modifier
                             )
-                            .squircleClip(12.dp)
+                            .squircleClip(14.dp)
                             .clickable {
-                                onSelect(emoji)
+                                onSelect(spec.id)
                                 onDismiss()
-                            },
-                        contentAlignment = Alignment.Center
+                            }
+                            .padding(vertical = 10.dp, horizontal = 4.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
+                        MiuixGlassIcon(
+                            icon = spec.icon,
+                            contentDescription = spec.label,
+                            accentColor = if (selected) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurface,
+                            size = 38.dp,
+                            iconSize = 19.dp,
+                            cornerRadius = 11.dp
+                        )
                         Text(
-                            text = emoji,
-                            fontSize = 22.sp,
-                            textAlign = TextAlign.Center
+                            text = spec.label,
+                            style = MiuixTheme.textStyles.footnote2,
+                            color = if (selected) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            textAlign = TextAlign.Center,
+                            maxLines = 1
                         )
                     }
                 }
             }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextField(
-                    value = customInput,
-                    onValueChange = { if (it.length <= 6) customInput = it },
-                    label = "직접 입력 (키보드 이모지)",
-                    singleLine = true,
-                    modifier = Modifier.weight(1f)
-                )
+            if (allowClear && currentIconKey.isNotBlank()) {
                 TextButton(
-                    text = "적용",
-                    onClick = {
-                        onSelect(customInput.trim())
-                        onDismiss()
-                    },
-                    colors = ButtonDefaults.textButtonColorsPrimary()
-                )
-            }
-
-            if (allowClear && currentEmoji.isNotBlank()) {
-                TextButton(
-                    text = "이모지 비우기 (기본 아이콘 사용)",
+                    text = "아이콘 초기화 (기본 아이콘 사용)",
                     onClick = {
                         onSelect("")
                         onDismiss()
@@ -195,6 +149,25 @@ fun MiuixEmojiPickerSheet(
             Spacer(modifier = Modifier.height(16.dp))
         }
     }
+}
+
+@Composable
+fun MiuixEmojiPickerSheet(
+    show: Boolean,
+    title: String = "아이콘 선택",
+    currentEmoji: String,
+    allowClear: Boolean = true,
+    onDismiss: () -> Unit,
+    onSelect: (String) -> Unit
+) {
+    MiuixIconPickerSheet(
+        show = show,
+        title = title.replace("이모지", "아이콘"),
+        currentIconKey = currentEmoji,
+        allowClear = allowClear,
+        onDismiss = onDismiss,
+        onSelect = onSelect
+    )
 }
 
 /**
@@ -479,10 +452,12 @@ fun EmojiAndColorIdentityRow(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    val selectedLabel = AlbaIconCatalog.resolveLabel(emoji)
                     SquirclePillBadge(
-                        text = if (emoji.isBlank()) "이모지 선택" else "이모지 변경 ($emoji)",
+                        text = if (selectedLabel.isBlank()) "아이콘 선택" else "아이콘 ($selectedLabel)",
                         backgroundColor = MiuixTheme.colorScheme.secondaryContainer,
                         contentColor = MiuixTheme.colorScheme.onSecondaryContainer,
+                        leadingIcon = AlbaIconCatalog.resolveIcon(emoji, fallbackIcon),
                         onClick = { showEmojiPicker = true },
                         modifier = Modifier.weight(1f)
                     )

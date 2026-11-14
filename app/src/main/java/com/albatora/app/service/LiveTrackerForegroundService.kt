@@ -77,14 +77,14 @@ class LiveTrackerForegroundService : Service() {
             snapshot.activeShifts.size > 1 ->
                 "알바토라 · ${snapshot.activeShifts.size}개 동시 근무 중"
             firstShift != null && isPaused ->
-                "⏸ 휴게 중 · ${firstShift.title}"
+                "일시정지(휴게) · ${firstShift.title}"
             firstShift != null ->
-                "🟢 근무 중 · ${firstShift.title}"
+                "근무 진행 중 · ${firstShift.title}"
             else -> "알바토라 실시간 근무 중"
         }
 
         val rateFormatted = String.format(Locale.US, "+%.2f원/초", snapshot.totalPerSecondRateWon)
-        val boostTag = if (snapshot.anyBoostActive) " · 🔥${snapshot.maxBoostMultiplier}배 부스트" else ""
+        val boostTag = if (snapshot.anyBoostActive) " · ${snapshot.maxBoostMultiplier}배 가산" else ""
         val content = "지금까지 ${PayrollCalculator.formatWonDecimal(snapshot.totalEarnedWon)} ($rateFormatted$boostTag)"
 
         val openAppIntent = PendingIntent.getActivity(

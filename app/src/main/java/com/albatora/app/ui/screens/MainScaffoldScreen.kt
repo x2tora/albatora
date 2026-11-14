@@ -5,6 +5,16 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
@@ -54,7 +64,10 @@ sealed interface AppRoute : NavKey {
     data object Settings : AppRoute
 
     @Serializable
-    data class AddEditRegularJob(val jobId: String? = null) : AppRoute
+    data object WidgetStudio : AppRoute
+
+    @Serializable
+    data class AddEditRegularJob(val jobId: String? = null, val prefillHourlyWage: Long? = null) : AppRoute
 
     @Serializable
     data class QuickAddShortTerm(val recordId: String? = null, val initialDateIso: String? = null) : AppRoute
@@ -132,14 +145,17 @@ fun MainScaffoldScreen(
                         launchActionNonce = launchActionNonce,
                         launchTargetTab = launchTargetTab,
                         launchOpenStopwatch = launchOpenStopwatch,
-                        onOpenAddRegularJob = { jobId ->
-                            backStack.add(AppRoute.AddEditRegularJob(jobId))
+                        onOpenAddRegularJob = { jobId, prefillWage ->
+                            backStack.add(AppRoute.AddEditRegularJob(jobId, prefillWage))
                         },
                         onOpenQuickShortTerm = { recId, dateIso ->
                             backStack.add(AppRoute.QuickAddShortTerm(recId, dateIso))
                         },
                         onOpenSettings = {
                             backStack.add(AppRoute.Settings)
+                        },
+                        onOpenWidgetStudio = {
+                            backStack.add(AppRoute.WidgetStudio)
                         }
                     )
                 }
@@ -148,8 +164,29 @@ fun MainScaffoldScreen(
                     SettingsScreenHost(
                         viewModel = viewModel,
                         toastState = toastState,
+                        onOpenWidgetStudio = { backStack.add(AppRoute.WidgetStudio) },
                         onBack = { backStack.removeAt(backStack.lastIndex) }
                     )
+                }
+
+                entry<AppRoute.WidgetStudio> {
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        WidgetStudioScreen(
+                            state = state,
+                            onUpdateWidgetConfig = viewModel::updateWidgetConfig,
+                            onBack = { backStack.removeAt(backStack.lastIndex) },
+                            onNotify = { toastState.show(it) }
+                        )
+                        StackedToastHost(
+                            state = toastState,
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .widthIn(max = 400.dp)
+                                .fillMaxWidth()
+                                .navigationBarsPadding()
+                                .padding(horizontal = 16.dp, vertical = 20.dp)
+                        )
+                    }
                 }
 
                 entry<AppRoute.AddEditRegularJob> { route ->
@@ -157,6 +194,7 @@ fun MainScaffoldScreen(
                     AddEditRegularJobScreen(
                         existingJob = existing,
                         defaultMinWage = state.settings.defaultMinWage,
+                        prefillHourlyWage = route.prefillHourlyWage,
                         onBack = { backStack.removeAt(backStack.lastIndex) },
                         onSave = { job ->
                             viewModel.upsertJob(job)
@@ -203,9 +241,10 @@ private fun MainTabsHost(
     launchActionNonce: Int,
     launchTargetTab: Int,
     launchOpenStopwatch: Boolean,
-    onOpenAddRegularJob: (String?) -> Unit,
+    onOpenAddRegularJob: (String?, Long?) -> Unit,
     onOpenQuickShortTerm: (String?, String?) -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    onOpenWidgetStudio: () -> Unit
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val liveDashboard by viewModel.liveDashboard.collectAsStateWithLifecycle()
@@ -306,104 +345,132 @@ private fun MainTabsHost(
                             }
                         }
                 ) {
-            when (selectedTab) {
-                0 -> HomeScreen(
-                    state = state,
-                    liveDashboard = liveDashboard,
-                    scrollBehavior = scrollBehavior,
-                    isFullscreenFocus = isFullscreenFocus,
-                    onToggleFullscreenFocus = { isFullscreenFocus = it },
-                    openStopwatchTrigger = openStopwatchTrigger,
-                    onAddRegularJob = { onOpenAddRegularJob(null) },
-                    onEditRegularJob = { jobId -> onOpenAddRegularJob(jobId) },
-                    onQuickAddShortTerm = {
-                        onOpenQuickShortTerm(null, PayrollCalculator.formatDate(LocalDate.now()))
-                    },
-                    onOpenUnpaidRecords = {
-                        recordsOpenUnpaid = true
-                        selectedTab = 2
-                    },
-                    onToggleBreak = viewModel::toggleBreak,
-                    onClockOut = viewModel::clockOut,
-                    onStartStopwatch = { title, emoji, kind, payType, unitAmt, jobId, colorHex, plannedMins, breakMins, breakPayType, allowance ->
-                        viewModel.startStopwatch(
-                            title = title,
-                            emoji = emoji,
-                            kind = kind,
-                            payType = payType,
-                            unitAmount = unitAmt,
-                            jobId = jobId,
-                            colorHex = colorHex,
-                            plannedDurationMinutes = plannedMins,
-                            unpaidBreakMinutes = breakMins,
-                            breakPayType = breakPayType,
-                            allowance = allowance
-                        )
-                        notify("'$title' 스톱워치 출근이 시작되었습니다")
-                    },
-                    onSelectTangibleItem = viewModel::selectTangibleItem,
-                    onUpsertTangibleItem = viewModel::upsertTangibleItem,
-                    onDeleteTangibleItem = viewModel::deleteTangibleItem,
-                    onUpsertWishlistGoal = viewModel::upsertWishlistGoal,
-                    onDeleteWishlistGoal = viewModel::deleteWishlistGoal
-                )
-                1 -> CalendarScreen(
-                    state = state,
-                    selectedDate = calendarSelectedDate,
-                    onSelectedDateChange = { calendarSelectedDate = it },
-                    scrollBehavior = scrollBehavior,
-                    onQuickAddShortTermForDate = { dateIso ->
-                        onOpenQuickShortTerm(null, dateIso)
-                    },
-                    onEditRecord = { rec ->
-                        if (rec.id.startsWith("cal_") || rec.id.startsWith("virtual_")) {
-                            // Virtual scheduled slot -> materialize as editable record
-                            val realized = rec.copy(
-                                id = java.util.UUID.randomUUID().toString(),
-                                isScheduledOverride = true
+                    AnimatedContent(
+                        targetState = selectedTab,
+                        transitionSpec = {
+                            val forward = targetState >= initialState
+                            val enterOffset: (Int) -> Int = { full -> if (forward) full / 10 else -full / 10 }
+                            val exitOffset: (Int) -> Int = { full -> if (forward) -full / 10 else full / 10 }
+                            (slideInHorizontally(
+                                animationSpec = tween(260, easing = FastOutSlowInEasing),
+                                initialOffsetX = enterOffset
+                            ) + fadeIn(tween(240, easing = FastOutSlowInEasing)) + scaleIn(
+                                initialScale = 0.985f,
+                                animationSpec = tween(260, easing = FastOutSlowInEasing)
+                            )).togetherWith(
+                                slideOutHorizontally(
+                                    animationSpec = tween(220, easing = FastOutSlowInEasing),
+                                    targetOffsetX = exitOffset
+                                ) + fadeOut(tween(180)) + scaleOut(
+                                    targetScale = 0.985f,
+                                    animationSpec = tween(220, easing = FastOutSlowInEasing)
+                                )
                             )
-                            viewModel.upsertRecord(realized)
-                            onOpenQuickShortTerm(realized.id, realized.date)
-                        } else {
-                            onOpenQuickShortTerm(rec.id, rec.date)
-                        }
-                    },
-                    onTogglePaymentStatus = viewModel::togglePaymentStatus,
-                    onExtendOneHour = viewModel::extendOneHour,
-                    onMarkEarlyLeave = { viewModel.markEarlyLeave(it, 60) },
-                    onMarkAbsent = viewModel::markAbsent,
-                    onAddSubstituteFromJob = viewModel::addSubstituteFromJob,
-                    onStampTemplateOnDate = viewModel::stampTemplateOnDate,
-                    onNotify = notify
-                )
-                2 -> RecordsScreen(
-                    state = state,
-                    initialOnlyUnpaid = recordsOpenUnpaid,
-                    scrollBehavior = scrollBehavior,
-                    onEditRecord = { rec ->
-                        if (rec.isScheduledOverride || !rec.id.startsWith("virtual_")) {
-                            onOpenQuickShortTerm(rec.id, rec.date)
-                        } else {
-                            val realized = rec.copy(
-                                id = java.util.UUID.randomUUID().toString(),
-                                isScheduledOverride = true
+                        },
+                        label = "main_tab_transition"
+                    ) { tab ->
+                        when (tab) {
+                            0 -> HomeScreen(
+                                state = state,
+                                liveDashboard = liveDashboard,
+                                scrollBehavior = scrollBehavior,
+                                isFullscreenFocus = isFullscreenFocus,
+                                onToggleFullscreenFocus = { isFullscreenFocus = it },
+                                openStopwatchTrigger = openStopwatchTrigger,
+                                onAddRegularJob = { onOpenAddRegularJob(null, null) },
+                                onEditRegularJob = { jobId -> onOpenAddRegularJob(jobId, null) },
+                                onQuickAddShortTerm = {
+                                    onOpenQuickShortTerm(null, PayrollCalculator.formatDate(LocalDate.now()))
+                                },
+                                onOpenUnpaidRecords = {
+                                    recordsOpenUnpaid = true
+                                    selectedTab = 2
+                                },
+                                onToggleBreak = viewModel::toggleBreak,
+                                onClockOut = viewModel::clockOut,
+                                onStartStopwatch = { title, emoji, kind, payType, unitAmt, jobId, colorHex, plannedMins, breakMins, breakPayType, allowance ->
+                                    viewModel.startStopwatch(
+                                        title = title,
+                                        emoji = emoji,
+                                        kind = kind,
+                                        payType = payType,
+                                        unitAmount = unitAmt,
+                                        jobId = jobId,
+                                        colorHex = colorHex,
+                                        plannedDurationMinutes = plannedMins,
+                                        unpaidBreakMinutes = breakMins,
+                                        breakPayType = breakPayType,
+                                        allowance = allowance
+                                    )
+                                    notify("'$title' 스톱워치 출근이 시작되었습니다")
+                                },
+                                onSelectTangibleItem = viewModel::selectTangibleItem,
+                                onUpsertTangibleItem = viewModel::upsertTangibleItem,
+                                onDeleteTangibleItem = viewModel::deleteTangibleItem,
+                                onUpsertWishlistGoal = viewModel::upsertWishlistGoal,
+                                onDeleteWishlistGoal = viewModel::deleteWishlistGoal,
+                                onOpenCalendar = { selectedTab = 1 },
+                                onOpenCalculator = { selectedTab = 3 },
+                                onOpenWidgetStudio = onOpenWidgetStudio
                             )
-                            viewModel.upsertRecord(realized)
-                            onOpenQuickShortTerm(realized.id, realized.date)
+                            1 -> CalendarScreen(
+                                state = state,
+                                selectedDate = calendarSelectedDate,
+                                onSelectedDateChange = { calendarSelectedDate = it },
+                                scrollBehavior = scrollBehavior,
+                                onQuickAddShortTermForDate = { dateIso ->
+                                    onOpenQuickShortTerm(null, dateIso)
+                                },
+                                onEditRecord = { rec ->
+                                    if (rec.id.startsWith("cal_") || rec.id.startsWith("virtual_")) {
+                                        val realized = rec.copy(
+                                            id = java.util.UUID.randomUUID().toString(),
+                                            isScheduledOverride = true
+                                        )
+                                        viewModel.upsertRecord(realized)
+                                        onOpenQuickShortTerm(realized.id, realized.date)
+                                    } else {
+                                        onOpenQuickShortTerm(rec.id, rec.date)
+                                    }
+                                },
+                                onTogglePaymentStatus = viewModel::togglePaymentStatus,
+                                onExtendOneHour = viewModel::extendOneHour,
+                                onMarkEarlyLeave = { viewModel.markEarlyLeave(it, 60) },
+                                onMarkAbsent = viewModel::markAbsent,
+                                onAddSubstituteFromJob = viewModel::addSubstituteFromJob,
+                                onStampTemplateOnDate = viewModel::stampTemplateOnDate,
+                                onNotify = notify
+                            )
+                            2 -> RecordsScreen(
+                                state = state,
+                                initialOnlyUnpaid = recordsOpenUnpaid,
+                                scrollBehavior = scrollBehavior,
+                                onEditRecord = { rec ->
+                                    if (rec.isScheduledOverride || !rec.id.startsWith("virtual_")) {
+                                        onOpenQuickShortTerm(rec.id, rec.date)
+                                    } else {
+                                        val realized = rec.copy(
+                                            id = java.util.UUID.randomUUID().toString(),
+                                            isScheduledOverride = true
+                                        )
+                                        viewModel.upsertRecord(realized)
+                                        onOpenQuickShortTerm(realized.id, realized.date)
+                                    }
+                                },
+                                onTogglePaymentStatus = viewModel::togglePaymentStatus,
+                                onAddShortTerm = {
+                                    onOpenQuickShortTerm(null, PayrollCalculator.formatDate(LocalDate.now()))
+                                },
+                                onNotify = notify
+                            )
+                            else -> CalculatorScreen(
+                                defaultMinWage = state.settings.defaultMinWage,
+                                scrollBehavior = scrollBehavior,
+                                onCreateJobWithWage = { wage -> onOpenAddRegularJob(null, wage) }
+                            )
                         }
-                    },
-                    onTogglePaymentStatus = viewModel::togglePaymentStatus,
-                    onAddShortTerm = {
-                        onOpenQuickShortTerm(null, PayrollCalculator.formatDate(LocalDate.now()))
-                    },
-                    onNotify = notify
-                )
-                else -> CalculatorScreen(
-                    defaultMinWage = state.settings.defaultMinWage,
-                    scrollBehavior = scrollBehavior
-                )
-            }
-            }
+                    }
+                }
             }
 
             // ② Floating overlay layer (strictly OUTSIDE layerBackdrop capture box)
@@ -412,6 +479,8 @@ private fun MainTabsHost(
                     state = toastState,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
+                        .widthIn(max = 400.dp)
+                        .fillMaxWidth()
                         .navigationBarsPadding()
                         .padding(start = 16.dp, end = 16.dp, bottom = 92.dp)
                 )
@@ -428,6 +497,8 @@ private fun MainTabsHost(
                     onCenterAddClick = { showHomeQuickMenu = true },
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
+                        .widthIn(max = 368.dp)
+                        .fillMaxWidth()
                         .navigationBarsPadding()
                         .padding(horizontal = 16.dp, vertical = 14.dp)
                 )
@@ -436,6 +507,8 @@ private fun MainTabsHost(
                     state = toastState,
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
+                        .widthIn(max = 400.dp)
+                        .fillMaxWidth()
                         .navigationBarsPadding()
                         .padding(horizontal = 16.dp, vertical = 20.dp)
                 )
@@ -452,7 +525,7 @@ private fun MainTabsHost(
                         text = "정규/고정 알바 추가",
                         onClick = {
                             showHomeQuickMenu = false
-                            onOpenAddRegularJob(null)
+                            onOpenAddRegularJob(null, null)
                         },
                         colors = ButtonDefaults.textButtonColorsPrimary(),
                         modifier = Modifier.fillMaxWidth()
@@ -493,6 +566,7 @@ private fun MainTabsHost(
 private fun SettingsScreenHost(
     viewModel: AlbaToraViewModel,
     toastState: StackedToastState,
+    onOpenWidgetStudio: () -> Unit,
     onBack: () -> Unit
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -536,6 +610,7 @@ private fun SettingsScreenHost(
                 onImportJson = viewModel::importBackupJson,
                 onResetAllData = viewModel::resetAllData,
                 onCheckForUpdate = { viewModel.checkForUpdate(manual = true, onFeedback = notify) },
+                onOpenWidgetStudio = onOpenWidgetStudio,
                 onNotify = notify
             )
 
@@ -543,6 +618,8 @@ private fun SettingsScreenHost(
                 state = toastState,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
+                    .widthIn(max = 400.dp)
+                    .fillMaxWidth()
                     .navigationBarsPadding()
                     .padding(horizontal = 16.dp, vertical = 20.dp)
             )

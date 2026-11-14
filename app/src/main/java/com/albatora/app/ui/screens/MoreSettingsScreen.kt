@@ -32,6 +32,8 @@ import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
+import top.yukonga.miuix.kmp.squircle.squircleBackground
+import top.yukonga.miuix.kmp.squircle.squircleBorder
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import java.time.LocalDate
@@ -51,6 +53,7 @@ fun MoreSettingsScreen(
     onImportJson: (String) -> Result<Unit>,
     onResetAllData: () -> Unit,
     onCheckForUpdate: () -> Unit,
+    onOpenWidgetStudio: () -> Unit,
     onNotify: (String) -> Unit
 ) {
     val context = LocalContext.current
@@ -159,13 +162,26 @@ fun MoreSettingsScreen(
                         startAction = {
                             Box(
                                 modifier = Modifier
-                                    .size(38.dp)
-                                    .clip(CircleShape)
-                                    .background(Color(previewHex))
+                                    .size(40.dp)
+                                    .squircleBackground(Color(previewHex), 12.dp)
+                                    .squircleBorder(1.dp, MiuixTheme.colorScheme.onSurface.copy(alpha = 0.16f), 12.dp)
                             )
                         }
                     )
                 }
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                ArrowPreference(
+                    title = "바탕화면 위젯 꾸미기",
+                    summary = "${state.settings.widgetConfig.themeStyle.label} · 투명도 ${state.settings.widgetConfig.opacity.label} (위젯 4종)",
+                    onClick = onOpenWidgetStudio,
+                    startAction = {
+                        MiuixGlassIcon(
+                            icon = MiuixIcons.Layers,
+                            contentDescription = null,
+                            accentColor = Color(0xFF0EA5E9)
+                        )
+                    }
+                )
             }
         }
 

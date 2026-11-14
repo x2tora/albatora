@@ -23,9 +23,11 @@ import com.albatora.app.domain.CalendarDayScheduleItem
 import com.albatora.app.domain.PayrollCalculator
 import com.albatora.app.model.*
 import com.albatora.app.ui.components.MiuixEntityBadge
+import com.albatora.app.ui.components.MiuixGlassIcon
 import com.albatora.app.ui.components.MiuixTimePickerDialog
 import com.albatora.app.ui.components.SquirclePillBadge
 import com.albatora.app.ui.components.dayOfWeekKorean
+import com.albatora.app.ui.theme.AlbaIconCatalog
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.icon.MiuixIcons
@@ -84,15 +86,9 @@ fun CalendarScreen(
         ).totalNetPay
     }
     val navBottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val listBottomPadding = 116.dp + navBottomInset
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .overScrollVertical()
-            .nestedScroll(scrollBehavior.nestedScrollConnection),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 116.dp + navBottomInset),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
+    val leftContent: androidx.compose.foundation.lazy.LazyListScope.() -> Unit = {
         // Month header + Net Summary
         item {
             Card(
@@ -164,11 +160,11 @@ fun CalendarScreen(
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(state.templates, key = { it.id }) { tpl ->
                             val picked = activeStampTemplate?.id == tpl.id
-                            val prefix = if (tpl.emoji.isNotBlank()) "${tpl.emoji} " else ""
                             SquirclePillBadge(
-                                text = if (picked) "$prefix${tpl.name} · 선택됨" else "$prefix${tpl.name}",
+                                text = if (picked) "${tpl.name} · 선택됨" else tpl.name,
                                 backgroundColor = if (picked) Color(tpl.colorHex) else Color(tpl.colorHex).copy(alpha = 0.16f),
                                 contentColor = if (picked) Color.White else Color(tpl.colorHex),
+                                leadingIcon = AlbaIconCatalog.resolveIcon(tpl.emoji, MiuixIcons.Timer),
                                 onClick = {
                                     activeStampTemplate = if (picked) null else tpl
                                 }
@@ -325,7 +321,9 @@ fun CalendarScreen(
                 }
             }
         }
+    }
 
+    val rightContent: androidx.compose.foundation.lazy.LazyListScope.() -> Unit = {
         // Q15-3: 1-Tap Quick Actions Bar for Selected Date (supports target selection when multiple shifts exist)
         item {
             val actionableItems = selectedItems.filter { it.record != null && it.status != ShiftStatus.ABSENT }
@@ -438,7 +436,7 @@ fun CalendarScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 "${selectedDate.monthValue}월 ${selectedDate.dayOfMonth}일 근무 기록 없음",
                                 style = MiuixTheme.textStyles.body1.copy(fontWeight = FontWeight.SemiBold)
@@ -449,7 +447,13 @@ fun CalendarScreen(
                                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                             )
                         }
-                        Icon(MiuixIcons.AddCircle, contentDescription = null, tint = MiuixTheme.colorScheme.primary)
+                        MiuixGlassIcon(
+                            icon = MiuixIcons.AddCircle,
+                            contentDescription = null,
+                            accentColor = MiuixTheme.colorScheme.primary,
+                            size = 38.dp,
+                            iconSize = 19.dp
+                        )
                     }
                 }
             }
@@ -469,6 +473,50 @@ fun CalendarScreen(
                         }
                     }
                 )
+            }
+        }
+    }
+
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        if (maxWidth >= 600.dp) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(18.dp)
+            ) {
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1.05f)
+                        .fillMaxHeight()
+                        .overScrollVertical()
+                        .nestedScroll(scrollBehavior.nestedScrollConnection),
+                    contentPadding = PaddingValues(top = 12.dp, bottom = listBottomPadding),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    content = leftContent
+                )
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(0.95f)
+                        .fillMaxHeight()
+                        .overScrollVertical()
+                        .nestedScroll(scrollBehavior.nestedScrollConnection),
+                    contentPadding = PaddingValues(top = 12.dp, bottom = listBottomPadding),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                    content = rightContent
+                )
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .overScrollVertical()
+                    .nestedScroll(scrollBehavior.nestedScrollConnection),
+                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = listBottomPadding),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                leftContent()
+                rightContent()
             }
         }
     }

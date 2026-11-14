@@ -3,8 +3,11 @@
     <string name="app_name">알바토라</string>
     <string name="widget_live_earnings_label">실시간 수익 타이머</string>
     <string name="widget_live_earnings_desc">근무 중 실시간 누적 금액과 휴게·퇴근 제어를 바탕화면에서 바로 확인합니다.</string>
+    <string name="widget_compact_live_label">슬림 실시간 바 (4×1)</string>
+    <string name="widget_compact_live_desc">한 줄 컴팩트 바 형태로 현재 적립액과 휴게·퇴근 버튼을 빠르게 조작합니다.</string>
     <string name="widget_weekly_schedule_label">이번 주 스케줄</string>
     <string name="widget_weekly_schedule_desc">이번 주 예정된 정규·단기 근무 일정을 한눈에 확인합니다.</string>
     <string name="widget_monthly_summary_label">이번 달 수익 · 미수금</string>
     <string name="widget_monthly_summary_desc">이번 달 예상 누적 급여와 입금 대기 중인 미수금을 확인합니다.</string>
+    <string name="widget_configure_title">바탕화면 위젯 꾸미기</string>
 </resources>

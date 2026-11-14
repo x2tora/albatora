@@ -304,6 +304,9 @@ class AlbaToraViewModel(application: Application) : AndroidViewModel(application
     }
     fun updateOngoingNotification(enabled: Boolean) = stateHolder.updateSettings { it.copy(ongoingNotificationEnabled = enabled) }
     fun updateDefaultMinWage(wage: Long) = stateHolder.updateSettings { it.copy(defaultMinWage = wage.coerceAtLeast(1L)) }
+    fun updateWidgetConfig(transform: (WidgetConfig) -> WidgetConfig) = stateHolder.updateSettings {
+        it.copy(widgetConfig = transform(it.widgetConfig))
+    }
 
     fun exportBackupJson(): String = stateHolder.exportBackupJson()
     fun importBackupJson(raw: String): Result<Unit> = stateHolder.importBackupJson(raw)
