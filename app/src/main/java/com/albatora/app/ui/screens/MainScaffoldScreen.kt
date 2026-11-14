@@ -524,7 +524,7 @@ private fun MainTabsHost(
                     onCenterAddClick = { showHomeQuickMenu = true },
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .widthIn(max = 368.dp)
+                        .widthIn(max = 384.dp)
                         .fillMaxWidth()
                         .navigationBarsPadding()
                         .padding(horizontal = 16.dp, vertical = 14.dp)

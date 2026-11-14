@@ -59,6 +59,19 @@ object AppUpdater {
     }
 
     /**
+     * Parses a trailing hotfix level such as "_hotfix" (-> 1) or "_hotfix2" (-> 2).
+     * Returns 0 when no hotfix suffix is present.
+     */
+    private fun parseHotfixLevel(version: String): Int {
+        val cleaned = version.trim().removePrefix("v").removePrefix("V")
+            .substringBefore('-')
+            .substringBefore('+')
+        val match = Regex("""(?:^|[._-])hotfix(?:[._-]?(\d+))?$""", RegexOption.IGNORE_CASE)
+            .find(cleaned) ?: return 0
+        return match.groupValues[1].toIntOrNull() ?: 1
+    }
+
+    /**
      * Returns true strictly when remoteVersion represents a newer version than currentVersion.
      */
     fun isNewerVersion(remoteVersion: String, currentVersion: String): Boolean {
@@ -72,7 +85,7 @@ object AppUpdater {
             if (r > c) return true
             if (r < c) return false
         }
-        return false
+        return parseHotfixLevel(remoteVersion) > parseHotfixLevel(currentVersion)
     }
 
     /**

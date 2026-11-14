@@ -92,7 +92,7 @@ import kotlin.random.Random
 /**
  * Liquid Glass bottom navigation bar built on miuix-blur, AGSL RuntimeShader, and miuix-squircle.
  */
-private val DockHeight = 64.dp
+private val DockHeight = 60.dp
 private const val DockPressedScale = 1.04f
 private val DockBlurRadius = 14.dp
 private val DockRefractionHeight = 12.dp
@@ -103,8 +103,8 @@ private val GlassSurfaceTint = Color(0xFF6E7D96).copy(alpha = 0.03f)
 private const val GlassGrainAlpha = 0.10f
 private const val GRAIN_TILE = 96
 
-private val SliderHorizontalOverhang = 5.dp
-private val SliderVerticalOverhang = 7.dp
+private val SliderHorizontalOverhang = 10.dp
+private val SliderVerticalOverhang = 3.dp
 private val SliderDragStartSlop = 4.dp
 private val SliderRefractionHeight = 6.dp
 private val SliderRefractionAmount = 4.0.dp
