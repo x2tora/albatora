@@ -103,12 +103,13 @@ fun HomeScreen(
         liveDashboard.activeShifts.isEmpty()
 
     Box(modifier = Modifier.fillMaxSize()) {
+        val navBottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .overScrollVertical()
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 112.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 104.dp + navBottomInset),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // 1. Live Earnings Focus Timer Stage (fills primary viewport when active)

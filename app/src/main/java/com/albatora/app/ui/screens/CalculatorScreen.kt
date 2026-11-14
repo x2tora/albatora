@@ -2,6 +2,7 @@ package com.albatora.app.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -13,6 +14,7 @@ import androidx.compose.ui.unit.dp
 import com.albatora.app.domain.PayrollCalculator
 import com.albatora.app.model.FeeType
 import com.albatora.app.model.TaxMode
+import com.albatora.app.ui.components.SquirclePillBadge
 import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
@@ -29,13 +31,14 @@ fun CalculatorScreen(
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = listOf("시급·월급", "주휴수당", "일용직·순수익", "퇴직금")
+    val navBottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .overScrollVertical()
             .nestedScroll(scrollBehavior.nestedScrollConnection),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 110.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 104.dp + navBottomInset),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
@@ -90,6 +93,36 @@ private fun HourlyMonthlyCalculator(defaultMinWage: Long) {
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    item {
+                        SquirclePillBadge(
+                            text = "최저시급 ${PayrollCalculator.formatWon(defaultMinWage)}",
+                            backgroundColor = MiuixTheme.colorScheme.primary.copy(alpha = 0.14f),
+                            contentColor = MiuixTheme.colorScheme.primary,
+                            onClick = { hourlyText = defaultMinWage.toString() }
+                        )
+                    }
+                    item {
+                        SquirclePillBadge(
+                            text = "+1,000원",
+                            backgroundColor = MiuixTheme.colorScheme.secondaryContainer,
+                            contentColor = MiuixTheme.colorScheme.onSecondaryContainer,
+                            onClick = { hourlyText = ((hourlyText.toLongOrNull() ?: defaultMinWage) + 1000L).toString() }
+                        )
+                    }
+                    item {
+                        SquirclePillBadge(
+                            text = "기본값 초기화",
+                            backgroundColor = MiuixTheme.colorScheme.surfaceContainerHigh,
+                            contentColor = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            onClick = {
+                                hourlyText = defaultMinWage.toString()
+                                dailyHoursText = "8"
+                                weeklyDaysText = "5"
+                            }
+                        )
+                    }
+                }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     TextField(
                         value = dailyHoursText,
@@ -180,6 +213,32 @@ private fun WeeklyHolidayCalculator(defaultMinWage: Long) {
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    item {
+                        SquirclePillBadge(
+                            text = "최저시급 ${PayrollCalculator.formatWon(defaultMinWage)}",
+                            backgroundColor = MiuixTheme.colorScheme.primary.copy(alpha = 0.14f),
+                            contentColor = MiuixTheme.colorScheme.primary,
+                            onClick = { hourlyText = defaultMinWage.toString() }
+                        )
+                    }
+                    item {
+                        SquirclePillBadge(
+                            text = "주 15h",
+                            backgroundColor = MiuixTheme.colorScheme.secondaryContainer,
+                            contentColor = MiuixTheme.colorScheme.onSecondaryContainer,
+                            onClick = { weeklyHoursText = "15" }
+                        )
+                    }
+                    item {
+                        SquirclePillBadge(
+                            text = "주 40h",
+                            backgroundColor = MiuixTheme.colorScheme.secondaryContainer,
+                            contentColor = MiuixTheme.colorScheme.onSecondaryContainer,
+                            onClick = { weeklyHoursText = "40" }
+                        )
+                    }
+                }
             }
         }
         Card(modifier = Modifier.fillMaxWidth()) {
@@ -251,6 +310,38 @@ private fun DailyWorkerNetCalculator() {
                         singleLine = true,
                         modifier = Modifier.weight(1f)
                     )
+                }
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    item {
+                        SquirclePillBadge(
+                            text = "150,000원 (비과세 한도)",
+                            backgroundColor = MiuixTheme.colorScheme.primary.copy(alpha = 0.14f),
+                            contentColor = MiuixTheme.colorScheme.primary,
+                            onClick = { dailyPayText = "150000" }
+                        )
+                    }
+                    item {
+                        SquirclePillBadge(
+                            text = "180,000원",
+                            backgroundColor = MiuixTheme.colorScheme.secondaryContainer,
+                            contentColor = MiuixTheme.colorScheme.onSecondaryContainer,
+                            onClick = { dailyPayText = "180000" }
+                        )
+                    }
+                    item {
+                        SquirclePillBadge(
+                            text = "초기화",
+                            backgroundColor = MiuixTheme.colorScheme.surfaceContainerHigh,
+                            contentColor = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            onClick = {
+                                dailyPayText = "180000"
+                                bonusText = "0"
+                                transportText = "3000"
+                                mealText = "0"
+                                feeText = "10"
+                            }
+                        )
+                    }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     TextField(

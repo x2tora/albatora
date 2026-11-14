@@ -16,14 +16,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.albatora.app.domain.PayrollCalculator
-import com.albatora.app.model.JobKind
-import com.albatora.app.model.WorkRecord
 import com.albatora.app.ui.components.AppUpdateDialog
-import com.albatora.app.ui.components.AppUpdateUiState
+import com.albatora.app.ui.components.FloatingLiquidGlassNavBar
+import com.albatora.app.ui.components.StackedToastHost
+import com.albatora.app.ui.components.StackedToastState
+import com.albatora.app.ui.components.rememberStackedToastState
 import com.albatora.app.ui.theme.LocalAppBackdrop
-import com.albatora.app.ui.theme.LocalIsDarkTheme
 import com.albatora.app.viewmodel.AlbaToraViewModel
-import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.blur.BlendColorEntry
@@ -35,7 +34,8 @@ import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.progressiveTextureBlur
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.*
+import top.yukonga.miuix.kmp.icon.extended.Back
+import top.yukonga.miuix.kmp.icon.extended.Settings
 import top.yukonga.miuix.kmp.nav.core.NavDisplay
 import top.yukonga.miuix.kmp.nav.core.NavKey
 import top.yukonga.miuix.kmp.nav.core.rememberNavBackStack
@@ -49,6 +49,9 @@ import java.time.LocalDate
 sealed interface AppRoute : NavKey {
     @Serializable
     data object Main : AppRoute
+
+    @Serializable
+    data object Settings : AppRoute
 
     @Serializable
     data class AddEditRegularJob(val jobId: String? = null) : AppRoute
@@ -87,6 +90,7 @@ fun MainScaffoldScreen(
         }
     }
 
+    val toastState = rememberStackedToastState()
     val surfaceBg = MiuixTheme.colorScheme.surface
 
     // Keep card/icon glass blur strictly separate from scrollable content barBackdrop to avoid cyclic RenderNode graphs.
@@ -121,12 +125,24 @@ fun MainScaffoldScreen(
                     MainTabsHost(
                         viewModel = viewModel,
                         barBackdrop = barBackdrop,
+                        toastState = toastState,
                         onOpenAddRegularJob = { jobId ->
                             backStack.add(AppRoute.AddEditRegularJob(jobId))
                         },
                         onOpenQuickShortTerm = { recId, dateIso ->
                             backStack.add(AppRoute.QuickAddShortTerm(recId, dateIso))
+                        },
+                        onOpenSettings = {
+                            backStack.add(AppRoute.Settings)
                         }
+                    )
+                }
+
+                entry<AppRoute.Settings> {
+                    SettingsScreenHost(
+                        viewModel = viewModel,
+                        toastState = toastState,
+                        onBack = { backStack.removeAt(backStack.lastIndex) }
                     )
                 }
 
@@ -177,15 +193,18 @@ fun MainScaffoldScreen(
 private fun MainTabsHost(
     viewModel: AlbaToraViewModel,
     barBackdrop: LayerBackdrop,
+    toastState: StackedToastState,
     onOpenAddRegularJob: (String?) -> Unit,
-    onOpenQuickShortTerm: (String?, String?) -> Unit
+    onOpenQuickShortTerm: (String?, String?) -> Unit,
+    onOpenSettings: () -> Unit
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val liveDashboard by viewModel.liveDashboard.collectAsStateWithLifecycle()
     val updateUiState by viewModel.updateUiState.collectAsStateWithLifecycle()
-    val isDark = LocalIsDarkTheme.current
+    val surfaceBg = MiuixTheme.colorScheme.surface
 
-    var selectedTab by remember { mutableIntStateOf(0) } // 0=홈, 1=달력, 2=기록, 3=계산기, 4=더보기
+    var selectedTab by remember { mutableIntStateOf(0) } // 0=홈, 1=달력, 2=기록, 3=계산기
+    var calendarSelectedDate by remember { mutableStateOf(LocalDate.now()) }
     var recordsOpenUnpaid by remember { mutableStateOf(false) }
     var isFullscreenFocus by remember { mutableStateOf(false) }
     var showHomeQuickMenu by remember { mutableStateOf(false) }
@@ -197,12 +216,8 @@ private fun MainTabsHost(
         }
     }
 
-    val snackbarHostState = remember { SnackbarHostState() }
-    val coroutineScope = rememberCoroutineScope()
     val notify: (String) -> Unit = { msg ->
-        coroutineScope.launch {
-            snackbarHostState.showSnackbar(msg)
-        }
+        toastState.show(msg)
     }
 
     val unpaidCount = remember(state.records) {
@@ -214,11 +229,11 @@ private fun MainTabsHost(
     val barOverlayColor = MiuixTheme.colorScheme.surface.copy(alpha = if (useShader) 0.72f else 0.96f)
     val showChrome = !(isFullscreenFocus && selectedTab == 0 && liveDashboard.activeShifts.isNotEmpty())
 
-    val tabTitles = listOf("알바토라", "근무 달력", "정산 · 명세서", "급여 계산기", "더보기")
+    val tabTitles = listOf("알바토라", "근무 달력", "정산 · 명세서", "급여 계산기")
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        snackbarHost = { SnackbarHost(state = snackbarHostState) },
+        containerColor = Color.Transparent,
         topBar = {
             if (showChrome) {
                 val topBlurMod = if (useShader) {
@@ -240,107 +255,38 @@ private fun MainTabsHost(
                         color = Color.Transparent,
                         scrollBehavior = scrollBehavior,
                         actions = {
-                            if (selectedTab == 0 || selectedTab == 1 || selectedTab == 2) {
-                                IconButton(
-                                    onClick = {
-                                        if (selectedTab == 0) {
-                                            showHomeQuickMenu = true
-                                        } else {
-                                            onOpenQuickShortTerm(null, PayrollCalculator.formatDate(LocalDate.now()))
-                                        }
-                                    }
-                                ) {
-                                    Icon(
-                                        imageVector = MiuixIcons.AddCircle,
-                                        contentDescription = "추가 및 출근",
-                                        tint = MiuixTheme.colorScheme.primary
-                                    )
-                                }
+                            IconButton(onClick = onOpenSettings) {
+                                Icon(
+                                    imageVector = MiuixIcons.Regular.Settings,
+                                    contentDescription = "더보기 및 설정",
+                                    tint = MiuixTheme.colorScheme.onSurface
+                                )
                             }
                         }
                     )
                 }
             }
-        },
-        bottomBar = {
-            if (showChrome) {
-                val bottomBlurMod = if (useShader) {
-                    Modifier.progressiveTextureBlur(
-                        backdrop = barBackdrop,
-                        shape = RectangleShape,
-                        blurRadius = 16f,
-                        gradient = ProgressiveBlur.Bottom,
-                        colors = BlurDefaults.blurColors(
-                            blendColors = listOf(BlendColorEntry(barOverlayColor, BlurBlendMode.SrcOver))
-                        )
-                    )
-                } else {
-                    Modifier.background(barOverlayColor)
-                }
-                Box(modifier = bottomBlurMod) {
-                    NavigationBar(
-                        color = Color.Transparent,
-                        mode = NavigationBarDisplayMode.IconAndText
-                    ) {
-                        NavigationBarItem(
-                            selected = selectedTab == 0,
-                            onClick = { selectedTab = 0 },
-                            icon = MiuixIcons.Regular.Home,
-                            label = "홈",
-                            badge = {
-                                if (liveDashboard.activeShifts.isNotEmpty()) {
-                                    Badge()
-                                }
-                            }
-                        )
-                        NavigationBarItem(
-                            selected = selectedTab == 1,
-                            onClick = { selectedTab = 1 },
-                            icon = MiuixIcons.Regular.Months,
-                            label = "달력"
-                        )
-                        NavigationBarItem(
-                            selected = selectedTab == 2,
-                            onClick = {
-                                recordsOpenUnpaid = false
-                                selectedTab = 2
-                            },
-                            icon = MiuixIcons.Regular.Notes,
-                            label = "기록",
-                            badge = {
-                                if (unpaidCount > 0) {
-                                    Badge { Text(unpaidCount.toString()) }
-                                }
-                            }
-                        )
-                        NavigationBarItem(
-                            selected = selectedTab == 3,
-                            onClick = { selectedTab = 3 },
-                            icon = MiuixIcons.Regular.Tune,
-                            label = "계산기"
-                        )
-                        NavigationBarItem(
-                            selected = selectedTab == 4,
-                            onClick = { selectedTab = 4 },
-                            icon = MiuixIcons.Regular.Settings,
-                            label = "더보기"
-                        )
-                    }
-                }
-            }
         }
     ) { paddingValues ->
-        val contentBackdropModifier = Modifier
-            .fillMaxSize()
-            .layerBackdrop(barBackdrop)
-
-        Box(
-            modifier = if (showChrome) {
-                contentBackdropModifier.padding(top = paddingValues.calculateTopPadding())
-            } else {
-                contentBackdropModifier
-            }
-        ) {
+        Box(modifier = Modifier.fillMaxSize()) {
+            // ① Capture layer ONLY: surface background + scrolling pages (no glass dock inside!)
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .layerBackdrop(barBackdrop)
+                    .background(surfaceBg)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .let {
+                            if (showChrome) {
+                                it.padding(top = paddingValues.calculateTopPadding())
+                            } else {
+                                it
+                            }
+                        }
+                ) {
             when (selectedTab) {
                 0 -> HomeScreen(
                     state = state,
@@ -384,6 +330,8 @@ private fun MainTabsHost(
                 )
                 1 -> CalendarScreen(
                     state = state,
+                    selectedDate = calendarSelectedDate,
+                    onSelectedDateChange = { calendarSelectedDate = it },
                     scrollBehavior = scrollBehavior,
                     onQuickAddShortTermForDate = { dateIso ->
                         onOpenQuickShortTerm(null, dateIso)
@@ -431,29 +379,50 @@ private fun MainTabsHost(
                     },
                     onNotify = notify
                 )
-                3 -> CalculatorScreen(
+                else -> CalculatorScreen(
                     defaultMinWage = state.settings.defaultMinWage,
                     scrollBehavior = scrollBehavior
                 )
-                4 -> MoreSettingsScreen(
-                    state = state,
-                    scrollBehavior = scrollBehavior,
-                    updateUiState = updateUiState,
-                    onUpdateTheme = viewModel::updateTheme,
-                    onUpdateMonet = viewModel::updateMonet,
-                    onUpdateCustomKeyColor = viewModel::updateCustomKeyColor,
-                    onUpdateOngoingNotification = viewModel::updateOngoingNotification,
-                    onUpdateDefaultMinWage = viewModel::updateDefaultMinWage,
-                    onDeleteTemplate = viewModel::deleteTemplate,
-                    onExportJson = viewModel::exportBackupJson,
-                    onImportJson = viewModel::importBackupJson,
-                    onResetAllData = viewModel::resetAllData,
-                    onCheckForUpdate = { viewModel.checkForUpdate(manual = true, onFeedback = notify) },
-                    onNotify = notify
+            }
+            }
+            }
+
+            // ② Floating overlay layer (strictly OUTSIDE layerBackdrop capture box)
+            if (showChrome) {
+                StackedToastHost(
+                    state = toastState,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
+                        .padding(start = 16.dp, end = 16.dp, bottom = 92.dp)
+                )
+
+                FloatingLiquidGlassNavBar(
+                    backdrop = barBackdrop,
+                    selectedTab = selectedTab,
+                    hasActiveShift = liveDashboard.activeShifts.isNotEmpty(),
+                    unpaidCount = unpaidCount,
+                    onSelectTab = { tab ->
+                        if (tab == 2) recordsOpenUnpaid = false
+                        selectedTab = tab
+                    },
+                    onCenterAddClick = { showHomeQuickMenu = true },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 14.dp)
+                )
+            } else {
+                StackedToastHost(
+                    state = toastState,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 20.dp)
                 )
             }
 
-            // Mount Miuix OverlayDialogs directly inside Scaffold scope so PopupHost is always active
+            // Mount Miuix OverlayDialogs inside Scaffold scope so PopupHost is always active
             OverlayDialog(
                 show = showHomeQuickMenu,
                 title = "빠른 등록 · 즉시 출근",
@@ -473,7 +442,8 @@ private fun MainTabsHost(
                         text = "단기/일용직 10초 등록",
                         onClick = {
                             showHomeQuickMenu = false
-                            onOpenQuickShortTerm(null, PayrollCalculator.formatDate(LocalDate.now()))
+                            val prefillDate = if (selectedTab == 1) calendarSelectedDate else LocalDate.now()
+                            onOpenQuickShortTerm(null, PayrollCalculator.formatDate(prefillDate))
                         },
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -481,12 +451,82 @@ private fun MainTabsHost(
                         text = "즉시 출근 스톱워치 시작",
                         onClick = {
                             showHomeQuickMenu = false
+                            selectedTab = 0
                             openStopwatchTrigger++
                         },
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
             }
+
+            AppUpdateDialog(
+                uiState = updateUiState,
+                onDismiss = viewModel::dismissUpdateDialog,
+                onStartDownload = viewModel::startUpdateDownloadAndInstall,
+                onRetryInstall = viewModel::retryApkInstall,
+                onOpenPermissionSettings = viewModel::openInstallUnknownSourcesSettings
+            )
+        }
+    }
+}
+
+@Composable
+private fun SettingsScreenHost(
+    viewModel: AlbaToraViewModel,
+    toastState: StackedToastState,
+    onBack: () -> Unit
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val updateUiState by viewModel.updateUiState.collectAsStateWithLifecycle()
+    val scrollBehavior = MiuixScrollBehavior(state = rememberTopAppBarState())
+    val notify: (String) -> Unit = { msg -> toastState.show(msg) }
+
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        topBar = {
+            SmallTopAppBar(
+                title = "더보기 · 설정",
+                scrollBehavior = scrollBehavior,
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = MiuixIcons.Back,
+                            contentDescription = "뒤로가기"
+                        )
+                    }
+                }
+            )
+        }
+    ) { paddingValues ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = paddingValues.calculateTopPadding())
+        ) {
+            MoreSettingsScreen(
+                state = state,
+                scrollBehavior = scrollBehavior,
+                updateUiState = updateUiState,
+                onUpdateTheme = viewModel::updateTheme,
+                onUpdateThemeColorStyle = viewModel::updateThemeColorStyle,
+                onUpdateCustomKeyColor = viewModel::updateCustomKeyColor,
+                onUpdateOngoingNotification = viewModel::updateOngoingNotification,
+                onUpdateDefaultMinWage = viewModel::updateDefaultMinWage,
+                onDeleteTemplate = viewModel::deleteTemplate,
+                onExportJson = viewModel::exportBackupJson,
+                onImportJson = viewModel::importBackupJson,
+                onResetAllData = viewModel::resetAllData,
+                onCheckForUpdate = { viewModel.checkForUpdate(manual = true, onFeedback = notify) },
+                onNotify = notify
+            )
+
+            StackedToastHost(
+                state = toastState,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 20.dp)
+            )
 
             AppUpdateDialog(
                 uiState = updateUiState,

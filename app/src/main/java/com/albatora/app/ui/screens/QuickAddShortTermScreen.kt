@@ -440,7 +440,7 @@ fun QuickAddShortTermScreen(
                             color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                         )
                         TabRowWithContour(
-                            tabs = PaymentStatus.entries.map { "${it.badgeEmoji} ${it.label}" },
+                            tabs = PaymentStatus.entries.map { it.label },
                             selectedTabIndex = PaymentStatus.entries.indexOf(paymentStatus),
                             onTabSelected = { paymentStatus = PaymentStatus.entries[it] }
                         )

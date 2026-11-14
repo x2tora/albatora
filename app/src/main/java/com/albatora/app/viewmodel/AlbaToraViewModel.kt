@@ -288,8 +288,20 @@ class AlbaToraViewModel(application: Application) : AndroidViewModel(application
     fun deleteWishlistGoal(goalId: String) = stateHolder.deleteWishlistGoal(goalId)
 
     fun updateTheme(option: ThemeOption) = stateHolder.updateSettings { it.copy(themeOption = option) }
-    fun updateMonet(enabled: Boolean) = stateHolder.updateSettings { it.copy(monetEnabled = enabled) }
-    fun updateCustomKeyColor(colorHex: Long?) = stateHolder.updateSettings { it.copy(customKeyColorHex = colorHex) }
+    fun updateThemeColorStyle(style: ThemeColorStyle) = stateHolder.updateSettings {
+        it.copy(
+            themeColorStyle = style,
+            monetEnabled = style != ThemeColorStyle.DEFAULT,
+            customKeyColorHex = if (style == ThemeColorStyle.CUSTOM) (it.customKeyColorHex ?: 0xFF3482FF) else it.customKeyColorHex
+        )
+    }
+    fun updateCustomKeyColor(colorHex: Long?) = stateHolder.updateSettings {
+        it.copy(
+            customKeyColorHex = colorHex,
+            themeColorStyle = if (colorHex != null) ThemeColorStyle.CUSTOM else it.themeColorStyle,
+            monetEnabled = if (colorHex != null) true else it.monetEnabled
+        )
+    }
     fun updateOngoingNotification(enabled: Boolean) = stateHolder.updateSettings { it.copy(ongoingNotificationEnabled = enabled) }
     fun updateDefaultMinWage(wage: Long) = stateHolder.updateSettings { it.copy(defaultMinWage = wage.coerceAtLeast(1L)) }
 

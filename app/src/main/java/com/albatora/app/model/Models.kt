@@ -12,6 +12,13 @@ enum class ThemeOption(val label: String) {
 }
 
 @Serializable
+enum class ThemeColorStyle(val label: String, val description: String) {
+    DEFAULT("기본", "알바토라 기본 HyperOS 블루 테마"),
+    MATERIAL_YOU("Material You", "기기 배경화면 색상에 맞춘 시스템 다이나믹 테마"),
+    CUSTOM("커스텀", "내가 직접 고른 포인트 색상 기반 테마")
+}
+
+@Serializable
 enum class JobKind(val label: String) {
     REGULAR("정규/고정"),
     SHORT_TERM("단기/일용직")
@@ -257,12 +264,22 @@ data class ScheduledShiftRuntime(
 @Serializable
 data class AppSettings(
     val themeOption: ThemeOption = ThemeOption.SYSTEM,
+    val themeColorStyle: ThemeColorStyle? = null,
     val monetEnabled: Boolean = false,
     val customKeyColorHex: Long? = null,
     val ongoingNotificationEnabled: Boolean = true,
     val defaultMinWage: Long = DEFAULT_2026_MIN_WAGE,
     val selectedTangibleItemId: String = "tangible_americano"
-)
+) {
+    fun resolvedColorStyle(): ThemeColorStyle {
+        if (themeColorStyle != null) return themeColorStyle
+        return when {
+            !monetEnabled -> ThemeColorStyle.DEFAULT
+            customKeyColorHex != null -> ThemeColorStyle.CUSTOM
+            else -> ThemeColorStyle.MATERIAL_YOU
+        }
+    }
+}
 
 @Serializable
 data class AlbaToraDataState(

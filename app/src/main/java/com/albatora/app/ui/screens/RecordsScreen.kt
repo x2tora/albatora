@@ -69,12 +69,14 @@ fun RecordsScreen(
         )
     }
 
+    val navBottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .overScrollVertical()
             .nestedScroll(scrollBehavior.nestedScrollConnection),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 110.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 104.dp + navBottomInset),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // Filter: All vs Unpaid
@@ -183,12 +185,12 @@ fun RecordsScreen(
                             StatementRow("교통비 · 식비 지출", "-${PayrollCalculator.formatWon(summary.totalExpenses)}", MiuixTheme.colorScheme.error)
                         }
                         if (summary.unpaidAmount > 0L) {
-                            StatementRow("\uD83D\uDD34 기간 내 미수금", "${PayrollCalculator.formatWon(summary.unpaidAmount)} (${summary.unpaidCount}건)", MiuixTheme.colorScheme.error)
+                            StatementRow("기간 내 미수금 (입금 대기)", "${PayrollCalculator.formatWon(summary.unpaidAmount)} (${summary.unpaidCount}건)", MiuixTheme.colorScheme.error)
                         }
 
                         Spacer(modifier = Modifier.height(6.dp))
                         TextButton(
-                            text = "📋 정산 내역서(급여명세서) 텍스트 원탭 복사",
+                            text = "정산 내역서 (급여명세서) 텍스트 복사",
                             onClick = {
                                 val title = selectedJob?.name ?: "전체 근무지 합산"
                                 val text = PayrollCalculator.buildPayslipText(title, summary)

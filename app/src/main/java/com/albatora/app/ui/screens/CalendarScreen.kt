@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,6 +26,7 @@ import com.albatora.app.ui.components.MiuixEntityBadge
 import com.albatora.app.ui.components.MiuixTimePickerDialog
 import com.albatora.app.ui.components.SquirclePillBadge
 import com.albatora.app.ui.components.dayOfWeekKorean
+import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.*
@@ -38,9 +41,14 @@ import java.time.LocalDateTime
 import java.time.YearMonth
 import kotlin.math.abs
 
+private const val CALENDAR_PAGER_CENTER = 600
+private const val CALENDAR_PAGER_COUNT = 1201
+
 @Composable
 fun CalendarScreen(
     state: AlbaToraDataState,
+    selectedDate: LocalDate,
+    onSelectedDateChange: (LocalDate) -> Unit,
     scrollBehavior: ScrollBehavior,
     onQuickAddShortTermForDate: (String) -> Unit,
     onEditRecord: (WorkRecord) -> Unit,
@@ -52,24 +60,22 @@ fun CalendarScreen(
     onStampTemplateOnDate: (ShortTermTemplate, LocalDate) -> Unit,
     onNotify: (String) -> Unit
 ) {
-    var displayMonth by remember { mutableStateOf(YearMonth.now()) }
-    var selectedDate by remember { mutableStateOf(LocalDate.now()) }
+    val baseMonth = remember { YearMonth.now() }
+    val pagerState = rememberPagerState(
+        initialPage = CALENDAR_PAGER_CENTER,
+        pageCount = { CALENDAR_PAGER_COUNT }
+    )
+    val coroutineScope = rememberCoroutineScope()
+    val displayMonth = remember(pagerState.currentPage, baseMonth) {
+        baseMonth.plusMonths((pagerState.currentPage - CALENDAR_PAGER_CENTER).toLong())
+    }
     var activeStampTemplate by remember { mutableStateOf<ShortTermTemplate?>(null) }
     var showSubstituteDialog by remember { mutableStateOf(false) }
 
     val nowDt = remember { LocalDateTime.now() }
-    val monthDates = remember(displayMonth) { buildMonthGridDates(displayMonth) }
-
-    val dayItemsMap = remember(state, displayMonth) {
-        val map = mutableMapOf<LocalDate, List<CalendarDayScheduleItem>>()
-        val days = (1..displayMonth.lengthOfMonth()).map { displayMonth.atDay(it) }
-        days.forEach { d ->
-            map[d] = PayrollCalculator.resolveCalendarDayItems(state, d, nowDt)
-        }
-        map
+    val selectedItems = remember(state, selectedDate) {
+        PayrollCalculator.resolveCalendarDayItems(state, selectedDate, nowDt)
     }
-
-    val selectedItems = dayItemsMap[selectedDate] ?: PayrollCalculator.resolveCalendarDayItems(state, selectedDate, nowDt)
     val monthTotal = remember(state, displayMonth) {
         PayrollCalculator.calculateSettlementSummary(
             state,
@@ -77,13 +83,14 @@ fun CalendarScreen(
             displayMonth.atEndOfMonth()
         ).totalNetPay
     }
+    val navBottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .overScrollVertical()
             .nestedScroll(scrollBehavior.nestedScrollConnection),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 110.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 104.dp + navBottomInset),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         // Month header + Net Summary
@@ -97,10 +104,27 @@ fun CalendarScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = { displayMonth = displayMonth.minusMonths(1) }) {
+                    IconButton(
+                        onClick = {
+                            coroutineScope.launch {
+                                pagerState.animateScrollToPage((pagerState.currentPage - 1).coerceAtLeast(0))
+                            }
+                        }
+                    ) {
                         Icon(MiuixIcons.ChevronBackward, contentDescription = "이전 달")
                     }
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier
+                            .squircleClip(10.dp)
+                            .clickable {
+                                coroutineScope.launch {
+                                    pagerState.animateScrollToPage(CALENDAR_PAGER_CENTER)
+                                }
+                                onSelectedDateChange(LocalDate.now())
+                            }
+                            .padding(horizontal = 10.dp, vertical = 2.dp)
+                    ) {
                         Text(
                             text = "${displayMonth.year}년 ${displayMonth.monthValue}월",
                             style = MiuixTheme.textStyles.title4.copy(fontWeight = FontWeight.Bold)
@@ -111,7 +135,13 @@ fun CalendarScreen(
                             color = MiuixTheme.colorScheme.primary
                         )
                     }
-                    IconButton(onClick = { displayMonth = displayMonth.plusMonths(1) }) {
+                    IconButton(
+                        onClick = {
+                            coroutineScope.launch {
+                                pagerState.animateScrollToPage((pagerState.currentPage + 1).coerceAtMost(CALENDAR_PAGER_COUNT - 1))
+                            }
+                        }
+                    ) {
                         Icon(MiuixIcons.ChevronForward, contentDescription = "다음 달")
                     }
                 }
@@ -149,124 +179,143 @@ fun CalendarScreen(
             }
         }
 
-        // Monthly Grid Card
+        // Swipeable Monthly Grid Pager
         item {
-            Card(
+            HorizontalPager(
+                state = pagerState,
                 modifier = Modifier.fillMaxWidth(),
-                insideMargin = PaddingValues(12.dp)
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    // Week Header (Sun..Sat)
-                    Row(modifier = Modifier.fillMaxWidth()) {
-                        listOf("일", "월", "화", "수", "목", "금", "토").forEachIndexed { idx, label ->
-                            val col = when (idx) {
-                                0 -> MiuixTheme.colorScheme.error
-                                6 -> MiuixTheme.colorScheme.primary
-                                else -> MiuixTheme.colorScheme.onSurfaceVariantSummary
-                            }
-                            Box(
-                                modifier = Modifier.weight(1f),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = label,
-                                    style = MiuixTheme.textStyles.footnote2.copy(fontWeight = FontWeight.SemiBold),
-                                    color = col
-                                )
+                beyondViewportPageCount = 1
+            ) { page ->
+                val pageMonth = remember(page, baseMonth) {
+                    baseMonth.plusMonths((page - CALENDAR_PAGER_CENTER).toLong())
+                }
+                val monthDates = remember(pageMonth) { buildMonthGridDates(pageMonth) }
+                val dayItemsMap = remember(state, pageMonth) {
+                    val map = mutableMapOf<LocalDate, List<CalendarDayScheduleItem>>()
+                    val days = (1..pageMonth.lengthOfMonth()).map { pageMonth.atDay(it) }
+                    days.forEach { d ->
+                        map[d] = PayrollCalculator.resolveCalendarDayItems(state, d, nowDt)
+                    }
+                    map
+                }
+
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    insideMargin = PaddingValues(12.dp)
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        // Week Header (Sun..Sat)
+                        Row(modifier = Modifier.fillMaxWidth()) {
+                            listOf("일", "월", "화", "수", "목", "금", "토").forEachIndexed { idx, label ->
+                                val col = when (idx) {
+                                    0 -> MiuixTheme.colorScheme.error
+                                    6 -> MiuixTheme.colorScheme.primary
+                                    else -> MiuixTheme.colorScheme.onSurfaceVariantSummary
+                                }
+                                Box(
+                                    modifier = Modifier.weight(1f),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = label,
+                                        style = MiuixTheme.textStyles.footnote2.copy(fontWeight = FontWeight.SemiBold),
+                                        color = col
+                                    )
+                                }
                             }
                         }
-                    }
 
-                    val weeks = monthDates.chunked(7)
-                    val today = remember { LocalDate.now() }
-                    weeks.forEach { week ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            week.forEach { cellDate ->
-                                if (cellDate == null) {
-                                    Spacer(modifier = Modifier.weight(1f).height(54.dp))
-                                } else {
-                                    val items = dayItemsMap[cellDate].orEmpty()
-                                    val isSelected = cellDate == selectedDate
-                                    val isToday = cellDate == today
-                                    val isHolidayOrSun = cellDate.dayOfWeek == DayOfWeek.SUNDAY ||
-                                        PayrollCalculator.isKoreanPublicHoliday(cellDate)
-                                    val dayNet = items.filter { it.status != ShiftStatus.ABSENT }.sumOf { it.estimatedNetPay }
-                                    val hasUnpaid = items.any { it.paymentStatus == PaymentStatus.UNPAID }
+                        val weeks = monthDates.chunked(7)
+                        val today = remember { LocalDate.now() }
+                        weeks.forEach { week ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                week.forEach { cellDate ->
+                                    if (cellDate == null) {
+                                        Spacer(modifier = Modifier.weight(1f).height(54.dp))
+                                    } else {
+                                        val items = dayItemsMap[cellDate].orEmpty()
+                                        val isSelected = cellDate == selectedDate
+                                        val isToday = cellDate == today
+                                        val isHolidayOrSun = cellDate.dayOfWeek == DayOfWeek.SUNDAY ||
+                                            PayrollCalculator.isKoreanPublicHoliday(cellDate)
+                                        val dayNet = items.filter { it.status != ShiftStatus.ABSENT }.sumOf { it.estimatedNetPay }
+                                        val hasUnpaid = items.any { it.paymentStatus == PaymentStatus.UNPAID }
 
-                                    val cellBg = when {
-                                        isSelected -> MiuixTheme.colorScheme.primary.copy(alpha = 0.16f)
-                                        isToday -> MiuixTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f)
-                                        else -> Color.Transparent
-                                    }
+                                        val cellBg = when {
+                                            isSelected -> MiuixTheme.colorScheme.primary.copy(alpha = 0.16f)
+                                            isToday -> MiuixTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f)
+                                            else -> Color.Transparent
+                                        }
 
-                                    Column(
-                                        modifier = Modifier
-                                            .weight(1f)
-                                            .height(54.dp)
-                                            .squircleBackground(cellBg, 10.dp)
-                                            .then(
-                                                if (isSelected) Modifier.border(
-                                                    1.5.dp,
-                                                    MiuixTheme.colorScheme.primary,
-                                                    androidx.compose.foundation.shape.RoundedCornerShape(10.dp)
-                                                ) else Modifier
-                                            )
-                                            .squircleClip(10.dp)
-                                            .clickable {
-                                                selectedDate = cellDate
-                                                val stamp = activeStampTemplate
-                                                if (stamp != null) {
-                                                    onStampTemplateOnDate(stamp, cellDate)
-                                                    onNotify("${cellDate.monthValue}/${cellDate.dayOfMonth} '${stamp.name}' 원탭 등록 완료")
+                                        Column(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .height(54.dp)
+                                                .squircleBackground(cellBg, 10.dp)
+                                                .then(
+                                                    if (isSelected) Modifier.border(
+                                                        1.5.dp,
+                                                        MiuixTheme.colorScheme.primary,
+                                                        androidx.compose.foundation.shape.RoundedCornerShape(10.dp)
+                                                    ) else Modifier
+                                                )
+                                                .squircleClip(10.dp)
+                                                .clickable {
+                                                    onSelectedDateChange(cellDate)
+                                                    val stamp = activeStampTemplate
+                                                    if (stamp != null) {
+                                                        onStampTemplateOnDate(stamp, cellDate)
+                                                        onNotify("${cellDate.monthValue}/${cellDate.dayOfMonth} '${stamp.name}' 원탭 등록 완료")
+                                                    }
                                                 }
-                                            }
-                                            .padding(2.dp),
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Text(
-                                            text = cellDate.dayOfMonth.toString(),
-                                            style = MiuixTheme.textStyles.footnote1.copy(
-                                                fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Medium
-                                            ),
-                                            color = when {
-                                                isHolidayOrSun -> MiuixTheme.colorScheme.error
-                                                cellDate.dayOfWeek == DayOfWeek.SATURDAY -> MiuixTheme.colorScheme.primary
-                                                else -> MiuixTheme.colorScheme.onSurface
-                                            }
-                                        )
-
-                                        if (items.isNotEmpty()) {
-                                            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                                                items.take(3).forEach { itItem ->
-                                                    Box(
-                                                        modifier = Modifier
-                                                            .size(5.dp)
-                                                            .clip(CircleShape)
-                                                            .background(
-                                                                if (itItem.status == ShiftStatus.ABSENT) {
-                                                                    MiuixTheme.colorScheme.outline
-                                                                } else {
-                                                                    Color(itItem.colorHex)
-                                                                }
-                                                            )
-                                                    )
-                                                }
-                                            }
+                                                .padding(2.dp),
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.SpaceBetween
+                                        ) {
                                             Text(
-                                                text = compactManWon(dayNet, hasUnpaid),
-                                                style = MiuixTheme.textStyles.footnote2.copy(
-                                                    fontSize = MiuixTheme.textStyles.footnote2.fontSize * 0.82f
+                                                text = cellDate.dayOfMonth.toString(),
+                                                style = MiuixTheme.textStyles.footnote1.copy(
+                                                    fontWeight = if (isSelected || isToday) FontWeight.Bold else FontWeight.Medium
                                                 ),
-                                                color = if (hasUnpaid) MiuixTheme.colorScheme.error else MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                                maxLines = 1,
-                                                overflow = TextOverflow.Clip
+                                                color = when {
+                                                    isHolidayOrSun -> MiuixTheme.colorScheme.error
+                                                    cellDate.dayOfWeek == DayOfWeek.SATURDAY -> MiuixTheme.colorScheme.primary
+                                                    else -> MiuixTheme.colorScheme.onSurface
+                                                }
                                             )
-                                        } else {
-                                            Spacer(modifier = Modifier.height(10.dp))
+
+                                            if (items.isNotEmpty()) {
+                                                Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                                                    items.take(3).forEach { itItem ->
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .size(5.dp)
+                                                                .clip(CircleShape)
+                                                                .background(
+                                                                    if (itItem.status == ShiftStatus.ABSENT) {
+                                                                        MiuixTheme.colorScheme.outline
+                                                                    } else {
+                                                                        Color(itItem.colorHex)
+                                                                    }
+                                                                )
+                                                        )
+                                                    }
+                                                }
+                                                Text(
+                                                    text = compactManWon(dayNet, hasUnpaid),
+                                                    style = MiuixTheme.textStyles.footnote2.copy(
+                                                        fontSize = MiuixTheme.textStyles.footnote2.fontSize * 0.82f
+                                                    ),
+                                                    color = if (hasUnpaid) MiuixTheme.colorScheme.error else MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                                    maxLines = 1,
+                                                    overflow = TextOverflow.Clip
+                                                )
+                                            } else {
+                                                Spacer(modifier = Modifier.height(10.dp))
+                                            }
                                         }
                                     }
                                 }
@@ -277,10 +326,29 @@ fun CalendarScreen(
             }
         }
 
-        // Q15-3: 1-Tap Quick Actions Bar for Selected Date
+        // Q15-3: 1-Tap Quick Actions Bar for Selected Date (supports target selection when multiple shifts exist)
         item {
-            val primaryItem = selectedItems.firstOrNull { it.record != null && it.status != ShiftStatus.ABSENT }
+            val actionableItems = selectedItems.filter { it.record != null && it.status != ShiftStatus.ABSENT }
+            var selectedTargetId by remember(selectedDate) { mutableStateOf<String?>(null) }
+            val primaryItem = actionableItems.find { it.record?.id == selectedTargetId } ?: actionableItems.firstOrNull()
             SmallTitle(text = "${selectedDate.monthValue}월 ${selectedDate.dayOfMonth}일 (${dayOfWeekKorean(selectedDate.dayOfWeek.value)}) 원탭 퀵 액션")
+            if (actionableItems.size > 1) {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(bottom = 8.dp)
+                ) {
+                    items(actionableItems, key = { it.record?.id ?: it.title }) { candidate ->
+                        val cid = candidate.record?.id
+                        val isTarget = primaryItem?.record?.id == cid
+                        SquirclePillBadge(
+                            text = if (isTarget) "선택됨 · ${candidate.title}" else candidate.title,
+                            backgroundColor = if (isTarget) Color(candidate.colorHex) else Color(candidate.colorHex).copy(alpha = 0.14f),
+                            contentColor = if (isTarget) Color.White else Color(candidate.colorHex),
+                            onClick = { selectedTargetId = cid }
+                        )
+                    }
+                }
+            }
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 item {
                     SquirclePillBadge(

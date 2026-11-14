@@ -6,6 +6,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
+import com.albatora.app.model.ThemeColorStyle
 import com.albatora.app.model.ThemeOption
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.theme.ColorSchemeMode
@@ -31,7 +32,7 @@ val JobAccentPalette: List<Pair<String, Long>> = listOf(
 @Composable
 fun AlbaToraTheme(
     themeOption: ThemeOption,
-    monetEnabled: Boolean,
+    colorStyle: ThemeColorStyle,
     customKeyColorHex: Long? = null,
     content: @Composable () -> Unit
 ) {
@@ -42,14 +43,19 @@ fun AlbaToraTheme(
         ThemeOption.DARK -> true
     }
 
+    val useMonet = colorStyle != ThemeColorStyle.DEFAULT
     val colorSchemeMode = when (themeOption) {
-        ThemeOption.SYSTEM -> if (monetEnabled) ColorSchemeMode.MonetSystem else ColorSchemeMode.System
-        ThemeOption.LIGHT -> if (monetEnabled) ColorSchemeMode.MonetLight else ColorSchemeMode.Light
-        ThemeOption.DARK -> if (monetEnabled) ColorSchemeMode.MonetDark else ColorSchemeMode.Dark
+        ThemeOption.SYSTEM -> if (useMonet) ColorSchemeMode.MonetSystem else ColorSchemeMode.System
+        ThemeOption.LIGHT -> if (useMonet) ColorSchemeMode.MonetLight else ColorSchemeMode.Light
+        ThemeOption.DARK -> if (useMonet) ColorSchemeMode.MonetDark else ColorSchemeMode.Dark
     }
 
-    val resolvedKeyColor: Color? = customKeyColorHex?.let { Color(it) }
-    val controller = remember(colorSchemeMode, customKeyColorHex) {
+    val resolvedKeyColor: Color? = when (colorStyle) {
+        ThemeColorStyle.DEFAULT -> null
+        ThemeColorStyle.MATERIAL_YOU -> null
+        ThemeColorStyle.CUSTOM -> Color(customKeyColorHex ?: 0xFF3482FF)
+    }
+    val controller = remember(colorSchemeMode, colorStyle, customKeyColorHex) {
         ThemeController(
             colorSchemeMode = colorSchemeMode,
             keyColor = resolvedKeyColor,

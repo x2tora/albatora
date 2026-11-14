@@ -42,7 +42,7 @@ fun MoreSettingsScreen(
     scrollBehavior: ScrollBehavior,
     updateUiState: AppUpdateUiState,
     onUpdateTheme: (ThemeOption) -> Unit,
-    onUpdateMonet: (Boolean) -> Unit,
+    onUpdateThemeColorStyle: (ThemeColorStyle) -> Unit,
     onUpdateCustomKeyColor: (Long?) -> Unit,
     onUpdateOngoingNotification: (Boolean) -> Unit,
     onUpdateDefaultMinWage: (Long) -> Unit,
@@ -129,11 +129,18 @@ fun MoreSettingsScreen(
                     }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                SwitchPreference(
-                    title = "다이나믹 컬러 (Monet)",
-                    summary = "켜면 배경화면 다이나믹 컬러 또는 아래에서 지정한 테마 색상이 적용됩니다 (끄면 기본 테마)",
-                    checked = state.settings.monetEnabled,
-                    onCheckedChange = onUpdateMonet,
+                val colorStyles = ThemeColorStyle.entries
+                val colorStyle = state.settings.resolvedColorStyle()
+                OverlayDropdownPreference(
+                    title = "테마 컬러 스타일",
+                    summary = "${colorStyle.label} · ${colorStyle.description}",
+                    items = colorStyles.map { it.label },
+                    selectedIndex = colorStyles.indexOf(colorStyle),
+                    onSelectedIndexChange = { index ->
+                        val chosen = colorStyles[index]
+                        onUpdateThemeColorStyle(chosen)
+                        onNotify("테마 컬러가 '${chosen.label}'으로 적용되었습니다.")
+                    },
                     startAction = {
                         MiuixGlassIcon(
                             icon = MiuixIcons.Favorites,
@@ -142,51 +149,19 @@ fun MoreSettingsScreen(
                         )
                     }
                 )
-                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                val customHex = state.settings.customKeyColorHex
-                val previewHex = customHex ?: 0xFF3482FF
-                ArrowPreference(
-                    title = "테마 포인트 색상 직접 지정",
-                    summary = when {
-                        !state.settings.monetEnabled -> "다이나믹 컬러 꺼짐 상태 · 색상 지정 시 자동으로 켜집니다"
-                        customHex == null -> "시스템 배경화면 다이나믹 컬러 적용 중 · 탭하여 직접 지정"
-                        else -> "직접 지정 색상 ${formatRgbHex(customHex)} 적용 중 · 탭하여 변경"
-                    },
-                    onClick = { showAppColorDialog = true },
-                    startAction = {
-                        if (state.settings.monetEnabled && customHex == null) {
-                            MiuixGlassIcon(
-                                icon = MiuixIcons.Theme,
-                                contentDescription = null,
-                                accentColor = MiuixTheme.colorScheme.primary
-                            )
-                        } else {
+                if (colorStyle == ThemeColorStyle.CUSTOM) {
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                    val previewHex = state.settings.customKeyColorHex ?: 0xFF3482FF
+                    ArrowPreference(
+                        title = "커스텀 포인트 색상 지정",
+                        summary = "현재 ${formatRgbHex(previewHex)} 적용 중 · 탭하여 변경",
+                        onClick = { showAppColorDialog = true },
+                        startAction = {
                             Box(
                                 modifier = Modifier
                                     .size(38.dp)
                                     .clip(CircleShape)
                                     .background(Color(previewHex))
-                            )
-                        }
-                    }
-                )
-                if (customHex != null || !state.settings.monetEnabled) {
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                    ArrowPreference(
-                        title = "시스템 다이나믹 컬러로 되돌리기",
-                        summary = "직접 지정 색상을 해제하고 기기 배경화면 다이나믹 컬러(Monet)로 복원합니다",
-                        onClick = {
-                            onUpdateCustomKeyColor(null)
-                            if (!state.settings.monetEnabled) {
-                                onUpdateMonet(true)
-                            }
-                            onNotify("시스템 배경화면 다이나믹 컬러로 복원되었습니다.")
-                        },
-                        startAction = {
-                            MiuixGlassIcon(
-                                icon = MiuixIcons.Reset,
-                                contentDescription = null,
-                                accentColor = MiuixTheme.colorScheme.primary
                             )
                         }
                     )
@@ -341,24 +316,13 @@ fun MoreSettingsScreen(
 
     MiuixColorPickerDialog(
         show = showAppColorDialog,
-        title = "앱 테마 포인트 색상 선택",
+        title = "커스텀 테마 포인트 색상 선택",
         initialColorHex = state.settings.customKeyColorHex ?: 0xFF3482FF,
         onDismiss = { showAppColorDialog = false },
         onConfirm = { chosenHex ->
             onUpdateCustomKeyColor(chosenHex)
-            if (!state.settings.monetEnabled) {
-                onUpdateMonet(true)
-            }
-            onNotify("테마 포인트 색상이 ${formatRgbHex(chosenHex)}로 적용되었습니다.")
-        },
-        onResetDynamic = {
-            onUpdateCustomKeyColor(null)
-            if (!state.settings.monetEnabled) {
-                onUpdateMonet(true)
-            }
-            onNotify("시스템 배경화면 다이나믹 컬러로 복원되었습니다.")
-        },
-        resetDynamicLabel = "시스템 배경화면 다이나믹으로 복원"
+            onNotify("커스텀 포인트 색상이 ${formatRgbHex(chosenHex)}로 적용되었습니다.")
+        }
     )
 
     // Default minimum wage editor
