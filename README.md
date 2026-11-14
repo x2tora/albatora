@@ -1,7 +1,7 @@
 <div align="center">
   <img src="assets/icon.png" alt="AlbaTora" width="88" height="88" />
 
-  <h1>AlbaTora (알바토라)</h1>
+  <h1>알바토라</h1>
   <p>실시간 급여 트래킹과 정규·단기·일용직 급여 정산을 위한 안드로이드 앱</p>
 
   <p>
