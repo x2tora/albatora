@@ -105,7 +105,6 @@ private const val GRAIN_TILE = 96
 
 private val SliderHorizontalOverhang = 5.dp
 private val SliderVerticalOverhang = 7.dp
-private val SliderCornerRadius = 28.dp
 private val SliderDragStartSlop = 4.dp
 private val SliderRefractionHeight = 6.dp
 private val SliderRefractionAmount = 4.0.dp
@@ -659,8 +658,7 @@ private fun LiquidGlassNavBarContent(
                     }
                     .liquidGlassSurface(
                         backdrop = dockBackdrop,
-                        shape = RoundedCornerShape(SliderCornerRadius),
-                        cornerRadius = SliderCornerRadius,
+                        shape = RoundedCornerShape(50),
                         blurRadius = if (draggingState.value) 1.5.dp else 0.8.dp,
                         refractionHeight = SliderRefractionHeight,
                         refractionAmount = SliderRefractionAmount,
