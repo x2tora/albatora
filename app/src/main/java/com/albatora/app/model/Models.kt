@@ -19,6 +19,12 @@ enum class ThemeColorStyle(val label: String, val description: String) {
 }
 
 @Serializable
+enum class NavBarStyle(val label: String, val description: String) {
+    MIUIX("기본 내비게이션", "깔끔한 Miuix 기본 하단 내비게이션 바"),
+    LIQUID_GLASS("리퀴드 글래스", "플로팅 유리 굴절 효과 및 슬라이딩 렌즈")
+}
+
+@Serializable
 enum class WidgetThemeStyle(val label: String, val description: String) {
     AUTO("시스템 자동", "OneUI 다크/라이트 모드에 맞춰 자동 전환"),
     LIGHT("밝은 카드", "낮·밤 관계없이 깔끔한 화이트 톤 유지"),
@@ -294,6 +300,7 @@ data class ScheduledShiftRuntime(
 data class AppSettings(
     val themeOption: ThemeOption = ThemeOption.SYSTEM,
     val themeColorStyle: ThemeColorStyle? = null,
+    val navBarStyle: NavBarStyle = NavBarStyle.MIUIX,
     val monetEnabled: Boolean = false,
     val customKeyColorHex: Long? = null,
     val ongoingNotificationEnabled: Boolean = true,

@@ -291,6 +291,7 @@ class AlbaToraViewModel(application: Application) : AndroidViewModel(application
     fun deleteArchivedGoal(archiveId: String) = stateHolder.deleteArchivedGoal(archiveId)
 
     fun updateTheme(option: ThemeOption) = stateHolder.updateSettings { it.copy(themeOption = option) }
+    fun updateNavBarStyle(style: NavBarStyle) = stateHolder.updateSettings { it.copy(navBarStyle = style) }
     fun updateThemeColorStyle(style: ThemeColorStyle) = stateHolder.updateSettings {
         it.copy(
             themeColorStyle = style,

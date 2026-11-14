@@ -53,6 +53,7 @@ import kotlin.math.roundToInt
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.albatora.app.domain.LiveDashboardSnapshot
 import com.albatora.app.domain.PayrollCalculator
+import com.albatora.app.model.NavBarStyle
 import com.albatora.app.model.ThemeColorStyle
 import com.albatora.app.service.BatteryOptimizationHelper
 import com.albatora.app.ui.components.AppUpdateDialog
@@ -78,12 +79,17 @@ import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.progressiveTextureBlur
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Add
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.ChevronForward
+import top.yukonga.miuix.kmp.icon.extended.Home
+import top.yukonga.miuix.kmp.icon.extended.Months
+import top.yukonga.miuix.kmp.icon.extended.Notes
 import top.yukonga.miuix.kmp.icon.extended.Settings
 import top.yukonga.miuix.kmp.icon.extended.Stopwatch
 import top.yukonga.miuix.kmp.icon.extended.Store
 import top.yukonga.miuix.kmp.icon.extended.Timer
+import top.yukonga.miuix.kmp.icon.extended.Tune
 import top.yukonga.miuix.kmp.nav.core.NavDisplay
 import top.yukonga.miuix.kmp.nav.core.NavKey
 import top.yukonga.miuix.kmp.nav.core.rememberNavBackStack
@@ -640,7 +646,8 @@ private fun MainTabsHost(
                 )
             }
 
-            // ④ Floating Liquid Glass nav dock & Toasts (strictly OUTSIDE layerBackdrop capture box)
+            // ④ Bottom navigation bar (Miuix default or Floating Liquid Glass) & Toasts (strictly OUTSIDE layerBackdrop capture box)
+            val isLiquidGlassNav = state.settings.navBarStyle == NavBarStyle.LIQUID_GLASS
             AnimatedVisibility(
                 visible = showChrome,
                 enter = slideInVertically(
@@ -661,29 +668,90 @@ private fun MainTabsHost(
                             .widthIn(max = 400.dp)
                             .fillMaxWidth()
                             .navigationBarsPadding()
-                            .padding(start = 16.dp, end = 16.dp, bottom = 92.dp)
+                            .padding(start = 16.dp, end = 16.dp, bottom = if (isLiquidGlassNav) 92.dp else 86.dp)
                     )
 
-                    FloatingLiquidGlassNavBar(
-                        backdrop = barBackdrop,
-                        selectedTab = selectedTab,
-                        isCenterAddSelected = showHomeQuickMenu,
-                        hasActiveShift = liveDashboard.activeShifts.isNotEmpty(),
-                        unpaidCount = unpaidCount,
-                        onSelectTab = { tab ->
-                            showHomeQuickMenu = false
-                            if (tab == 2) recordsOpenUnpaid = false
-                            selectedTab = tab
-                        },
-                        onCenterAddClick = { showHomeQuickMenu = !showHomeQuickMenu },
-                        useLensTint = state.settings.resolvedColorStyle() != ThemeColorStyle.DEFAULT,
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .widthIn(max = 384.dp)
-                            .fillMaxWidth()
-                            .navigationBarsPadding()
-                            .padding(horizontal = 16.dp, vertical = 14.dp)
-                    )
+                    if (isLiquidGlassNav) {
+                        FloatingLiquidGlassNavBar(
+                            backdrop = barBackdrop,
+                            selectedTab = selectedTab,
+                            isCenterAddSelected = showHomeQuickMenu,
+                            hasActiveShift = liveDashboard.activeShifts.isNotEmpty(),
+                            unpaidCount = unpaidCount,
+                            onSelectTab = { tab ->
+                                showHomeQuickMenu = false
+                                if (tab == 2) recordsOpenUnpaid = false
+                                selectedTab = tab
+                            },
+                            onCenterAddClick = { showHomeQuickMenu = !showHomeQuickMenu },
+                            useLensTint = state.settings.resolvedColorStyle() != ThemeColorStyle.DEFAULT,
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .widthIn(max = 384.dp)
+                                .fillMaxWidth()
+                                .navigationBarsPadding()
+                                .padding(horizontal = 16.dp, vertical = 14.dp)
+                        )
+                    } else {
+                        NavigationBar(
+                            showDivider = true,
+                            defaultWindowInsetsPadding = true,
+                            mode = NavigationBarDisplayMode.IconAndText,
+                            modifier = Modifier
+                                .align(Alignment.BottomCenter)
+                                .fillMaxWidth()
+                        ) {
+                            NavigationBarItem(
+                                selected = !showHomeQuickMenu && selectedTab == 0,
+                                onClick = {
+                                    showHomeQuickMenu = false
+                                    selectedTab = 0
+                                },
+                                icon = MiuixIcons.Regular.Home,
+                                label = "홈",
+                                badge = if (liveDashboard.activeShifts.isNotEmpty()) {
+                                    { Badge(modifier = Modifier.size(7.dp)) }
+                                } else null
+                            )
+                            NavigationBarItem(
+                                selected = !showHomeQuickMenu && selectedTab == 1,
+                                onClick = {
+                                    showHomeQuickMenu = false
+                                    selectedTab = 1
+                                },
+                                icon = MiuixIcons.Regular.Months,
+                                label = "달력"
+                            )
+                            NavigationBarItem(
+                                selected = showHomeQuickMenu,
+                                onClick = { showHomeQuickMenu = !showHomeQuickMenu },
+                                icon = MiuixIcons.Add,
+                                label = "추가"
+                            )
+                            NavigationBarItem(
+                                selected = !showHomeQuickMenu && selectedTab == 2,
+                                onClick = {
+                                    showHomeQuickMenu = false
+                                    recordsOpenUnpaid = false
+                                    selectedTab = 2
+                                },
+                                icon = MiuixIcons.Regular.Notes,
+                                label = "기록",
+                                badge = if (unpaidCount > 0) {
+                                    { Badge { Text(unpaidCount.toString()) } }
+                                } else null
+                            )
+                            NavigationBarItem(
+                                selected = !showHomeQuickMenu && selectedTab == 3,
+                                onClick = {
+                                    showHomeQuickMenu = false
+                                    selectedTab = 3
+                                },
+                                icon = MiuixIcons.Regular.Tune,
+                                label = "계산기"
+                            )
+                        }
+                    }
                 }
             }
 
@@ -832,6 +900,7 @@ private fun SettingsScreenHost(
                 updateUiState = updateUiState,
                 onUpdateTheme = viewModel::updateTheme,
                 onUpdateThemeColorStyle = viewModel::updateThemeColorStyle,
+                onUpdateNavBarStyle = viewModel::updateNavBarStyle,
                 onUpdateCustomKeyColor = viewModel::updateCustomKeyColor,
                 onUpdateOngoingNotification = viewModel::updateOngoingNotification,
                 onUpdateAutoDnd = viewModel::updateAutoDnd,
