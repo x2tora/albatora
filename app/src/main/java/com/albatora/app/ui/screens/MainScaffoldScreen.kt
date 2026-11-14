@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.platform.LocalContext
@@ -39,6 +38,7 @@ import top.yukonga.miuix.kmp.nav.core.NavDisplay
 import top.yukonga.miuix.kmp.nav.core.NavKey
 import top.yukonga.miuix.kmp.nav.core.rememberNavBackStack
 import top.yukonga.miuix.kmp.nav.transition.NavTransitions
+import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.shader.isRuntimeShaderSupported
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.time.LocalDate
@@ -86,8 +86,6 @@ fun MainScaffoldScreen(
     }
 
     val surfaceBg = MiuixTheme.colorScheme.surface
-    val primaryAmbient = MiuixTheme.colorScheme.primary.copy(alpha = 0.08f)
-    val secondaryAmbient = MiuixTheme.colorScheme.secondary.copy(alpha = 0.06f)
 
     // Keep card/icon glass blur strictly separate from scrollable content barBackdrop to avoid cyclic RenderNode graphs.
     val ambientBackdrop = rememberLayerBackdrop {
@@ -104,11 +102,7 @@ fun MainScaffoldScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .layerBackdrop(ambientBackdrop)
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(surfaceBg, primaryAmbient, secondaryAmbient, surfaceBg)
-                    )
-                )
+                .background(surfaceBg)
         )
 
         CompositionLocalProvider(LocalAppBackdrop provides ambientBackdrop) {
@@ -190,6 +184,15 @@ private fun MainTabsHost(
 
     var selectedTab by remember { mutableIntStateOf(0) } // 0=홈, 1=달력, 2=기록, 3=계산기, 4=더보기
     var recordsOpenUnpaid by remember { mutableStateOf(false) }
+    var isFullscreenFocus by remember { mutableStateOf(false) }
+    var showHomeQuickMenu by remember { mutableStateOf(false) }
+    var openStopwatchTrigger by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(liveDashboard.activeShifts.isEmpty()) {
+        if (liveDashboard.activeShifts.isEmpty()) {
+            isFullscreenFocus = false
+        }
+    }
 
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
@@ -206,6 +209,7 @@ private fun MainTabsHost(
     val scrollBehavior = MiuixScrollBehavior(state = rememberTopAppBarState())
     val useShader = isRuntimeShaderSupported()
     val barOverlayColor = MiuixTheme.colorScheme.surface.copy(alpha = if (useShader) 0.72f else 0.96f)
+    val showChrome = !(isFullscreenFocus && selectedTab == 0 && liveDashboard.activeShifts.isNotEmpty())
 
     val tabTitles = listOf("알바토라", "근무 달력", "정산 · 명세서", "급여 계산기", "더보기")
 
@@ -213,104 +217,112 @@ private fun MainTabsHost(
         modifier = Modifier.fillMaxSize(),
         snackbarHost = { SnackbarHost(state = snackbarHostState) },
         topBar = {
-            val topBlurMod = if (useShader) {
-                Modifier.progressiveTextureBlur(
-                    backdrop = barBackdrop,
-                    shape = RectangleShape,
-                    blurRadius = 16f,
-                    gradient = ProgressiveBlur.Top,
-                    colors = BlurDefaults.blurColors(
-                        blendColors = listOf(BlendColorEntry(barOverlayColor, BlurBlendMode.SrcOver))
+            if (showChrome) {
+                val topBlurMod = if (useShader) {
+                    Modifier.progressiveTextureBlur(
+                        backdrop = barBackdrop,
+                        shape = RectangleShape,
+                        blurRadius = 16f,
+                        gradient = ProgressiveBlur.Top,
+                        colors = BlurDefaults.blurColors(
+                            blendColors = listOf(BlendColorEntry(barOverlayColor, BlurBlendMode.SrcOver))
+                        )
                     )
-                )
-            } else {
-                Modifier.background(barOverlayColor)
-            }
-            Box(modifier = topBlurMod) {
-                SmallTopAppBar(
-                    title = tabTitles[selectedTab],
-                    color = Color.Transparent,
-                    scrollBehavior = scrollBehavior,
-                    actions = {
-                        if (selectedTab == 0 || selectedTab == 1 || selectedTab == 2) {
-                            IconButton(
-                                onClick = {
-                                    onOpenQuickShortTerm(null, PayrollCalculator.formatDate(LocalDate.now()))
+                } else {
+                    Modifier.background(barOverlayColor)
+                }
+                Box(modifier = topBlurMod) {
+                    SmallTopAppBar(
+                        title = tabTitles[selectedTab],
+                        color = Color.Transparent,
+                        scrollBehavior = scrollBehavior,
+                        actions = {
+                            if (selectedTab == 0 || selectedTab == 1 || selectedTab == 2) {
+                                IconButton(
+                                    onClick = {
+                                        if (selectedTab == 0) {
+                                            showHomeQuickMenu = true
+                                        } else {
+                                            onOpenQuickShortTerm(null, PayrollCalculator.formatDate(LocalDate.now()))
+                                        }
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = MiuixIcons.AddCircle,
+                                        contentDescription = "추가 및 출근",
+                                        tint = MiuixTheme.colorScheme.primary
+                                    )
                                 }
-                            ) {
-                                Icon(
-                                    imageVector = MiuixIcons.AddCircle,
-                                    contentDescription = "단기 10초 퀵 등록",
-                                    tint = MiuixTheme.colorScheme.primary
-                                )
                             }
                         }
-                    }
-                )
+                    )
+                }
             }
         },
         bottomBar = {
-            val bottomBlurMod = if (useShader) {
-                Modifier.progressiveTextureBlur(
-                    backdrop = barBackdrop,
-                    shape = RectangleShape,
-                    blurRadius = 16f,
-                    gradient = ProgressiveBlur.Bottom,
-                    colors = BlurDefaults.blurColors(
-                        blendColors = listOf(BlendColorEntry(barOverlayColor, BlurBlendMode.SrcOver))
+            if (showChrome) {
+                val bottomBlurMod = if (useShader) {
+                    Modifier.progressiveTextureBlur(
+                        backdrop = barBackdrop,
+                        shape = RectangleShape,
+                        blurRadius = 16f,
+                        gradient = ProgressiveBlur.Bottom,
+                        colors = BlurDefaults.blurColors(
+                            blendColors = listOf(BlendColorEntry(barOverlayColor, BlurBlendMode.SrcOver))
+                        )
                     )
-                )
-            } else {
-                Modifier.background(barOverlayColor)
-            }
-            Box(modifier = bottomBlurMod) {
-                NavigationBar(
-                    color = Color.Transparent,
-                    mode = NavigationBarDisplayMode.IconAndText
-                ) {
-                    NavigationBarItem(
-                        selected = selectedTab == 0,
-                        onClick = { selectedTab = 0 },
-                        icon = MiuixIcons.Regular.Home,
-                        label = "홈",
-                        badge = {
-                            if (liveDashboard.activeShifts.isNotEmpty()) {
-                                Badge()
+                } else {
+                    Modifier.background(barOverlayColor)
+                }
+                Box(modifier = bottomBlurMod) {
+                    NavigationBar(
+                        color = Color.Transparent,
+                        mode = NavigationBarDisplayMode.IconAndText
+                    ) {
+                        NavigationBarItem(
+                            selected = selectedTab == 0,
+                            onClick = { selectedTab = 0 },
+                            icon = MiuixIcons.Regular.Home,
+                            label = "홈",
+                            badge = {
+                                if (liveDashboard.activeShifts.isNotEmpty()) {
+                                    Badge()
+                                }
                             }
-                        }
-                    )
-                    NavigationBarItem(
-                        selected = selectedTab == 1,
-                        onClick = { selectedTab = 1 },
-                        icon = MiuixIcons.Regular.Months,
-                        label = "달력"
-                    )
-                    NavigationBarItem(
-                        selected = selectedTab == 2,
-                        onClick = {
-                            recordsOpenUnpaid = false
-                            selectedTab = 2
-                        },
-                        icon = MiuixIcons.Regular.Notes,
-                        label = "기록",
-                        badge = {
-                            if (unpaidCount > 0) {
-                                Badge { Text(unpaidCount.toString()) }
+                        )
+                        NavigationBarItem(
+                            selected = selectedTab == 1,
+                            onClick = { selectedTab = 1 },
+                            icon = MiuixIcons.Regular.Months,
+                            label = "달력"
+                        )
+                        NavigationBarItem(
+                            selected = selectedTab == 2,
+                            onClick = {
+                                recordsOpenUnpaid = false
+                                selectedTab = 2
+                            },
+                            icon = MiuixIcons.Regular.Notes,
+                            label = "기록",
+                            badge = {
+                                if (unpaidCount > 0) {
+                                    Badge { Text(unpaidCount.toString()) }
+                                }
                             }
-                        }
-                    )
-                    NavigationBarItem(
-                        selected = selectedTab == 3,
-                        onClick = { selectedTab = 3 },
-                        icon = MiuixIcons.Regular.Tune,
-                        label = "계산기"
-                    )
-                    NavigationBarItem(
-                        selected = selectedTab == 4,
-                        onClick = { selectedTab = 4 },
-                        icon = MiuixIcons.Regular.Settings,
-                        label = "더보기"
-                    )
+                        )
+                        NavigationBarItem(
+                            selected = selectedTab == 3,
+                            onClick = { selectedTab = 3 },
+                            icon = MiuixIcons.Regular.Tune,
+                            label = "계산기"
+                        )
+                        NavigationBarItem(
+                            selected = selectedTab == 4,
+                            onClick = { selectedTab = 4 },
+                            icon = MiuixIcons.Regular.Settings,
+                            label = "더보기"
+                        )
+                    }
                 }
             }
         }
@@ -320,13 +332,20 @@ private fun MainTabsHost(
             .layerBackdrop(barBackdrop)
 
         Box(
-            modifier = contentBackdropModifier.padding(top = paddingValues.calculateTopPadding())
+            modifier = if (showChrome) {
+                contentBackdropModifier.padding(top = paddingValues.calculateTopPadding())
+            } else {
+                contentBackdropModifier
+            }
         ) {
             when (selectedTab) {
                 0 -> HomeScreen(
                     state = state,
                     liveDashboard = liveDashboard,
                     scrollBehavior = scrollBehavior,
+                    isFullscreenFocus = isFullscreenFocus,
+                    onToggleFullscreenFocus = { isFullscreenFocus = it },
+                    openStopwatchTrigger = openStopwatchTrigger,
                     onAddRegularJob = { onOpenAddRegularJob(null) },
                     onEditRegularJob = { jobId -> onOpenAddRegularJob(jobId) },
                     onQuickAddShortTerm = {
@@ -338,9 +357,10 @@ private fun MainTabsHost(
                     },
                     onToggleBreak = viewModel::toggleBreak,
                     onClockOut = viewModel::clockOut,
-                    onStartStopwatch = { title, kind, payType, unitAmt, jobId, colorHex, plannedMins, breakMins, breakPayType, allowance ->
+                    onStartStopwatch = { title, emoji, kind, payType, unitAmt, jobId, colorHex, plannedMins, breakMins, breakPayType, allowance ->
                         viewModel.startStopwatch(
                             title = title,
+                            emoji = emoji,
                             kind = kind,
                             payType = payType,
                             unitAmount = unitAmt,
@@ -351,7 +371,7 @@ private fun MainTabsHost(
                             breakPayType = breakPayType,
                             allowance = allowance
                         )
-                        notify("'$title' 스톱워치 출근이 시작되었습니다!")
+                        notify("'$title' 스톱워치 출근이 시작되었습니다")
                     },
                     onSelectTangibleItem = viewModel::selectTangibleItem,
                     onUpsertTangibleItem = viewModel::upsertTangibleItem,
@@ -417,17 +437,50 @@ private fun MainTabsHost(
                     scrollBehavior = scrollBehavior,
                     onUpdateTheme = viewModel::updateTheme,
                     onUpdateMonet = viewModel::updateMonet,
+                    onUpdateCustomKeyColor = viewModel::updateCustomKeyColor,
                     onUpdateOngoingNotification = viewModel::updateOngoingNotification,
                     onUpdateDefaultMinWage = viewModel::updateDefaultMinWage,
                     onDeleteTemplate = viewModel::deleteTemplate,
                     onExportJson = viewModel::exportBackupJson,
                     onImportJson = viewModel::importBackupJson,
                     onResetAllData = viewModel::resetAllData,
-                    onAddRegularJob = { onOpenAddRegularJob(null) },
-                    onAddShortTerm = {
+                    onNotify = notify
+                )
+            }
+        }
+    }
+
+    if (showHomeQuickMenu) {
+        OverlayDialog(
+            show = true,
+            title = "빠른 등록 · 즉시 출근",
+            onDismissRequest = { showHomeQuickMenu = false }
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(
+                    text = "정규/고정 알바 추가",
+                    onClick = {
+                        showHomeQuickMenu = false
+                        onOpenAddRegularJob(null)
+                    },
+                    colors = ButtonDefaults.textButtonColorsPrimary(),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                TextButton(
+                    text = "단기/일용직 10초 등록",
+                    onClick = {
+                        showHomeQuickMenu = false
                         onOpenQuickShortTerm(null, PayrollCalculator.formatDate(LocalDate.now()))
                     },
-                    onNotify = notify
+                    modifier = Modifier.fillMaxWidth()
+                )
+                TextButton(
+                    text = "즉시 출근 스톱워치 시작",
+                    onClick = {
+                        showHomeQuickMenu = false
+                        openStopwatchTrigger++
+                    },
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         }

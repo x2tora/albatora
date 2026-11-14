@@ -111,6 +111,7 @@ data class WeeklyHolidayRule(
 data class Job(
     val id: String,
     val name: String,
+    val emoji: String = "",
     val kind: JobKind = JobKind.REGULAR,
     val colorHex: Long = 0xFF3482FF,
     val payType: PayType = PayType.HOURLY,
@@ -140,6 +141,7 @@ data class WorkRecord(
     val id: String,
     val jobId: String? = null,
     val title: String,
+    val emoji: String = "",
     val kind: JobKind = JobKind.REGULAR,
     val colorHex: Long = 0xFF3482FF,
     val date: String, // yyyy-MM-dd
@@ -173,6 +175,7 @@ data class WorkRecord(
 data class ShortTermTemplate(
     val id: String,
     val name: String,
+    val emoji: String = "",
     val colorHex: Long = 0xFF10B981,
     val startMinute: Int = 9 * 60,
     val endMinute: Int = 18 * 60,
@@ -216,6 +219,7 @@ data class ActiveStopwatchSession(
     val id: String,
     val jobId: String? = null,
     val title: String,
+    val emoji: String = "",
     val kind: JobKind = JobKind.SHORT_TERM,
     val colorHex: Long = 0xFF3482FF,
     val payType: PayType = PayType.HOURLY,
@@ -254,6 +258,7 @@ data class ScheduledShiftRuntime(
 data class AppSettings(
     val themeOption: ThemeOption = ThemeOption.SYSTEM,
     val monetEnabled: Boolean = false,
+    val customKeyColorHex: Long? = null,
     val ongoingNotificationEnabled: Boolean = true,
     val defaultMinWage: Long = DEFAULT_2026_MIN_WAGE,
     val selectedTangibleItemId: String = "tangible_americano"

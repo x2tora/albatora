@@ -32,6 +32,7 @@ val JobAccentPalette: List<Pair<String, Long>> = listOf(
 fun AlbaToraTheme(
     themeOption: ThemeOption,
     monetEnabled: Boolean,
+    customKeyColorHex: Long? = null,
     content: @Composable () -> Unit
 ) {
     val systemDark = isSystemInDarkTheme()
@@ -47,10 +48,11 @@ fun AlbaToraTheme(
         ThemeOption.DARK -> if (monetEnabled) ColorSchemeMode.MonetDark else ColorSchemeMode.Dark
     }
 
-    val controller = remember(colorSchemeMode) {
+    val resolvedKeyColor = customKeyColorHex?.let { Color(it) } ?: Color(0xFF3482FF)
+    val controller = remember(colorSchemeMode, customKeyColorHex) {
         ThemeController(
             colorSchemeMode = colorSchemeMode,
-            keyColor = Color(0xFF3482FF),
+            keyColor = resolvedKeyColor,
             colorSpec = ThemeColorSpec.Spec2025,
             paletteStyle = ThemePaletteStyle.TonalSpot
         )

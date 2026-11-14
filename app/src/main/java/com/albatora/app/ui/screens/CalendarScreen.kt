@@ -20,7 +20,7 @@ import androidx.compose.ui.unit.dp
 import com.albatora.app.domain.CalendarDayScheduleItem
 import com.albatora.app.domain.PayrollCalculator
 import com.albatora.app.model.*
-import com.albatora.app.ui.components.MiuixGlassIcon
+import com.albatora.app.ui.components.MiuixEntityBadge
 import com.albatora.app.ui.components.MiuixTimePickerDialog
 import com.albatora.app.ui.components.SquirclePillBadge
 import com.albatora.app.ui.components.dayOfWeekKorean
@@ -124,7 +124,7 @@ fun CalendarScreen(
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(
                         text = if (activeStampTemplate != null) {
-                            "⚡ 원탭 도장 모드 켜짐: 달력에서 날짜를 누르면 '${activeStampTemplate!!.name}'이 즉시 등록됩니다"
+                            "원탭 도장 활성화: 달력 날짜를 누르면 '${activeStampTemplate!!.name}'이 즉시 등록됩니다"
                         } else {
                             "단기 프리셋 원탭 도장 (선택 후 날짜를 탭하세요)"
                         },
@@ -134,8 +134,9 @@ fun CalendarScreen(
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(state.templates, key = { it.id }) { tpl ->
                             val picked = activeStampTemplate?.id == tpl.id
+                            val prefix = if (tpl.emoji.isNotBlank()) "${tpl.emoji} " else ""
                             SquirclePillBadge(
-                                text = if (picked) "✔ ${tpl.name}" else "⚡ ${tpl.name}",
+                                text = if (picked) "$prefix${tpl.name} · 선택됨" else "$prefix${tpl.name}",
                                 backgroundColor = if (picked) Color(tpl.colorHex) else Color(tpl.colorHex).copy(alpha = 0.16f),
                                 contentColor = if (picked) Color.White else Color(tpl.colorHex),
                                 onClick = {
@@ -439,8 +440,9 @@ private fun CalendarDayShiftCard(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.weight(1f)
             ) {
-                MiuixGlassIcon(
-                    icon = if (item.isCurrentlyLive) MiuixIcons.Stopwatch else MiuixIcons.Notes,
+                MiuixEntityBadge(
+                    emoji = item.emoji,
+                    fallbackIcon = if (item.isCurrentlyLive) MiuixIcons.Stopwatch else MiuixIcons.Notes,
                     contentDescription = null,
                     accentColor = Color(item.colorHex)
                 )
@@ -483,7 +485,7 @@ private fun CalendarDayShiftCard(
                 val pStatus = item.paymentStatus
                 if (pStatus != null && item.record != null && !item.record.id.startsWith("cal_")) {
                     SquirclePillBadge(
-                        text = "${pStatus.badgeEmoji} ${pStatus.label}",
+                        text = pStatus.label,
                         backgroundColor = if (pStatus == PaymentStatus.UNPAID) {
                             MiuixTheme.colorScheme.error.copy(alpha = 0.14f)
                         } else {

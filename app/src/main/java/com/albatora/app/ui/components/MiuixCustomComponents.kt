@@ -7,24 +7,30 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.albatora.app.domain.PayrollCalculator
+import androidx.compose.ui.unit.sp
 import com.albatora.app.ui.theme.LocalAppBackdrop
 import com.albatora.app.ui.theme.LocalIsDarkTheme
 import top.yukonga.miuix.kmp.basic.*
@@ -42,10 +48,12 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.time.LocalDate
 import java.time.YearMonth
 import java.util.Locale
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 
 /**
- * Glassmorphic icon container inspired by HyperOS / Miuix glass icons.
- * Uses continuous squircle geometry + miuix-icons + runtime shader textureBlur with glass edge stroke on API 33+.
+ * Calm squircle icon container with subtle accent fill and hairline border.
  */
 @Composable
 fun MiuixGlassIcon(
@@ -53,50 +61,19 @@ fun MiuixGlassIcon(
     contentDescription: String?,
     accentColor: Color,
     modifier: Modifier = Modifier,
-    size: Dp = 42.dp,
+    size: Dp = 40.dp,
     iconSize: Dp = 20.dp,
     cornerRadius: Dp = 12.dp
 ) {
     val isDark = LocalIsDarkTheme.current
-    val backdrop = LocalAppBackdrop.current
-    val useShaderBlur = isRuntimeShaderSupported() && backdrop != null
-    val shape: Shape = RoundedCornerShape(cornerRadius)
-
-    val containerTint = if (isDark) accentColor.copy(alpha = 0.24f) else accentColor.copy(alpha = 0.14f)
-    val borderTint = if (isDark) accentColor.copy(alpha = 0.42f) else accentColor.copy(alpha = 0.28f)
-
-    val blurModifier = if (useShaderBlur) {
-        Modifier
-            .squircleClip(cornerRadius)
-            .textureBlur(
-                backdrop = backdrop!!,
-                shape = shape,
-                blurRadius = 16f,
-                colors = BlurDefaults.blurColors(
-                    blendColors = listOf(
-                        BlendColorEntry(containerTint, BlurBlendMode.SrcOver)
-                    )
-                ),
-                highlight = if (isDark) Highlight.GlassStrokeSmallDark else Highlight.GlassStrokeSmallLight
-            )
-    } else {
-        Modifier
-            .squircleBackground(containerTint, cornerRadius)
-            .squircleBorder(1.dp, borderTint, cornerRadius)
-    }
+    val containerTint = accentColor.copy(alpha = if (isDark) 0.18f else 0.11f)
+    val borderTint = accentColor.copy(alpha = if (isDark) 0.30f else 0.18f)
 
     Box(
         modifier = modifier
             .size(size)
-            .then(blurModifier)
-            .background(
-                Brush.linearGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = if (isDark) 0.10f else 0.35f),
-                        Color.Transparent
-                    )
-                )
-            ),
+            .squircleBackground(containerTint, cornerRadius)
+            .squircleBorder(1.dp, borderTint, cornerRadius),
         contentAlignment = Alignment.Center
     ) {
         Icon(
@@ -109,7 +86,151 @@ fun MiuixGlassIcon(
 }
 
 /**
- * Modifier helper for HyperOS-style glassmorphic Hero/Live Tracker cards with fallback below API 33.
+ * Displays a user-selected emoji inside a squircle badge, falling back to [MiuixGlassIcon] when blank.
+ */
+@Composable
+fun MiuixEntityBadge(
+    emoji: String,
+    fallbackIcon: ImageVector,
+    accentColor: Color,
+    modifier: Modifier = Modifier,
+    size: Dp = 40.dp,
+    cornerRadius: Dp = 12.dp,
+    contentDescription: String? = null
+) {
+    if (emoji.isBlank()) {
+        MiuixGlassIcon(
+            icon = fallbackIcon,
+            contentDescription = contentDescription,
+            accentColor = accentColor,
+            modifier = modifier,
+            size = size,
+            iconSize = (size.value * 0.48f).dp,
+            cornerRadius = cornerRadius
+        )
+    } else {
+        val isDark = LocalIsDarkTheme.current
+        val containerTint = accentColor.copy(alpha = if (isDark) 0.18f else 0.11f)
+        val borderTint = accentColor.copy(alpha = if (isDark) 0.30f else 0.18f)
+        Box(
+            modifier = modifier
+                .size(size)
+                .squircleBackground(containerTint, cornerRadius)
+                .squircleBorder(1.dp, borderTint, cornerRadius),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = emoji,
+                fontSize = (size.value * 0.48f).sp,
+                textAlign = TextAlign.Center,
+                maxLines = 1
+            )
+        }
+    }
+}
+
+/**
+ * Quiet signature dot marking live/paused/status states without decorative emoji clutter.
+ */
+@Composable
+fun LiveStatusDot(
+    color: Color,
+    modifier: Modifier = Modifier,
+    size: Dp = 8.dp
+) {
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(CircleShape)
+            .background(color)
+    )
+}
+
+/**
+ * Precision chronometer focus ring for the live earnings focus timer stage.
+ */
+@Composable
+fun FocusTimerRingCanvas(
+    progress: Float?,
+    accentColor: Color,
+    trackColor: Color,
+    tickColor: Color,
+    isPaused: Boolean,
+    secondFraction: Float,
+    modifier: Modifier = Modifier
+) {
+    Canvas(modifier = modifier) {
+        val strokeWidth = 10.dp.toPx()
+        val inset = strokeWidth / 2f + 12.dp.toPx()
+        val arcDiameter = size.minDimension - inset * 2f
+        val topLeft = Offset((size.width - arcDiameter) / 2f, (size.height - arcDiameter) / 2f)
+        val arcSize = Size(arcDiameter, arcDiameter)
+        val center = Offset(size.width / 2f, size.height / 2f)
+        val outerR = arcDiameter / 2f + strokeWidth / 2f + 8.dp.toPx()
+
+        // Chronometer dial ticks (60 crisp ticks around perimeter)
+        for (i in 0 until 60) {
+            val angleRad = (-90.0 + i * 6.0) * (PI / 180.0)
+            val isMajor = i % 5 == 0
+            val innerLen = if (isMajor) 7.dp.toPx() else 3.5.dp.toPx()
+            val start = Offset(
+                x = center.x + (outerR - innerLen) * cos(angleRad).toFloat(),
+                y = center.y + (outerR - innerLen) * sin(angleRad).toFloat()
+            )
+            val end = Offset(
+                x = center.x + outerR * cos(angleRad).toFloat(),
+                y = center.y + outerR * sin(angleRad).toFloat()
+            )
+            drawLine(
+                color = if (isMajor) tickColor.copy(alpha = 0.55f) else tickColor.copy(alpha = 0.25f),
+                start = start,
+                end = end,
+                strokeWidth = if (isMajor) 1.5.dp.toPx() else 1.dp.toPx(),
+                cap = StrokeCap.Round
+            )
+        }
+
+        // Background track ring
+        drawArc(
+            color = trackColor,
+            startAngle = -90f,
+            sweepAngle = 360f,
+            useCenter = false,
+            topLeft = topLeft,
+            size = arcSize,
+            style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+        )
+
+        val sweepColor = if (isPaused) Color(0xFFD97706) else accentColor
+        if (progress != null) {
+            val sweep = (progress.coerceIn(0f, 1f) * 360f).coerceAtLeast(3f)
+            drawArc(
+                color = sweepColor,
+                startAngle = -90f,
+                sweepAngle = sweep,
+                useCenter = false,
+                topLeft = topLeft,
+                size = arcSize,
+                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+            )
+        } else {
+            // Stopwatch mode: calm 60-second sweep showing live forward progression
+            val startAngle = -90f + (secondFraction.coerceIn(0f, 1f) * 360f)
+            drawArc(
+                color = sweepColor,
+                startAngle = startAngle - 72f,
+                sweepAngle = 96f,
+                useCenter = false,
+                topLeft = topLeft,
+                size = arcSize,
+                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+            )
+        }
+    }
+}
+
+/**
+ * Calm HyperOS squircle raised card surface with quiet 8% hairline border.
  */
 @Composable
 fun Modifier.miuixGlassSurface(
@@ -117,44 +238,14 @@ fun Modifier.miuixGlassSurface(
     tintColor: Color? = null,
     useBigHighlight: Boolean = true
 ): Modifier {
-    val isDark = LocalIsDarkTheme.current
-    val backdrop = LocalAppBackdrop.current
-    val baseTint = tintColor ?: MiuixTheme.colorScheme.surfaceContainer.copy(
-        alpha = if (isDark) 0.78f else 0.86f
-    )
-    val shape = RoundedCornerShape(cornerRadius)
-    return if (isRuntimeShaderSupported() && backdrop != null) {
-        val hl = when {
-            useBigHighlight && isDark -> Highlight.GlassStrokeBigDark
-            useBigHighlight && !isDark -> Highlight.GlassStrokeBigLight
-            isDark -> Highlight.GlassStrokeMiddleDark
-            else -> Highlight.GlassStrokeMiddleLight
-        }
-        this
-            .squircleClip(cornerRadius)
-            .textureBlur(
-                backdrop = backdrop,
-                shape = shape,
-                blurRadius = 24f,
-                colors = BlurDefaults.blurColors(
-                    blendColors = listOf(
-                        BlendColorEntry(baseTint, BlurBlendMode.SrcOver)
-                    )
-                ),
-                highlight = hl
-            )
-    } else {
-        this
-            .squircleBackground(
-                color = tintColor ?: MiuixTheme.colorScheme.surfaceContainer,
-                cornerRadius = cornerRadius
-            )
-            .squircleBorder(
-                width = 1.dp,
-                color = MiuixTheme.colorScheme.outline.copy(alpha = 0.28f),
-                cornerRadius = cornerRadius
-            )
-    }
+    val bg = tintColor ?: MiuixTheme.colorScheme.surfaceContainer
+    return this
+        .squircleBackground(color = bg, cornerRadius = cornerRadius)
+        .squircleBorder(
+            width = 1.dp,
+            color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+            cornerRadius = cornerRadius
+        )
 }
 
 /**
@@ -184,16 +275,17 @@ fun OdometerCurrencyText(
             key(posFromRight) {
                 AnimatedContent(
                     targetState = ch,
+                    modifier = Modifier.clipToBounds(),
                     transitionSpec = {
                         (slideInVertically(initialOffsetY = { it / 2 }) + fadeIn())
                             .togetherWith(slideOutVertically(targetOffsetY = { -it / 2 }) + fadeOut())
-                            .using(SizeTransform(clip = false))
+                            .using(SizeTransform(clip = true))
                     },
                     label = "odometer_digit_$posFromRight"
                 ) { targetChar ->
                     Text(
                         text = targetChar.toString(),
-                        style = textStyle,
+                        style = textStyle.copy(fontFeatureSettings = "tnum"),
                         color = color,
                         maxLines = 1,
                         softWrap = false

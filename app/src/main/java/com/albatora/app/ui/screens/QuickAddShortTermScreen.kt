@@ -16,11 +16,13 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.albatora.app.domain.PayrollCalculator
 import com.albatora.app.model.*
+import com.albatora.app.ui.components.EmojiAndColorIdentityRow
 import com.albatora.app.ui.components.MiuixDatePickerDialog
 import com.albatora.app.ui.components.MiuixTimePickerDialog
 import com.albatora.app.ui.components.SquirclePillBadge
 import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.AddCircle
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.icon.extended.Ok
@@ -47,6 +49,8 @@ fun QuickAddShortTermScreen(
     val fallbackDate = remember { LocalDate.now() }
 
     var title by remember { mutableStateOf(existingRecord?.title ?: "") }
+    var emoji by remember { mutableStateOf(existingRecord?.emoji ?: "") }
+    var colorHex by remember { mutableLongStateOf(existingRecord?.colorHex ?: 0xFF10B981) }
     var dateIso by remember {
         mutableStateOf(
             existingRecord?.date ?: initialDateIso ?: PayrollCalculator.formatDate(fallbackDate)
@@ -104,8 +108,9 @@ fun QuickAddShortTermScreen(
     val previewRecord = WorkRecord(
         id = "preview",
         title = title.ifBlank { "단기 근무" },
+        emoji = emoji,
         kind = JobKind.SHORT_TERM,
-        colorHex = existingRecord?.colorHex ?: 0xFF10B981,
+        colorHex = colorHex,
         date = dateIso,
         startMinute = startMin,
         endMinute = endMin,
@@ -142,13 +147,13 @@ fun QuickAddShortTermScreen(
             errorMsg = "급여 금액을 입력해 주세요."
             return
         }
-        val color = existingRecord?.colorHex ?: 0xFF10B981
         val finalRecord = WorkRecord(
             id = existingRecord?.id ?: UUID.randomUUID().toString(),
             jobId = existingRecord?.jobId,
             title = cleanTitle,
+            emoji = emoji,
             kind = existingRecord?.kind ?: JobKind.SHORT_TERM,
-            colorHex = color,
+            colorHex = colorHex,
             date = dateIso,
             startMinute = startMin,
             endMinute = endMin,
@@ -179,7 +184,8 @@ fun QuickAddShortTermScreen(
             ShortTermTemplate(
                 id = UUID.randomUUID().toString(),
                 name = cleanTitle,
-                colorHex = color,
+                emoji = emoji,
+                colorHex = colorHex,
                 startMinute = startMin,
                 endMinute = endMin,
                 payType = payType,
@@ -263,12 +269,15 @@ fun QuickAddShortTermScreen(
                     SmallTitle(text = "원탭 단기 프리셋 불러오기")
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(templates, key = { it.id }) { tpl ->
+                            val labelPrefix = if (tpl.emoji.isNotBlank()) "${tpl.emoji} " else ""
                             SquirclePillBadge(
-                                text = "⚡ ${tpl.name} · ${PayrollCalculator.formatWon(tpl.unitAmount)}",
+                                text = "$labelPrefix${tpl.name} · ${PayrollCalculator.formatWon(tpl.unitAmount)}",
                                 backgroundColor = Color(tpl.colorHex).copy(alpha = 0.16f),
                                 contentColor = Color(tpl.colorHex),
                                 onClick = {
                                     title = tpl.name
+                                    emoji = tpl.emoji
+                                    colorHex = tpl.colorHex
                                     startMin = tpl.startMinute
                                     endMin = tpl.endMinute
                                     payType = tpl.payType
@@ -312,6 +321,14 @@ fun QuickAddShortTermScreen(
                             label = "현장/업무 이름 (예: 물류센터 상하차, 카페 대타)",
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
+                        )
+
+                        EmojiAndColorIdentityRow(
+                            emoji = emoji,
+                            fallbackIcon = MiuixIcons.AddCircle,
+                            colorHex = colorHex,
+                            onEmojiChange = { emoji = it },
+                            onColorChange = { colorHex = it }
                         )
 
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

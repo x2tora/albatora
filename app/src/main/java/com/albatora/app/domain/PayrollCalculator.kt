@@ -42,6 +42,7 @@ data class LiveShiftSnapshot(
     val stopwatchId: String?,
     val jobId: String?,
     val title: String,
+    val emoji: String = "",
     val kind: JobKind,
     val colorHex: Long,
     val startEpochMillis: Long,
@@ -80,6 +81,7 @@ data class ResolvedRecordItem(
 
 data class CalendarDayScheduleItem(
     val title: String,
+    val emoji: String = "",
     val colorHex: Long,
     val jobId: String?,
     val record: WorkRecord?,
@@ -701,6 +703,7 @@ object PayrollCalculator {
             val br = calculateShiftFinancials(rec)
             result += CalendarDayScheduleItem(
                 title = rec.title,
+                emoji = rec.emoji.ifBlank { job?.emoji.orEmpty() },
                 colorHex = rec.colorHex,
                 jobId = job?.id,
                 record = rec,
@@ -729,6 +732,7 @@ object PayrollCalculator {
                     id = "cal_${job.id}_$dateStr",
                     jobId = job.id,
                     title = job.name,
+                    emoji = job.emoji,
                     kind = JobKind.REGULAR,
                     colorHex = job.colorHex,
                     date = dateStr,
@@ -752,6 +756,7 @@ object PayrollCalculator {
                 val br = calculateShiftFinancials(virtualRec)
                 result += CalendarDayScheduleItem(
                     title = job.name,
+                    emoji = job.emoji,
                     colorHex = job.colorHex,
                     jobId = job.id,
                     record = virtualRec,
@@ -816,6 +821,7 @@ object PayrollCalculator {
                             stopwatchId = null,
                             jobId = job.id,
                             title = job.name,
+                            emoji = job.emoji,
                             kind = JobKind.REGULAR,
                             colorHex = job.colorHex,
                             payType = job.payType,
@@ -845,6 +851,7 @@ object PayrollCalculator {
                 stopwatchId = session.id,
                 jobId = session.jobId,
                 title = session.title,
+                emoji = session.emoji,
                 kind = session.kind,
                 colorHex = session.colorHex,
                 payType = session.payType,
@@ -885,6 +892,7 @@ object PayrollCalculator {
         stopwatchId: String?,
         jobId: String?,
         title: String,
+        emoji: String,
         kind: JobKind,
         colorHex: Long,
         payType: PayType,
@@ -1010,6 +1018,7 @@ object PayrollCalculator {
             stopwatchId = stopwatchId,
             jobId = jobId,
             title = title,
+            emoji = emoji,
             kind = kind,
             colorHex = colorHex,
             startEpochMillis = startEpochMillis,

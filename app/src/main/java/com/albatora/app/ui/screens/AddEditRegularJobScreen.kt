@@ -20,6 +20,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.albatora.app.domain.PayrollCalculator
 import com.albatora.app.model.*
+import com.albatora.app.ui.components.EmojiAndColorIdentityRow
 import com.albatora.app.ui.components.MiuixDatePickerDialog
 import com.albatora.app.ui.components.MiuixTimePickerDialog
 import com.albatora.app.ui.components.SquirclePillBadge
@@ -31,6 +32,7 @@ import top.yukonga.miuix.kmp.icon.extended.Add
 import top.yukonga.miuix.kmp.icon.extended.Back
 import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.icon.extended.Ok
+import top.yukonga.miuix.kmp.icon.extended.Store
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
@@ -53,6 +55,7 @@ fun AddEditRegularJobScreen(
     val today = remember { LocalDate.now() }
 
     var name by remember { mutableStateOf(existingJob?.name ?: "") }
+    var emoji by remember { mutableStateOf(existingJob?.emoji ?: "") }
     var colorHex by remember { mutableLongStateOf(existingJob?.colorHex ?: JobAccentPalette.first().second) }
     var payType by remember { mutableStateOf(existingJob?.payType ?: PayType.HOURLY) }
     var baseAmountText by remember { mutableStateOf((existingJob?.baseAmount ?: defaultMinWage).toString()) }
@@ -140,6 +143,7 @@ fun AddEditRegularJobScreen(
                             val built = Job(
                                 id = existingJob?.id ?: UUID.randomUUID().toString(),
                                 name = trimmed,
+                                emoji = emoji,
                                 kind = JobKind.REGULAR,
                                 colorHex = colorHex,
                                 payType = payType,
@@ -231,26 +235,17 @@ fun AddEditRegularJobScreen(
                         )
 
                         Text(
-                            text = "구분 색상",
+                            text = "아이콘(이모지) 및 구분 색상",
                             style = MiuixTheme.textStyles.footnote1,
                             color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                         )
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            items(JobAccentPalette) { (_, hex) ->
-                                val selected = hex == colorHex
-                                Box(
-                                    modifier = Modifier
-                                        .size(34.dp)
-                                        .clip(CircleShape)
-                                        .background(Color(hex))
-                                        .then(
-                                            if (selected) Modifier.border(3.dp, MiuixTheme.colorScheme.onSurface, CircleShape)
-                                            else Modifier
-                                        )
-                                        .clickable { colorHex = hex }
-                                )
-                            }
-                        }
+                        EmojiAndColorIdentityRow(
+                            emoji = emoji,
+                            fallbackIcon = MiuixIcons.Store,
+                            colorHex = colorHex,
+                            onEmojiChange = { emoji = it },
+                            onColorChange = { colorHex = it }
+                        )
 
                         val payTypes = PayType.entries
                         TabRowWithContour(

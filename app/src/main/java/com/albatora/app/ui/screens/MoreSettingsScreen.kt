@@ -2,11 +2,15 @@ package com.albatora.app.ui.screens
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -16,7 +20,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.albatora.app.domain.PayrollCalculator
 import com.albatora.app.model.*
+import com.albatora.app.ui.components.MiuixColorPickerDialog
 import com.albatora.app.ui.components.MiuixGlassIcon
+import com.albatora.app.ui.components.formatRgbHex
 import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.*
@@ -34,14 +40,13 @@ fun MoreSettingsScreen(
     scrollBehavior: ScrollBehavior,
     onUpdateTheme: (ThemeOption) -> Unit,
     onUpdateMonet: (Boolean) -> Unit,
+    onUpdateCustomKeyColor: (Long?) -> Unit,
     onUpdateOngoingNotification: (Boolean) -> Unit,
     onUpdateDefaultMinWage: (Long) -> Unit,
     onDeleteTemplate: (String) -> Unit,
     onExportJson: () -> String,
     onImportJson: (String) -> Result<Unit>,
     onResetAllData: () -> Unit,
-    onAddRegularJob: () -> Unit,
-    onAddShortTerm: () -> Unit,
     onNotify: (String) -> Unit
 ) {
     val context = LocalContext.current
@@ -49,6 +54,7 @@ fun MoreSettingsScreen(
     val clipboardManager = LocalClipboardManager.current
 
     var showMinWageDialog by remember { mutableStateOf(false) }
+    var showAppColorDialog by remember { mutableStateOf(false) }
     var showTemplatesDialog by remember { mutableStateOf(false) }
     var showPasteRestoreDialog by remember { mutableStateOf(false) }
     var showResetConfirm by remember { mutableStateOf(false) }
@@ -132,11 +138,30 @@ fun MoreSettingsScreen(
                         )
                     }
                 )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                val activeAppColor = state.settings.customKeyColorHex ?: 0xFF3482FF
+                ArrowPreference(
+                    title = "앱 포인트 색상 직접 지정",
+                    summary = if (state.settings.monetEnabled) {
+                        "다이나믹 컬러 꺼짐 시 적용 · 현재 ${formatRgbHex(activeAppColor)}"
+                    } else {
+                        "현재 포인트 색상 ${formatRgbHex(activeAppColor)}"
+                    },
+                    onClick = { showAppColorDialog = true },
+                    startAction = {
+                        Box(
+                            modifier = Modifier
+                                .size(38.dp)
+                                .clip(CircleShape)
+                                .background(Color(activeAppColor))
+                        )
+                    }
+                )
             }
         }
 
         item {
-            SmallTitle(text = "실시간 알림 · 급여 기본값")
+            SmallTitle(text = "실시간 알림 · 급여 · 프리셋")
             Card(modifier = Modifier.fillMaxWidth()) {
                 SwitchPreference(
                     title = "상단바 실시간 수익 알림",
@@ -164,28 +189,18 @@ fun MoreSettingsScreen(
                         )
                     }
                 )
-            }
-        }
-
-        item {
-            SmallTitle(text = "알바 · 단기 프리셋 관리")
-            Card(modifier = Modifier.fillMaxWidth()) {
-                ArrowPreference(
-                    title = "새 정규/고정 알바 추가",
-                    summary = "현재 등록된 알바 ${state.jobs.size}개 (무제한 등록 가능)",
-                    onClick = onAddRegularJob
-                )
-                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                ArrowPreference(
-                    title = "단기/일용직 10초 퀵 등록",
-                    summary = "총 기록 ${state.records.size}건",
-                    onClick = onAddShortTerm
-                )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 ArrowPreference(
                     title = "단기 알바 프리셋(템플릿) 관리",
                     summary = "저장된 프리셋 ${state.templates.size}개",
-                    onClick = { showTemplatesDialog = true }
+                    onClick = { showTemplatesDialog = true },
+                    startAction = {
+                        MiuixGlassIcon(
+                            icon = MiuixIcons.Notes,
+                            contentDescription = null,
+                            accentColor = MiuixTheme.colorScheme.primary
+                        )
+                    }
                 )
             }
         }
@@ -257,7 +272,7 @@ fun MoreSettingsScreen(
             Card(modifier = Modifier.fillMaxWidth(), insideMargin = PaddingValues(16.dp)) {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text(
-                        "알바토라 (AlbaTora) v1.0.1",
+                        "알바토라 (AlbaTora) v1.0.2",
                         style = MiuixTheme.textStyles.body1
                     )
                     Text(
@@ -269,6 +284,20 @@ fun MoreSettingsScreen(
             }
         }
     }
+
+    MiuixColorPickerDialog(
+        show = showAppColorDialog,
+        title = "앱 포인트 색상 선택",
+        initialColorHex = state.settings.customKeyColorHex ?: 0xFF3482FF,
+        onDismiss = { showAppColorDialog = false },
+        onConfirm = { chosenHex ->
+            onUpdateCustomKeyColor(chosenHex)
+            if (state.settings.monetEnabled) {
+                onUpdateMonet(false)
+            }
+            onNotify("앱 포인트 색상이 ${formatRgbHex(chosenHex)}로 변경되었습니다")
+        }
+    )
 
     // Default minimum wage editor
     if (showMinWageDialog) {

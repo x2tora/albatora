@@ -1,0 +1,549 @@
+package com.albatora.app.ui.components
+
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.albatora.app.ui.theme.JobAccentPalette
+import top.yukonga.miuix.kmp.basic.*
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Theme
+import top.yukonga.miuix.kmp.overlay.OverlayBottomSheet
+import top.yukonga.miuix.kmp.overlay.OverlayDialog
+import top.yukonga.miuix.kmp.squircle.squircleBackground
+import top.yukonga.miuix.kmp.squircle.squircleBorder
+import top.yukonga.miuix.kmp.squircle.squircleClip
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import java.util.Locale
+
+private data class EmojiCategory(
+    val label: String,
+    val emojis: List<String>
+)
+
+private val EMOJI_CATEGORIES = listOf(
+    EmojiCategory(
+        label = "매장",
+        emojis = listOf(
+            "☕", "🍵", "🧋", "🥐", "🍰", "🍔", "🍟", "🍕", "🍗", "🍜", "🍱", "🏪",
+            "🛒", "🛍️", "💳", "🧾", "🧁", "🍦", "🥖", "🍻"
+        )
+    ),
+    EmojiCategory(
+        label = "현장",
+        emojis = listOf(
+            "📦", "🚚", "🛵", "🚲", "🏗️", "🔧", "🔨", "🦺", "🧹", "🪴", "🎪", "🎫",
+            "🎤", "📸", "🎬", "🏋️", "⛳", "🚗", "⛽", "🏭"
+        )
+    ),
+    EmojiCategory(
+        label = "사무",
+        emojis = listOf(
+            "💻", "⌨️", "📊", "📝", "📚", "🎓", "✏️", "📐", "🎨", "🎧", "📞", "🗂️",
+            "🏢", "💼", "🧪", "🏥", "💊", "🐶", "🐱", "👶"
+        )
+    ),
+    EmojiCategory(
+        label = "목표",
+        emojis = listOf(
+            "🎯", "✈️", "🏝️", "📱", "🎧", "⌚", "🎮", "👟", "👜", "💍", "🎸", "🏠",
+            "🚘", "💎", "💰", "🥂", "🎁", "🌟", "🔥", "💪"
+        )
+    )
+)
+
+/**
+ * Categorized bottom sheet emoji picker with 1-tap selection and optional custom input.
+ */
+@Composable
+fun MiuixEmojiPickerSheet(
+    show: Boolean,
+    title: String = "이모지 선택",
+    currentEmoji: String,
+    allowClear: Boolean = true,
+    onDismiss: () -> Unit,
+    onSelect: (String) -> Unit
+) {
+    var categoryIdx by remember(show) { mutableIntStateOf(0) }
+    var customInput by remember(show, currentEmoji) { mutableStateOf(currentEmoji) }
+
+    val allEmojis = remember { EMOJI_CATEGORIES.flatMap { it.emojis }.distinct() }
+    val tabLabels = remember { listOf("전체") + EMOJI_CATEGORIES.map { it.label } }
+    val visibleEmojis = remember(categoryIdx) {
+        if (categoryIdx == 0) allEmojis else EMOJI_CATEGORIES[categoryIdx - 1].emojis
+    }
+
+    OverlayBottomSheet(
+        show = show,
+        title = title,
+        onDismissRequest = onDismiss
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            TabRowWithContour(
+                tabs = tabLabels,
+                selectedTabIndex = categoryIdx,
+                onTabSelected = { categoryIdx = it }
+            )
+
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(6),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(236.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(visibleEmojis, key = { it }) { emoji ->
+                    val selected = emoji == currentEmoji
+                    Box(
+                        modifier = Modifier
+                            .aspectRatio(1f)
+                            .squircleBackground(
+                                color = if (selected) {
+                                    MiuixTheme.colorScheme.primary.copy(alpha = 0.16f)
+                                } else {
+                                    MiuixTheme.colorScheme.surfaceContainer
+                                },
+                                cornerRadius = 12.dp
+                            )
+                            .then(
+                                if (selected) {
+                                    Modifier.squircleBorder(
+                                        1.5.dp,
+                                        MiuixTheme.colorScheme.primary,
+                                        12.dp
+                                    )
+                                } else Modifier
+                            )
+                            .squircleClip(12.dp)
+                            .clickable {
+                                onSelect(emoji)
+                                onDismiss()
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = emoji,
+                            fontSize = 22.sp,
+                            textAlign = TextAlign.Center
+                        )
+                    }
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                TextField(
+                    value = customInput,
+                    onValueChange = { if (it.length <= 6) customInput = it },
+                    label = "직접 입력 (키보드 이모지)",
+                    singleLine = true,
+                    modifier = Modifier.weight(1f)
+                )
+                TextButton(
+                    text = "적용",
+                    onClick = {
+                        onSelect(customInput.trim())
+                        onDismiss()
+                    },
+                    colors = ButtonDefaults.textButtonColorsPrimary()
+                )
+            }
+
+            if (allowClear && currentEmoji.isNotBlank()) {
+                TextButton(
+                    text = "이모지 비우기 (기본 아이콘 사용)",
+                    onClick = {
+                        onSelect("")
+                        onDismiss()
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+    }
+}
+
+/**
+ * Full HSV + Hex custom color picker allowing any arbitrary color selection.
+ */
+@Composable
+fun MiuixColorPickerDialog(
+    show: Boolean,
+    title: String = "색상 직접 지정",
+    initialColorHex: Long,
+    onDismiss: () -> Unit,
+    onConfirm: (Long) -> Unit
+) {
+    val initHsv = remember(show, initialColorHex) {
+        FloatArray(3).also {
+            android.graphics.Color.colorToHSV(Color(initialColorHex).toArgb(), it)
+        }
+    }
+    var hue by remember(show, initialColorHex) { mutableFloatStateOf(initHsv[0]) }
+    var sat by remember(show, initialColorHex) { mutableFloatStateOf(initHsv[1]) }
+    var value by remember(show, initialColorHex) { mutableFloatStateOf(initHsv[2]) }
+    var hexInput by remember(show, initialColorHex) {
+        mutableStateOf(formatRgbHex(initialColorHex))
+    }
+
+    fun updateFromHsv(h: Float, s: Float, v: Float) {
+        hue = h.coerceIn(0f, 360f)
+        sat = s.coerceIn(0f, 1f)
+        value = v.coerceIn(0f, 1f)
+        val argb = android.graphics.Color.HSVToColor(floatArrayOf(hue, sat, value))
+        val packed = (argb.toLong() and 0x00FFFFFFL) or 0xFF000000L
+        hexInput = formatRgbHex(packed)
+    }
+
+    val previewColor = remember(hue, sat, value) {
+        Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, sat, value)))
+    }
+    val previewHexLong = remember(hue, sat, value) {
+        val argb = android.graphics.Color.HSVToColor(floatArrayOf(hue, sat, value))
+        (argb.toLong() and 0x00FFFFFFL) or 0xFF000000L
+    }
+
+    OverlayDialog(
+        show = show,
+        title = title,
+        onDismissRequest = onDismiss
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Live swatch + HEX input
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .squircleBackground(previewColor, 12.dp)
+                        .squircleBorder(1.dp, MiuixTheme.colorScheme.onSurface.copy(alpha = 0.14f), 12.dp)
+                )
+                TextField(
+                    value = hexInput,
+                    onValueChange = { raw ->
+                        val cleaned = raw.uppercase(Locale.US).filter { it in "0123456789ABCDEF#" }.take(7)
+                        hexInput = cleaned
+                        val digits = cleaned.removePrefix("#")
+                        if (digits.length == 6) {
+                            digits.toLongOrNull(16)?.let { rgb ->
+                                val parsedArgb = (rgb or 0xFF000000L).toInt()
+                                val hsv = FloatArray(3)
+                                android.graphics.Color.colorToHSV(parsedArgb, hsv)
+                                hue = hsv[0]
+                                sat = hsv[1]
+                                value = hsv[2]
+                            }
+                        }
+                    },
+                    label = "HEX 색상 코드 (#RRGGBB)",
+                    singleLine = true,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            // 2D Saturation / Value plane
+            val hueColor = remember(hue) {
+                Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, 1f, 1f)))
+            }
+            Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(168.dp)
+                    .squircleClip(12.dp)
+                    .pointerInput(hue) {
+                        detectTapGestures { pos ->
+                            val s = (pos.x / size.width.toFloat()).coerceIn(0f, 1f)
+                            val v = 1f - (pos.y / size.height.toFloat()).coerceIn(0f, 1f)
+                            updateFromHsv(hue, s, v)
+                        }
+                    }
+                    .pointerInput(hue) {
+                        detectDragGestures { change, _ ->
+                            change.consume()
+                            val s = (change.position.x / size.width.toFloat()).coerceIn(0f, 1f)
+                            val v = 1f - (change.position.y / size.height.toFloat()).coerceIn(0f, 1f)
+                            updateFromHsv(hue, s, v)
+                        }
+                    }
+            ) {
+                drawRect(
+                    brush = Brush.horizontalGradient(
+                        colors = listOf(Color.White, hueColor)
+                    )
+                )
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(Color.Transparent, Color.Black)
+                    )
+                )
+                val pad = 11.dp.toPx()
+                val cx = (sat * size.width).coerceIn(pad, (size.width - pad).coerceAtLeast(pad))
+                val cy = ((1f - value) * size.height).coerceIn(pad, (size.height - pad).coerceAtLeast(pad))
+                drawCircle(
+                    color = Color.White,
+                    radius = 9.dp.toPx(),
+                    center = Offset(cx, cy),
+                    style = Stroke(width = 2.5.dp.toPx())
+                )
+                drawCircle(
+                    color = Color.Black.copy(alpha = 0.55f),
+                    radius = 10.5.dp.toPx(),
+                    center = Offset(cx, cy),
+                    style = Stroke(width = 1.dp.toPx())
+                )
+            }
+
+            // Hue spectrum bar
+            val spectrumColors = remember {
+                listOf(
+                    Color.Red,
+                    Color.Yellow,
+                    Color.Green,
+                    Color.Cyan,
+                    Color.Blue,
+                    Color.Magenta,
+                    Color.Red
+                )
+            }
+            Canvas(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(26.dp)
+                    .squircleClip(8.dp)
+                    .pointerInput(Unit) {
+                        detectTapGestures { pos ->
+                            val nextHue = ((pos.x / size.width.toFloat()) * 360f).coerceIn(0f, 360f)
+                            updateFromHsv(nextHue, sat, value)
+                        }
+                    }
+                    .pointerInput(Unit) {
+                        detectDragGestures { change, _ ->
+                            change.consume()
+                            val nextHue = ((change.position.x / size.width.toFloat()) * 360f).coerceIn(0f, 360f)
+                            updateFromHsv(nextHue, sat, value)
+                        }
+                    }
+            ) {
+                drawRect(brush = Brush.horizontalGradient(colors = spectrumColors))
+                val hxPad = 11.dp.toPx()
+                val hx = ((hue / 360f) * size.width).coerceIn(hxPad, (size.width - hxPad).coerceAtLeast(hxPad))
+                drawCircle(
+                    color = Color.White,
+                    radius = 9.dp.toPx(),
+                    center = Offset(hx, size.height / 2f),
+                    style = Stroke(width = 2.5.dp.toPx())
+                )
+            }
+
+            // Quick swatches
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(JobAccentPalette) { (_, presetHex) ->
+                    val active = (presetHex and 0x00FFFFFFL) == (previewHexLong and 0x00FFFFFFL)
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(Color(presetHex))
+                            .then(
+                                if (active) Modifier.border(2.dp, MiuixTheme.colorScheme.onSurface, CircleShape)
+                                else Modifier
+                            )
+                            .clickable {
+                                val hsv = FloatArray(3)
+                                android.graphics.Color.colorToHSV(Color(presetHex).toArgb(), hsv)
+                                updateFromHsv(hsv[0], hsv[1], hsv[2])
+                            }
+                    )
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                TextButton(
+                    text = "취소",
+                    onClick = onDismiss,
+                    modifier = Modifier.weight(1f)
+                )
+                TextButton(
+                    text = "색상 적용",
+                    onClick = {
+                        onConfirm(previewHexLong)
+                        onDismiss()
+                    },
+                    colors = ButtonDefaults.textButtonColorsPrimary(),
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Combined Emoji + Arbitrary Color row for regular jobs, short-term shifts, and stopwatches.
+ */
+@Composable
+fun EmojiAndColorIdentityRow(
+    emoji: String,
+    fallbackIcon: ImageVector,
+    colorHex: Long,
+    onEmojiChange: (String) -> Unit,
+    onColorChange: (Long) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var showEmojiPicker by remember { mutableStateOf(false) }
+    var showColorPicker by remember { mutableStateOf(false) }
+
+    Column(
+        modifier = modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .squircleClip(14.dp)
+                    .clickable { showEmojiPicker = true }
+            ) {
+                MiuixEntityBadge(
+                    emoji = emoji,
+                    fallbackIcon = fallbackIcon,
+                    accentColor = Color(colorHex),
+                    size = 52.dp,
+                    cornerRadius = 14.dp
+                )
+            }
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    SquirclePillBadge(
+                        text = if (emoji.isBlank()) "이모지 선택" else "이모지 변경 ($emoji)",
+                        backgroundColor = MiuixTheme.colorScheme.secondaryContainer,
+                        contentColor = MiuixTheme.colorScheme.onSecondaryContainer,
+                        onClick = { showEmojiPicker = true },
+                        modifier = Modifier.weight(1f)
+                    )
+                    SquirclePillBadge(
+                        text = "색상 직접 지정",
+                        backgroundColor = Color(colorHex).copy(alpha = 0.16f),
+                        contentColor = Color(colorHex),
+                        onClick = { showColorPicker = true }
+                    )
+                }
+
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    items(JobAccentPalette) { (_, hex) ->
+                        val selected = (hex and 0x00FFFFFFL) == (colorHex and 0x00FFFFFFL)
+                        Box(
+                            modifier = Modifier
+                                .size(26.dp)
+                                .clip(CircleShape)
+                                .background(Color(hex))
+                                .then(
+                                    if (selected) Modifier.border(2.5.dp, MiuixTheme.colorScheme.onSurface, CircleShape)
+                                    else Modifier
+                                )
+                                .clickable { onColorChange(hex) }
+                        )
+                    }
+                    item {
+                        val isCustom = JobAccentPalette.none { (_, hex) ->
+                            (hex and 0x00FFFFFFL) == (colorHex and 0x00FFFFFFL)
+                        }
+                        Box(
+                            modifier = Modifier
+                                .size(26.dp)
+                                .clip(CircleShape)
+                                .background(if (isCustom) Color(colorHex) else MiuixTheme.colorScheme.secondaryContainer)
+                                .then(
+                                    if (isCustom) Modifier.border(2.5.dp, MiuixTheme.colorScheme.onSurface, CircleShape)
+                                    else Modifier
+                                )
+                                .clickable { showColorPicker = true },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = MiuixIcons.Theme,
+                                contentDescription = "색상 팔레트",
+                                tint = if (isCustom) Color.White else MiuixTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier.size(14.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    MiuixEmojiPickerSheet(
+        show = showEmojiPicker,
+        currentEmoji = emoji,
+        onDismiss = { showEmojiPicker = false },
+        onSelect = onEmojiChange
+    )
+
+    MiuixColorPickerDialog(
+        show = showColorPicker,
+        initialColorHex = colorHex,
+        onDismiss = { showColorPicker = false },
+        onConfirm = onColorChange
+    )
+}
+
+fun formatRgbHex(colorHex: Long): String {
+    val rgb = colorHex and 0x00FFFFFFL
+    return String.format(Locale.US, "#%06X", rgb)
+}

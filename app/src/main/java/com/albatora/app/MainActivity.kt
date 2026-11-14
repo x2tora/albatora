@@ -45,7 +45,8 @@ class MainActivity : ComponentActivity() {
 
             AlbaToraTheme(
                 themeOption = state.settings.themeOption,
-                monetEnabled = state.settings.monetEnabled
+                monetEnabled = state.settings.monetEnabled,
+                customKeyColorHex = state.settings.customKeyColorHex
             ) {
                 MainScaffoldScreen(viewModel = viewModel)
             }

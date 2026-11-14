@@ -17,6 +17,7 @@ import com.albatora.app.domain.PayrollCalculator
 import com.albatora.app.domain.ResolvedRecordItem
 import com.albatora.app.model.*
 import com.albatora.app.ui.components.EmptyDataBanner
+import com.albatora.app.ui.components.MiuixEntityBadge
 import com.albatora.app.ui.components.SquirclePillBadge
 import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.icon.MiuixIcons
@@ -79,7 +80,7 @@ fun RecordsScreen(
         // Filter: All vs Unpaid
         item {
             TabRowWithContour(
-                tabs = listOf("정산 기간 명세서", "\uD83D\uDD34 미수금 모아보기 (${globalUnpaid.second.size})"),
+                tabs = listOf("정산 기간 명세서", "미수금 모아보기 (${globalUnpaid.second.size})"),
                 selectedTabIndex = if (onlyUnpaid) 1 else 0,
                 onTabSelected = { onlyUnpaid = (it == 1) }
             )
@@ -129,8 +130,9 @@ fun RecordsScreen(
                                 }
                                 items(state.jobs, key = { it.id }) { j ->
                                     val active = selectedJobId == j.id
+                                    val prefix = if (j.emoji.isNotBlank()) "${j.emoji} " else ""
                                     SquirclePillBadge(
-                                        text = j.name,
+                                        text = "$prefix${j.name}",
                                         backgroundColor = if (active) Color(j.colorHex) else Color(j.colorHex).copy(alpha = 0.16f),
                                         contentColor = if (active) Color.White else Color(j.colorHex),
                                         onClick = { selectedJobId = j.id }
@@ -236,17 +238,20 @@ fun RecordsScreen(
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(
-                            "\uD83D\uDD34 아직 받지 못한 전체 미수금",
+                            "아직 받지 못한 전체 미수금",
                             style = MiuixTheme.textStyles.footnote1.copy(fontWeight = FontWeight.SemiBold),
                             color = MiuixTheme.colorScheme.onErrorContainer
                         )
                         Text(
                             PayrollCalculator.formatWon(globalUnpaid.first),
-                            style = MiuixTheme.textStyles.title2.copy(fontWeight = FontWeight.Bold),
+                            style = MiuixTheme.textStyles.title2.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                fontFeatureSettings = "tnum"
+                            ),
                             color = MiuixTheme.colorScheme.error
                         )
                         Text(
-                            "총 ${globalUnpaid.second.size}건 · 각 항목의 상태 배지를 눌러 즉시 입금 완료(🟢) 처리할 수 있습니다.",
+                            "총 ${globalUnpaid.second.size}건 · 각 항목의 상태 배지를 눌러 입금 완료 처리할 수 있습니다",
                             style = MiuixTheme.textStyles.footnote2,
                             color = MiuixTheme.colorScheme.onErrorContainer.copy(alpha = 0.85f)
                         )
@@ -257,9 +262,9 @@ fun RecordsScreen(
                 item {
                     EmptyDataBanner(
                         icon = MiuixIcons.Ok,
-                        title = "미수금이 0원입니다! \uD83C\uDF89",
-                        subtitle = "모든 단기/일용직 급여가 정산 완료 상태입니다.",
-                        accentColor = Color(0xFF10B981)
+                        title = "미수금이 없습니다",
+                        subtitle = "모든 단기/일용직 급여가 정산 완료 상태입니다",
+                        accentColor = Color(0xFF16A34A)
                     )
                 }
             } else {
@@ -316,69 +321,85 @@ private fun RecordDetailCard(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text(
-                        text = rec.title,
-                        style = MiuixTheme.textStyles.body1.copy(fontWeight = FontWeight.SemiBold)
-                    )
-                    if (rec.status != ShiftStatus.NORMAL) {
-                        SquirclePillBadge(
-                            text = rec.status.label,
-                            backgroundColor = MiuixTheme.colorScheme.secondaryContainer,
-                            contentColor = MiuixTheme.colorScheme.onSecondaryContainer
-                        )
-                    }
-                    if (item.isVirtualSchedule) {
-                        SquirclePillBadge(
-                            text = "자동정규",
-                            backgroundColor = Color(rec.colorHex).copy(alpha = 0.14f),
-                            contentColor = Color(rec.colorHex)
-                        )
-                    }
-                }
-                Text(
-                    text = "${rec.date} · ${PayrollCalculator.formatMinutes(rec.startMinute)}~${PayrollCalculator.formatMinutes(rec.endMinute)} (${PayrollCalculator.formatDurationKorean(br.paidWorkMinutes)})",
-                    style = MiuixTheme.textStyles.footnote2,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
+                MiuixEntityBadge(
+                    emoji = rec.emoji,
+                    fallbackIcon = MiuixIcons.Notes,
+                    accentColor = Color(rec.colorHex),
+                    size = 38.dp,
+                    cornerRadius = 10.dp
                 )
-                if (br.allowancePay > 0L || br.taxAmount > 0L || br.agencyFee > 0L || (br.transportExpense + br.mealExpense) > 0L) {
-                    val notes = buildList {
-                        if (br.allowancePay > 0L) add("수당 +${PayrollCalculator.formatWon(br.allowancePay)}")
-                        if (br.siteBonus > 0L) add("지원금 +${PayrollCalculator.formatWon(br.siteBonus)}")
-                        if (br.taxAmount > 0L) add("세금 -${PayrollCalculator.formatWon(br.taxAmount)}")
-                        if (br.agencyFee > 0L) add("수수료 -${PayrollCalculator.formatWon(br.agencyFee)}")
-                        if (br.transportExpense + br.mealExpense > 0L) add("지출 -${PayrollCalculator.formatWon(br.transportExpense + br.mealExpense)}")
-                    }.joinToString(" · ")
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = rec.title,
+                            style = MiuixTheme.textStyles.body1.copy(fontWeight = FontWeight.Medium)
+                        )
+                        if (rec.status != ShiftStatus.NORMAL) {
+                            SquirclePillBadge(
+                                text = rec.status.label,
+                                backgroundColor = MiuixTheme.colorScheme.secondaryContainer,
+                                contentColor = MiuixTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                        if (item.isVirtualSchedule) {
+                            SquirclePillBadge(
+                                text = "자동정규",
+                                backgroundColor = Color(rec.colorHex).copy(alpha = 0.14f),
+                                contentColor = Color(rec.colorHex)
+                            )
+                        }
+                    }
                     Text(
-                        text = notes,
-                        style = MiuixTheme.textStyles.footnote2,
+                        text = "${rec.date} · ${PayrollCalculator.formatMinutes(rec.startMinute)}~${PayrollCalculator.formatMinutes(rec.endMinute)} (${PayrollCalculator.formatDurationKorean(br.paidWorkMinutes)})",
+                        style = MiuixTheme.textStyles.footnote2.copy(fontFeatureSettings = "tnum"),
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                     )
+                    if (br.allowancePay > 0L || br.taxAmount > 0L || br.agencyFee > 0L || (br.transportExpense + br.mealExpense) > 0L) {
+                        val notes = buildList {
+                            if (br.allowancePay > 0L) add("수당 +${PayrollCalculator.formatWon(br.allowancePay)}")
+                            if (br.siteBonus > 0L) add("지원금 +${PayrollCalculator.formatWon(br.siteBonus)}")
+                            if (br.taxAmount > 0L) add("세금 -${PayrollCalculator.formatWon(br.taxAmount)}")
+                            if (br.agencyFee > 0L) add("수수료 -${PayrollCalculator.formatWon(br.agencyFee)}")
+                            if (br.transportExpense + br.mealExpense > 0L) add("지출 -${PayrollCalculator.formatWon(br.transportExpense + br.mealExpense)}")
+                        }.joinToString(" · ")
+                        Text(
+                            text = notes,
+                            style = MiuixTheme.textStyles.footnote2.copy(fontFeatureSettings = "tnum"),
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                        )
+                    }
                 }
             }
 
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     text = PayrollCalculator.formatWon(br.netPay),
-                    style = MiuixTheme.textStyles.body1.copy(fontWeight = FontWeight.Bold),
+                    style = MiuixTheme.textStyles.body1.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        fontFeatureSettings = "tnum"
+                    ),
                     color = MiuixTheme.colorScheme.onSurface
                 )
                 if (!item.isVirtualSchedule) {
                     SquirclePillBadge(
-                        text = "${rec.paymentStatus.badgeEmoji} ${rec.paymentStatus.label}",
+                        text = rec.paymentStatus.label,
                         backgroundColor = if (rec.paymentStatus == PaymentStatus.UNPAID) {
                             MiuixTheme.colorScheme.error.copy(alpha = 0.14f)
                         } else {
-                            Color(0xFF10B981).copy(alpha = 0.14f)
+                            Color(0xFF16A34A).copy(alpha = 0.14f)
                         },
                         contentColor = if (rec.paymentStatus == PaymentStatus.UNPAID) {
                             MiuixTheme.colorScheme.error
                         } else {
-                            Color(0xFF059669)
+                            Color(0xFF16A34A)
                         },
                         onClick = onTogglePayment
                     )

@@ -67,6 +67,7 @@ class AlbaToraViewModel(application: Application) : AndroidViewModel(application
 
     fun startStopwatch(
         title: String,
+        emoji: String = "",
         kind: JobKind,
         payType: PayType,
         unitAmount: Long,
@@ -83,6 +84,7 @@ class AlbaToraViewModel(application: Application) : AndroidViewModel(application
         dailyWorkerIncludeLocalTax: Boolean = true
     ) = stateHolder.startManualStopwatch(
         title = title,
+        emoji = emoji,
         kind = kind,
         payType = payType,
         unitAmount = unitAmount,
@@ -111,6 +113,7 @@ class AlbaToraViewModel(application: Application) : AndroidViewModel(application
 
     fun updateTheme(option: ThemeOption) = stateHolder.updateSettings { it.copy(themeOption = option) }
     fun updateMonet(enabled: Boolean) = stateHolder.updateSettings { it.copy(monetEnabled = enabled) }
+    fun updateCustomKeyColor(colorHex: Long?) = stateHolder.updateSettings { it.copy(customKeyColorHex = colorHex) }
     fun updateOngoingNotification(enabled: Boolean) = stateHolder.updateSettings { it.copy(ongoingNotificationEnabled = enabled) }
     fun updateDefaultMinWage(wage: Long) = stateHolder.updateSettings { it.copy(defaultMinWage = wage.coerceAtLeast(1L)) }
 
