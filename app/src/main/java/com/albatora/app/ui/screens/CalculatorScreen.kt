@@ -230,10 +230,10 @@ private fun HourlyMonthlyCalculator(
         if (maxWidth >= 600.dp) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                horizontalArrangement = Arrangement.spacedBy(20.dp)
             ) {
-                Box(modifier = Modifier.weight(1.05f)) { inputSection() }
-                Box(modifier = Modifier.weight(0.95f)) { resultSection() }
+                Box(modifier = Modifier.weight(1f)) { inputSection() }
+                Box(modifier = Modifier.weight(1f)) { resultSection() }
             }
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {

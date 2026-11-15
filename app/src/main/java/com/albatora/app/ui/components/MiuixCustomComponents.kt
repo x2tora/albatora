@@ -604,6 +604,15 @@ fun MiuixFloatingScrollTopBar(
     val isDark = LocalIsDarkTheme.current
     val density = LocalDensity.current
     val surfaceBg = MiuixTheme.colorScheme.surface
+    SideEffect {
+        // Keep ExitUntilCollapsedScrollBehavior from consuming upward scroll deltas when SmallTopAppBar is replaced
+        if (scrollBehavior.state.heightOffsetLimit != 0f) {
+            scrollBehavior.state.heightOffsetLimit = 0f
+        }
+        if (scrollBehavior.state.heightOffset != 0f) {
+            scrollBehavior.state.heightOffset = 0f
+        }
+    }
     val isScrolled by remember(scrollBehavior, isScrolledOverride) {
         derivedStateOf {
             isScrolledOverride ?: (scrollBehavior.state.contentOffset < -12f ||

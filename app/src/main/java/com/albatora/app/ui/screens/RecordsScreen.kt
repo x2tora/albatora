@@ -300,7 +300,7 @@ fun RecordsScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 20.dp),
-                horizontalArrangement = Arrangement.spacedBy(18.dp)
+                horizontalArrangement = Arrangement.spacedBy(20.dp)
             ) {
                 LazyColumn(
                     modifier = Modifier

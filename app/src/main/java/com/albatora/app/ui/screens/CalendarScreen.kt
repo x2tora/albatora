@@ -505,11 +505,11 @@ fun CalendarScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 20.dp),
-                horizontalArrangement = Arrangement.spacedBy(18.dp)
+                horizontalArrangement = Arrangement.spacedBy(20.dp)
             ) {
                 LazyColumn(
                     modifier = Modifier
-                        .weight(1.05f)
+                        .weight(1f)
                         .fillMaxHeight()
                         .overScrollVertical()
                         .nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -519,7 +519,7 @@ fun CalendarScreen(
                 )
                 LazyColumn(
                     modifier = Modifier
-                        .weight(0.95f)
+                        .weight(1f)
                         .fillMaxHeight()
                         .overScrollVertical()
                         .nestedScroll(scrollBehavior.nestedScrollConnection),

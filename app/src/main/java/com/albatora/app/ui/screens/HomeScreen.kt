@@ -325,7 +325,7 @@ fun HomeScreen(
             }
         }
 
-        val hubAndDetailsSection: androidx.compose.foundation.lazy.LazyListScope.() -> Unit = {
+        val quickActionHubSection: androidx.compose.foundation.lazy.LazyListScope.() -> Unit = {
             item(key = "quick_action_hub") {
                 SmallTitle(text = "자주 사용하는 기능")
                 HomeActionHubGrid(
@@ -343,7 +343,9 @@ fun HomeScreen(
                     }
                 )
             }
+        }
 
+        val overviewAndUnpaidSection: androidx.compose.foundation.lazy.LazyListScope.() -> Unit = {
             if (!completelyEmpty) {
                 item(key = "monthly_overview") {
                     val livePlusMonth = monthSummary.totalNetPay + liveDashboard.totalEarnedWon.toLong()
@@ -491,7 +493,9 @@ fun HomeScreen(
                     }
                 }
             }
+        }
 
+        val wishlistAndJobsSection: androidx.compose.foundation.lazy.LazyListScope.() -> Unit = {
             item(key = "wishlist_section") {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -808,9 +812,11 @@ fun HomeScreen(
                             .overScrollVertical()
                             .nestedScroll(scrollBehavior.nestedScrollConnection),
                         contentPadding = PaddingValues(top = topBarInset + 12.dp, bottom = bottomPad),
-                        verticalArrangement = Arrangement.spacedBy(18.dp),
-                        content = focusSection
-                    )
+                        verticalArrangement = Arrangement.spacedBy(18.dp)
+                    ) {
+                        focusSection()
+                        overviewAndUnpaidSection()
+                    }
                     if (liveDashboard.activeShifts.isNotEmpty() && !isFullscreenFocus) {
                         HomeFloatingLiveStage(
                             snapshot = liveDashboard,
@@ -847,9 +853,11 @@ fun HomeScreen(
                         .overScrollVertical()
                         .nestedScroll(scrollBehavior.nestedScrollConnection),
                     contentPadding = PaddingValues(top = topBarInset + 12.dp, bottom = bottomPad),
-                    verticalArrangement = Arrangement.spacedBy(18.dp),
-                    content = hubAndDetailsSection
-                )
+                    verticalArrangement = Arrangement.spacedBy(18.dp)
+                ) {
+                    quickActionHubSection()
+                    wishlistAndJobsSection()
+                }
             }
         } else {
             Box(modifier = Modifier.fillMaxSize()) {
@@ -868,7 +876,9 @@ fun HomeScreen(
                     verticalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
                     focusSection()
-                    hubAndDetailsSection()
+                    quickActionHubSection()
+                    overviewAndUnpaidSection()
+                    wishlistAndJobsSection()
                 }
 
                 if (liveDashboard.activeShifts.isNotEmpty() && !isFullscreenFocus) {
