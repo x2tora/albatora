@@ -26,6 +26,7 @@ import com.albatora.app.model.*
 import com.albatora.app.ui.components.ConfirmActionDialog
 import com.albatora.app.ui.components.EmojiAndColorIdentityRow
 import com.albatora.app.ui.components.MiuixDatePickerDialog
+import com.albatora.app.ui.components.MiuixBottomEdgeBlur
 import com.albatora.app.ui.components.MiuixFloatingScrollTopBar
 import com.albatora.app.ui.components.MiuixTimePickerDialog
 import com.albatora.app.ui.components.SquirclePillBadge
@@ -266,7 +267,8 @@ fun QuickAddShortTermScreen(
             )
         }
     ) { paddingValues ->
-        LazyColumn(
+        Box(modifier = Modifier.fillMaxSize()) {
+            LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .layerBackdrop(barBackdrop)
@@ -741,6 +743,12 @@ fun QuickAddShortTermScreen(
                     pendingEditSave = null
                     onSave(editPair.first, editPair.second)
                 }
+            )
+        }
+
+            MiuixBottomEdgeBlur(
+                backdrop = barBackdrop,
+                modifier = Modifier.align(Alignment.BottomCenter)
             )
         }
     }

@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.albatora.app.model.*
 import com.albatora.app.ui.components.MiuixColorPickerDialog
+import com.albatora.app.ui.components.MiuixBottomEdgeBlur
 import com.albatora.app.ui.components.MiuixFloatingScrollTopBar
 import com.albatora.app.ui.components.MiuixGlassIcon
 import com.albatora.app.ui.components.SquirclePillBadge
@@ -144,20 +145,21 @@ fun WidgetStudioScreen(
             )
         }
     ) { paddingValues ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .layerBackdrop(barBackdrop)
-                .background(surfaceBg)
-                .nestedScroll(scrollBehavior.nestedScrollConnection)
-                .overScrollVertical(),
-            contentPadding = PaddingValues(
-                start = 16.dp,
-                end = 16.dp,
-                top = paddingValues.calculateTopPadding() + 10.dp,
-                bottom = 36.dp
-            ),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+        Box(modifier = Modifier.fillMaxSize()) {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .layerBackdrop(barBackdrop)
+                    .background(surfaceBg)
+                    .nestedScroll(scrollBehavior.nestedScrollConnection)
+                    .overScrollVertical(),
+                contentPadding = PaddingValues(
+                    start = 16.dp,
+                    end = 16.dp,
+                    top = paddingValues.calculateTopPadding() + 10.dp,
+                    bottom = 64.dp
+                ),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // 1. Live OneUI 8~9 Preview Stage
             item {
@@ -474,6 +476,12 @@ fun WidgetStudioScreen(
                     )
                 }
             }
+            }
+
+            MiuixBottomEdgeBlur(
+                backdrop = barBackdrop,
+                modifier = Modifier.align(Alignment.BottomCenter)
+            )
         }
     }
 

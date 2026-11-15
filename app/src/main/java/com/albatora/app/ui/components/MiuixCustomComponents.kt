@@ -26,18 +26,23 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
 import com.albatora.app.ui.theme.AlbaIconCatalog
 import com.albatora.app.ui.theme.LocalAppBackdrop
 import com.albatora.app.ui.theme.LocalIsDarkTheme
@@ -46,7 +51,9 @@ import top.yukonga.miuix.kmp.blur.BlendColorEntry
 import top.yukonga.miuix.kmp.blur.BlurBlendMode
 import top.yukonga.miuix.kmp.blur.BlurDefaults
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
+import top.yukonga.miuix.kmp.blur.ProgressiveBlur
 import top.yukonga.miuix.kmp.blur.highlight.Highlight
+import top.yukonga.miuix.kmp.blur.progressiveTextureBlur
 import top.yukonga.miuix.kmp.blur.textureBlur
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.shader.isRuntimeShaderSupported
@@ -581,8 +588,8 @@ fun ConfirmActionDialog(
 }
 
 /**
- * Shared floating top bar that reveals a frosted floating squircle background sliding down
- * smoothly from the top when scrolling so titles and action icons always stay crisp and legible.
+ * Shared floating top bar that reveals separate frosted floating squircle islands behind only the
+ * occupied slots (navigation button, title, action buttons), animating strictly left-to-right.
  */
 @Composable
 fun MiuixFloatingScrollTopBar(
@@ -603,17 +610,157 @@ fun MiuixFloatingScrollTopBar(
                 scrollBehavior.state.overlappedFraction > 0.04f)
         }
     }
-    val floatProgress by animateFloatAsState(
-        targetValue = if (isScrolled) 1f else 0f,
-        animationSpec = spring(
-            dampingRatio = 0.84f,
-            stiffness = Spring.StiffnessMediumLow
-        ),
-        label = "floating_top_bar_progress"
+
+    var hasNav by remember { mutableStateOf(false) }
+    var hasActions by remember { mutableStateOf(false) }
+    var navPillVisible by remember { mutableStateOf(false) }
+    var titlePillVisible by remember { mutableStateOf(false) }
+    var actionsPillVisible by remember { mutableStateOf(false) }
+
+    LaunchedEffect(isScrolled, hasNav, hasActions) {
+        val target = isScrolled
+        val stepDelayMs = 85L
+        // Always stagger strictly left -> right (navigationIcon -> title -> actions)
+        if (hasNav) {
+            navPillVisible = target
+            delay(stepDelayMs)
+        } else {
+            navPillVisible = false
+        }
+        titlePillVisible = target
+        if (hasActions) {
+            delay(stepDelayMs)
+            actionsPillVisible = target
+        } else {
+            actionsPillVisible = false
+        }
+    }
+
+    val islandSpring = spring<Float>(
+        dampingRatio = 0.80f,
+        stiffness = Spring.StiffnessMediumLow
     )
-    val slideOffsetPx = with(density) { 64.dp.toPx() }
-    val pillCorner = 22.dp
-    val pillShape = RoundedCornerShape(pillCorner)
+    val navProgress by animateFloatAsState(
+        targetValue = if (navPillVisible) 1f else 0f,
+        animationSpec = islandSpring,
+        label = "floating_top_nav_progress"
+    )
+    val titleProgress by animateFloatAsState(
+        targetValue = if (titlePillVisible) 1f else 0f,
+        animationSpec = islandSpring,
+        label = "floating_top_title_progress"
+    )
+    val actionsProgress by animateFloatAsState(
+        targetValue = if (actionsPillVisible) 1f else 0f,
+        animationSpec = islandSpring,
+        label = "floating_top_actions_progress"
+    )
+    val slideOffsetPx = with(density) { 48.dp.toPx() }
+    val useShader = isRuntimeShaderSupported()
+    val edgeOverlayColor = surfaceBg.copy(alpha = if (useShader) 0.72f else 0.94f)
+    val topEdgeBlurMod = if (backdrop != null && useShader) {
+        Modifier.progressiveTextureBlur(
+            backdrop = backdrop,
+            shape = RectangleShape,
+            blurRadius = 16f,
+            gradient = ProgressiveBlur.Top,
+            colors = BlurDefaults.blurColors(
+                blendColors = listOf(BlendColorEntry(edgeOverlayColor, BlurBlendMode.SrcOver))
+            )
+        )
+    } else {
+        Modifier.background(
+            Brush.verticalGradient(
+                0.0f to surfaceBg.copy(alpha = 0.94f),
+                0.62f to surfaceBg.copy(alpha = 0.56f),
+                1.0f to Color.Transparent
+            )
+        )
+    }
+
+    Box(modifier = modifier.fillMaxWidth()) {
+        // Restored top progressive blur scrim behind the separated floating islands
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .then(topEdgeBlurMod)
+        )
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .height(58.dp)
+                .padding(horizontal = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FloatingTopBarIsland(
+                    progress = navProgress,
+                    isDark = isDark,
+                    backdrop = backdrop,
+                    cornerRadius = 21.dp,
+                    slideOffsetPx = slideOffsetPx,
+                    onHasContentChange = { hasNav = it },
+                    content = navigationIcon
+                )
+                FloatingTopBarIsland(
+                    progress = titleProgress,
+                    isDark = isDark,
+                    backdrop = backdrop,
+                    cornerRadius = 21.dp,
+                    slideOffsetPx = slideOffsetPx,
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 9.dp)
+                ) {
+                    Text(
+                        text = title,
+                        style = MiuixTheme.textStyles.title3.copy(fontWeight = FontWeight.SemiBold),
+                        color = MiuixTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+            }
+
+            FloatingTopBarIsland(
+                progress = actionsProgress,
+                isDark = isDark,
+                backdrop = backdrop,
+                cornerRadius = 21.dp,
+                slideOffsetPx = slideOffsetPx,
+                onHasContentChange = { hasActions = it }
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    content = actions
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FloatingTopBarIsland(
+    progress: Float,
+    isDark: Boolean,
+    backdrop: LayerBackdrop?,
+    cornerRadius: Dp,
+    slideOffsetPx: Float,
+    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues(0.dp),
+    onHasContentChange: (Boolean) -> Unit = {},
+    content: @Composable () -> Unit
+) {
+    val p = progress.coerceIn(0f, 1f)
+    val density = LocalDensity.current
+    val minSizePx = with(density) { 42.dp.roundToPx() }
+    val pillShape = RoundedCornerShape(cornerRadius)
     val pillFill = if (isDark) {
         MiuixTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f)
     } else {
@@ -621,67 +768,111 @@ fun MiuixFloatingScrollTopBar(
     }
     val pillBorder = MiuixTheme.colorScheme.onSurface.copy(alpha = if (isDark) 0.14f else 0.08f)
 
-    Box(modifier = modifier.fillMaxWidth()) {
-        // Subtle top fade protecting status bar icons when content scrolls underneath
-        if (floatProgress > 0.005f) {
+    Layout(
+        modifier = modifier.onSizeChanged { size ->
+            onHasContentChange(size.width > 0 && size.height > 0)
+        },
+        content = {
             Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .graphicsLayer { alpha = floatProgress }
-                    .background(
-                        Brush.verticalGradient(
-                            0.0f to surfaceBg.copy(alpha = 0.88f),
-                            0.55f to surfaceBg.copy(alpha = 0.42f),
-                            1.0f to Color.Transparent
+                modifier = Modifier.padding(contentPadding),
+                contentAlignment = Alignment.Center
+            ) {
+                content()
+            }
+            if (p > 0.005f) {
+                val blurMod = if (backdrop != null && isRuntimeShaderSupported()) {
+                    Modifier.textureBlur(
+                        backdrop = backdrop,
+                        shape = pillShape,
+                        blurRadius = 18f,
+                        colors = BlurDefaults.blurColors(
+                            blendColors = listOf(BlendColorEntry(pillFill, BlurBlendMode.SrcOver))
                         )
                     )
-            )
-
-            val blurMod = if (backdrop != null && isRuntimeShaderSupported()) {
-                Modifier.textureBlur(
-                    backdrop = backdrop,
-                    shape = pillShape,
-                    blurRadius = 18f,
-                    colors = BlurDefaults.blurColors(
-                        blendColors = listOf(BlendColorEntry(pillFill, BlurBlendMode.SrcOver))
-                    )
+                } else {
+                    Modifier
+                }
+                Box(
+                    modifier = Modifier
+                        .graphicsLayer {
+                            translationY = (1f - p) * -slideOffsetPx
+                            alpha = p
+                            val scale = 0.92f + 0.08f * p
+                            scaleX = scale
+                            scaleY = scale
+                        }
+                        .shadow(
+                            elevation = (10f * p).dp,
+                            shape = pillShape,
+                            ambientColor = Color.Black.copy(alpha = if (isDark) 0.42f else 0.14f),
+                            spotColor = Color.Black.copy(alpha = if (isDark) 0.42f else 0.16f)
+                        )
+                        .clip(pillShape)
+                        .then(blurMod)
+                        .squircleBackground(color = pillFill, cornerRadius = cornerRadius)
+                        .squircleBorder(width = 1.dp, color = pillBorder, cornerRadius = cornerRadius)
                 )
-            } else {
-                Modifier
             }
-
-            Box(
-                modifier = Modifier
-                    .matchParentSize()
-                    .statusBarsPadding()
-                    .padding(horizontal = 10.dp, vertical = 4.dp)
-                    .graphicsLayer {
-                        val p = floatProgress.coerceIn(0f, 1f)
-                        translationY = (1f - p) * -slideOffsetPx
-                        alpha = p
-                        val scale = 0.96f + 0.04f * p
-                        scaleX = scale
-                        scaleY = scale
-                    }
-                    .shadow(
-                        elevation = (10f * floatProgress.coerceIn(0f, 1f)).dp,
-                        shape = pillShape,
-                        ambientColor = Color.Black.copy(alpha = if (isDark) 0.42f else 0.14f),
-                        spotColor = Color.Black.copy(alpha = if (isDark) 0.42f else 0.16f)
-                    )
-                    .clip(pillShape)
-                    .then(blurMod)
-                    .squircleBackground(color = pillFill, cornerRadius = pillCorner)
-                    .squircleBorder(width = 1.dp, color = pillBorder, cornerRadius = pillCorner)
+        }
+    ) { measurables, constraints ->
+        val contentPlaceable = measurables[0].measure(constraints.copy(minWidth = 0, minHeight = 0))
+        if (contentPlaceable.width == 0 || contentPlaceable.height == 0) {
+            return@Layout layout(0, 0) {}
+        }
+        val pillW = contentPlaceable.width.coerceAtLeast(minSizePx).coerceAtMost(constraints.maxWidth)
+        val pillH = contentPlaceable.height.coerceAtLeast(minSizePx).coerceAtMost(constraints.maxHeight)
+        val bgPlaceable = if (measurables.size > 1) {
+            measurables[1].measure(Constraints.fixed(pillW, pillH))
+        } else {
+            null
+        }
+        layout(pillW, pillH) {
+            bgPlaceable?.placeRelative(0, 0)
+            contentPlaceable.placeRelative(
+                (pillW - contentPlaceable.width) / 2,
+                (pillH - contentPlaceable.height) / 2
             )
         }
+    }
+}
 
-        SmallTopAppBar(
-            title = title,
-            color = Color.Transparent,
-            scrollBehavior = scrollBehavior,
-            navigationIcon = navigationIcon,
-            actions = actions
+/**
+ * Progressive bottom edge blur overlay matching the top edge progressive blur across all screens.
+ */
+@Composable
+fun MiuixBottomEdgeBlur(
+    backdrop: LayerBackdrop,
+    modifier: Modifier = Modifier,
+    extraHeight: Dp = 52.dp
+) {
+    val surfaceBg = MiuixTheme.colorScheme.surface
+    val useShader = isRuntimeShaderSupported()
+    val edgeOverlayColor = surfaceBg.copy(alpha = if (useShader) 0.72f else 0.94f)
+    val navBottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val blurMod = if (useShader) {
+        Modifier.progressiveTextureBlur(
+            backdrop = backdrop,
+            shape = RectangleShape,
+            blurRadius = 16f,
+            gradient = ProgressiveBlur.Bottom,
+            colors = BlurDefaults.blurColors(
+                blendColors = listOf(BlendColorEntry(edgeOverlayColor, BlurBlendMode.SrcOver))
+            )
+        )
+    } else {
+        Modifier.background(
+            Brush.verticalGradient(
+                0.0f to Color.Transparent,
+                0.38f to surfaceBg.copy(alpha = 0.56f),
+                1.0f to surfaceBg.copy(alpha = 0.94f)
+            )
         )
     }
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(navBottomInset + extraHeight)
+            .then(blurMod)
+    )
 }

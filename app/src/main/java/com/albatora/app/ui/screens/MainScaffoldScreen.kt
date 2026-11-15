@@ -60,6 +60,7 @@ import com.albatora.app.model.ThemeColorStyle
 import com.albatora.app.service.BatteryOptimizationHelper
 import com.albatora.app.ui.components.AppUpdateDialog
 import com.albatora.app.ui.components.FloatingLiquidGlassNavBar
+import com.albatora.app.ui.components.MiuixBottomEdgeBlur
 import com.albatora.app.ui.components.MiuixFloatingScrollTopBar
 import com.albatora.app.ui.components.SquirclePillBadge
 import com.albatora.app.ui.components.StackedToastHost
@@ -621,6 +622,12 @@ private fun MainTabsHost(
                 modifier = Modifier.align(Alignment.BottomCenter)
             ) {
                 Box(modifier = Modifier.fillMaxWidth()) {
+                    MiuixBottomEdgeBlur(
+                        backdrop = barBackdrop,
+                        extraHeight = 76.dp,
+                        modifier = Modifier.align(Alignment.BottomCenter)
+                    )
+
                     StackedToastHost(
                         state = toastState,
                         modifier = Modifier
@@ -943,6 +950,11 @@ private fun SettingsScreenHost(
                     .fillMaxWidth()
                     .navigationBarsPadding()
                     .padding(horizontal = 16.dp, vertical = 20.dp)
+            )
+
+            MiuixBottomEdgeBlur(
+                backdrop = settingsBackdrop,
+                modifier = Modifier.align(Alignment.BottomCenter)
             )
 
             AppUpdateDialog(
