@@ -7,17 +7,15 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.albatora.app.data.AlbaToraStateHolder
-import com.albatora.app.ui.components.StackedToastHost
+import com.albatora.app.model.NavBarStyle
 import com.albatora.app.ui.components.rememberStackedToastState
 import com.albatora.app.ui.screens.WidgetStudioScreen
 import com.albatora.app.ui.theme.AlbaToraTheme
+import com.albatora.app.ui.theme.LocalLiquidGlassEnabled
 
 class WidgetConfigureActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -54,7 +52,9 @@ class WidgetConfigureActivity : ComponentActivity() {
                 colorStyle = state.settings.resolvedColorStyle(),
                 customKeyColorHex = state.settings.customKeyColorHex
             ) {
-                Box(modifier = Modifier.fillMaxSize()) {
+                CompositionLocalProvider(
+                    LocalLiquidGlassEnabled provides (state.settings.navBarStyle == NavBarStyle.LIQUID_GLASS)
+                ) {
                     WidgetStudioScreen(
                         state = state,
                         onUpdateWidgetConfig = { transform ->
@@ -64,12 +64,9 @@ class WidgetConfigureActivity : ComponentActivity() {
                         },
                         onBack = { commitAndFinish() },
                         onNotify = { toastState.show(it) },
+                        toastState = toastState,
                         confirmActionText = "적용",
                         onConfirmFinish = { commitAndFinish() }
-                    )
-                    StackedToastHost(
-                        state = toastState,
-                        modifier = Modifier.align(Alignment.BottomCenter)
                     )
                 }
             }

@@ -43,6 +43,8 @@ import com.albatora.app.ui.components.MiuixBottomEdgeBlur
 import com.albatora.app.ui.components.MiuixFloatingScrollTopBar
 import com.albatora.app.ui.components.MiuixGlassIcon
 import com.albatora.app.ui.components.SquirclePillBadge
+import com.albatora.app.ui.components.StackedToastHost
+import com.albatora.app.ui.components.StackedToastState
 import com.albatora.app.ui.components.formatRgbHex
 import com.albatora.app.ui.theme.JobAccentPalette
 import com.albatora.app.ui.theme.LocalIsDarkTheme
@@ -77,6 +79,7 @@ fun WidgetStudioScreen(
     onUpdateWidgetConfig: ((WidgetConfig) -> WidgetConfig) -> Unit,
     onBack: () -> Unit,
     onNotify: (String) -> Unit,
+    toastState: StackedToastState? = null,
     confirmActionText: String? = null,
     onConfirmFinish: (() -> Unit)? = null
 ) {
@@ -153,12 +156,12 @@ fun WidgetStudioScreen(
                     .background(surfaceBg)
                     .nestedScroll(scrollBehavior.nestedScrollConnection)
                     .overScrollVertical(),
-                contentPadding = PaddingValues(
-                    start = 16.dp,
-                    end = 16.dp,
-                    top = paddingValues.calculateTopPadding() + 10.dp,
-                    bottom = 64.dp
-                ),
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                end = 16.dp,
+                top = paddingValues.calculateTopPadding() + 10.dp,
+                bottom = paddingValues.calculateBottomPadding() + 64.dp
+            ),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             // 1. Live OneUI 8~9 Preview Stage
@@ -480,8 +483,22 @@ fun WidgetStudioScreen(
 
             MiuixBottomEdgeBlur(
                 backdrop = barBackdrop,
+                extraHeight = 36.dp,
                 modifier = Modifier.align(Alignment.BottomCenter)
             )
+
+            if (toastState != null) {
+                StackedToastHost(
+                    state = toastState,
+                    backdrop = barBackdrop,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .widthIn(max = 400.dp)
+                        .fillMaxWidth()
+                        .navigationBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 24.dp)
+                )
+            }
         }
     }
 

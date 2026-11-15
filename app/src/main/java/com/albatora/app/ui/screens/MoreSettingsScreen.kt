@@ -201,14 +201,14 @@ fun MoreSettingsScreen(
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 val navStyles = NavBarStyle.entries
                 OverlayDropdownPreference(
-                    title = "하단 내비게이션 스타일",
+                    title = "인터페이스 스타일",
                     summary = "${state.settings.navBarStyle.label} · ${state.settings.navBarStyle.description}",
                     items = navStyles.map { it.label },
                     selectedIndex = navStyles.indexOf(state.settings.navBarStyle),
                     onSelectedIndexChange = { index ->
                         val chosen = navStyles[index]
                         onUpdateNavBarStyle(chosen)
-                        onNotify("하단 내비게이션이 '${chosen.label}'으로 적용되었습니다.")
+                        onNotify("인터페이스 스타일이 '${chosen.label}'으로 적용되었습니다.")
                     },
                     startAction = {
                         PreferenceStartIcon(MiuixIcons.Tune, Color(0xFF14B8A6))

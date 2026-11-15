@@ -1,5 +1,6 @@
 package com.albatora.app.ui.components
 
+import android.os.Build
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
@@ -42,13 +43,17 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import com.albatora.app.ui.theme.LocalAppBackdrop
 import com.albatora.app.ui.theme.LocalIsDarkTheme
+import com.albatora.app.ui.theme.LocalLiquidGlassEnabled
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Ok
+import top.yukonga.miuix.kmp.shader.isRuntimeShaderSupported
 import top.yukonga.miuix.kmp.squircle.squircleBackground
 import top.yukonga.miuix.kmp.squircle.squircleClip
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -107,7 +112,9 @@ fun rememberStackedToastState(): StackedToastState = remember { StackedToastStat
 @Composable
 fun StackedToastHost(
     state: StackedToastState,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    backdrop: LayerBackdrop? = LocalAppBackdrop.current,
+    isLiquidGlass: Boolean = LocalLiquidGlassEnabled.current
 ) {
     val entries = state.entries
     if (entries.isEmpty()) return
@@ -161,6 +168,8 @@ fun StackedToastHost(
                     isFront = depth == 0,
                     isExiting = item.isExiting,
                     deckAlpha = animatedAlpha,
+                    backdrop = backdrop,
+                    isLiquidGlass = isLiquidGlass,
                     onRemove = { state.dismiss(item.id) },
                     modifier = Modifier
                         .zIndex((visibleEntries.size - depth).toFloat())
@@ -181,6 +190,8 @@ private fun SwipeableToastCard(
     isFront: Boolean,
     isExiting: Boolean,
     deckAlpha: Float,
+    backdrop: LayerBackdrop?,
+    isLiquidGlass: Boolean,
     onRemove: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -213,6 +224,35 @@ private fun SwipeableToastCard(
     }
     val borderColor = MiuixTheme.colorScheme.onSurface.copy(alpha = if (isDark) 0.14f else 0.09f)
     val corner = 18.dp
+    val shape = RoundedCornerShape(corner)
+    val useRealLiquidGlass = isLiquidGlass &&
+        backdrop != null &&
+        isRuntimeShaderSupported() &&
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+
+    val surfaceModifier = if (useRealLiquidGlass) {
+        Modifier.liquidGlassSurface(
+            backdrop = backdrop,
+            shape = shape,
+            cornerRadius = corner,
+            blurRadius = 14.dp,
+            refractionHeight = 9.dp,
+            refractionAmount = 5.5.dp,
+            chromaticAberration = 1.5.dp,
+            surfaceTint = if (isDark) {
+                Color(0xFF18202E).copy(alpha = if (isFront) 0.34f else 0.24f)
+            } else {
+                Color.White.copy(alpha = if (isFront) 0.38f else 0.26f)
+            },
+            grainAlpha = 0.08f,
+            fallbackColor = containerColor
+        )
+    } else {
+        Modifier
+            .squircleClip(corner)
+            .squircleBackground(color = containerColor, cornerRadius = corner)
+            .border(width = 0.75.dp, color = borderColor, shape = shape)
+    }
 
     Row(
         modifier = modifier
@@ -221,16 +261,14 @@ private fun SwipeableToastCard(
             .offset { IntOffset(dragX.value.roundToInt(), 0) }
             .alpha(combinedAlpha)
             .dropShadow(
-                shape = RoundedCornerShape(corner),
+                shape = shape,
                 shadow = Shadow(
                     radius = if (isFront) 14.dp else 8.dp,
                     color = Color.Black,
                     alpha = if (isDark) 0.34f else 0.13f
                 )
             )
-            .squircleClip(corner)
-            .squircleBackground(color = containerColor, cornerRadius = corner)
-            .border(width = 0.75.dp, color = borderColor, shape = RoundedCornerShape(corner))
+            .then(surfaceModifier)
             .then(
                 if (isFront && !isExiting) {
                     Modifier.pointerInput(Unit) {

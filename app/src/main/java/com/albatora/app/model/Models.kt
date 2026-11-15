@@ -20,8 +20,8 @@ enum class ThemeColorStyle(val label: String, val description: String) {
 
 @Serializable
 enum class NavBarStyle(val label: String, val description: String) {
-    MIUIX("기본 내비게이션", "깔끔한 Miuix 기본 하단 내비게이션 바"),
-    LIQUID_GLASS("리퀴드 글래스", "플로팅 유리 굴절 효과 및 슬라이딩 렌즈")
+    MIUIX("기본 스타일", "깔끔한 Miuix 기본 바 및 카드형 알림"),
+    LIQUID_GLASS("리퀴드 글래스", "하단 바·상단 플로팅 바·토스트 알림 실시간 유리 굴절 효과")
 }
 
 @Serializable

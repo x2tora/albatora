@@ -748,6 +748,7 @@ fun QuickAddShortTermScreen(
 
             MiuixBottomEdgeBlur(
                 backdrop = barBackdrop,
+                extraHeight = 36.dp,
                 modifier = Modifier.align(Alignment.BottomCenter)
             )
         }

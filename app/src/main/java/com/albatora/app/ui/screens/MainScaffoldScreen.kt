@@ -14,6 +14,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -69,6 +70,7 @@ import com.albatora.app.ui.components.rememberStackedToastState
 import com.albatora.app.ui.theme.AlbaIconCatalog
 import com.albatora.app.ui.theme.LocalAppBackdrop
 import com.albatora.app.ui.theme.LocalIsDarkTheme
+import com.albatora.app.ui.theme.LocalLiquidGlassEnabled
 import com.albatora.app.viewmodel.AlbaToraViewModel
 import kotlinx.serialization.Serializable
 import top.yukonga.miuix.kmp.basic.*
@@ -177,7 +179,10 @@ fun MainScaffoldScreen(
                 .background(surfaceBg)
         )
 
-        CompositionLocalProvider(LocalAppBackdrop provides ambientBackdrop) {
+        CompositionLocalProvider(
+            LocalAppBackdrop provides ambientBackdrop,
+            LocalLiquidGlassEnabled provides (state.settings.navBarStyle == NavBarStyle.LIQUID_GLASS)
+        ) {
             NavDisplay(
                 backStack = backStack,
                 onBack = {
@@ -220,23 +225,13 @@ fun MainScaffoldScreen(
                 }
 
                 entry<AppRoute.WidgetStudio> {
-                    Box(modifier = Modifier.fillMaxSize()) {
-                        WidgetStudioScreen(
-                            state = state,
-                            onUpdateWidgetConfig = viewModel::updateWidgetConfig,
-                            onBack = { backStack.removeAt(backStack.lastIndex) },
-                            onNotify = { toastState.show(it) }
-                        )
-                        StackedToastHost(
-                            state = toastState,
-                            modifier = Modifier
-                                .align(Alignment.BottomCenter)
-                                .widthIn(max = 400.dp)
-                                .fillMaxWidth()
-                                .navigationBarsPadding()
-                                .padding(horizontal = 16.dp, vertical = 20.dp)
-                        )
-                    }
+                    WidgetStudioScreen(
+                        state = state,
+                        onUpdateWidgetConfig = viewModel::updateWidgetConfig,
+                        onBack = { backStack.removeAt(backStack.lastIndex) },
+                        onNotify = { toastState.show(it) },
+                        toastState = toastState
+                    )
                 }
 
                 entry<AppRoute.AddEditRegularJob> { route ->
@@ -624,18 +619,8 @@ private fun MainTabsHost(
                 Box(modifier = Modifier.fillMaxWidth()) {
                     MiuixBottomEdgeBlur(
                         backdrop = barBackdrop,
-                        extraHeight = 76.dp,
+                        extraHeight = 72.dp,
                         modifier = Modifier.align(Alignment.BottomCenter)
-                    )
-
-                    StackedToastHost(
-                        state = toastState,
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .widthIn(max = 400.dp)
-                            .fillMaxWidth()
-                            .navigationBarsPadding()
-                            .padding(start = 16.dp, end = 16.dp, bottom = if (isLiquidGlassNav) 92.dp else 86.dp)
                     )
 
                     if (isLiquidGlassNav) {
@@ -774,17 +759,26 @@ private fun MainTabsHost(
                 }
             }
 
-            if (!showChrome) {
-                StackedToastHost(
-                    state = toastState,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .widthIn(max = 400.dp)
-                        .fillMaxWidth()
-                        .navigationBarsPadding()
-                        .padding(horizontal = 16.dp, vertical = 20.dp)
-                )
-            }
+            val toastBottomPadding by animateDpAsState(
+                targetValue = when {
+                    !showChrome -> 24.dp
+                    isLiquidGlassNav -> 104.dp
+                    else -> 94.dp
+                },
+                animationSpec = spring(dampingRatio = 0.88f, stiffness = Spring.StiffnessMediumLow),
+                label = "toast_bottom_offset"
+            )
+            StackedToastHost(
+                state = toastState,
+                backdrop = barBackdrop,
+                isLiquidGlass = isLiquidGlassNav,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .widthIn(max = 400.dp)
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(start = 16.dp, end = 16.dp, bottom = toastBottomPadding)
+            )
 
             // ⑤ Morphing Quick-Add menu expanding from the center '+' button
             if (isQuickMenuMounted) {
@@ -942,19 +936,21 @@ private fun SettingsScreenHost(
                 )
             }
 
+            MiuixBottomEdgeBlur(
+                backdrop = settingsBackdrop,
+                extraHeight = 36.dp,
+                modifier = Modifier.align(Alignment.BottomCenter)
+            )
+
             StackedToastHost(
                 state = toastState,
+                backdrop = settingsBackdrop,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .widthIn(max = 400.dp)
                     .fillMaxWidth()
                     .navigationBarsPadding()
-                    .padding(horizontal = 16.dp, vertical = 20.dp)
-            )
-
-            MiuixBottomEdgeBlur(
-                backdrop = settingsBackdrop,
-                modifier = Modifier.align(Alignment.BottomCenter)
+                    .padding(start = 16.dp, end = 16.dp, bottom = 24.dp)
             )
 
             AppUpdateDialog(

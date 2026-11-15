@@ -1,5 +1,6 @@
 package com.albatora.app.ui.components
 
+import android.os.Build
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.Spring
@@ -46,6 +47,7 @@ import kotlinx.coroutines.delay
 import com.albatora.app.ui.theme.AlbaIconCatalog
 import com.albatora.app.ui.theme.LocalAppBackdrop
 import com.albatora.app.ui.theme.LocalIsDarkTheme
+import com.albatora.app.ui.theme.LocalLiquidGlassEnabled
 import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.blur.BlendColorEntry
 import top.yukonga.miuix.kmp.blur.BlurBlendMode
@@ -768,6 +770,7 @@ private fun FloatingTopBarIsland(
 ) {
     val p = progress.coerceIn(0f, 1f)
     val density = LocalDensity.current
+    val isLiquidGlass = LocalLiquidGlassEnabled.current
     val minSizePx = with(density) { 42.dp.roundToPx() }
     val pillShape = RoundedCornerShape(cornerRadius)
     val pillFill = if (isDark) {
@@ -776,6 +779,10 @@ private fun FloatingTopBarIsland(
         Color.White.copy(alpha = 0.94f)
     }
     val pillBorder = MiuixTheme.colorScheme.onSurface.copy(alpha = if (isDark) 0.14f else 0.08f)
+    val useRealLiquidGlass = isLiquidGlass &&
+        backdrop != null &&
+        isRuntimeShaderSupported() &&
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
 
     Layout(
         modifier = modifier.onSizeChanged { size ->
@@ -789,17 +796,41 @@ private fun FloatingTopBarIsland(
                 content()
             }
             if (p > 0.005f) {
-                val blurMod = if (backdrop != null && isRuntimeShaderSupported()) {
-                    Modifier.textureBlur(
+                val bgSurfaceMod = if (useRealLiquidGlass) {
+                    Modifier.liquidGlassSurface(
                         backdrop = backdrop,
                         shape = pillShape,
-                        blurRadius = 18f,
-                        colors = BlurDefaults.blurColors(
-                            blendColors = listOf(BlendColorEntry(pillFill, BlurBlendMode.SrcOver))
-                        )
+                        cornerRadius = cornerRadius,
+                        blurRadius = 14.dp,
+                        refractionHeight = 8.dp,
+                        refractionAmount = 5.dp,
+                        chromaticAberration = 1.4.dp,
+                        surfaceTint = if (isDark) {
+                            Color(0xFF1A2232).copy(alpha = 0.24f)
+                        } else {
+                            Color.White.copy(alpha = 0.22f)
+                        },
+                        grainAlpha = 0.08f,
+                        fallbackColor = if (isDark) MiuixTheme.colorScheme.surfaceContainerHigh else Color.White
                     )
                 } else {
+                    val blurMod = if (backdrop != null && isRuntimeShaderSupported()) {
+                        Modifier.textureBlur(
+                            backdrop = backdrop,
+                            shape = pillShape,
+                            blurRadius = 18f,
+                            colors = BlurDefaults.blurColors(
+                                blendColors = listOf(BlendColorEntry(pillFill, BlurBlendMode.SrcOver))
+                            )
+                        )
+                    } else {
+                        Modifier
+                    }
                     Modifier
+                        .clip(pillShape)
+                        .then(blurMod)
+                        .squircleBackground(color = pillFill, cornerRadius = cornerRadius)
+                        .squircleBorder(width = 1.dp, color = pillBorder, cornerRadius = cornerRadius)
                 }
                 Box(
                     modifier = Modifier
@@ -816,10 +847,7 @@ private fun FloatingTopBarIsland(
                             ambientColor = Color.Black.copy(alpha = if (isDark) 0.42f else 0.14f),
                             spotColor = Color.Black.copy(alpha = if (isDark) 0.42f else 0.16f)
                         )
-                        .clip(pillShape)
-                        .then(blurMod)
-                        .squircleBackground(color = pillFill, cornerRadius = cornerRadius)
-                        .squircleBorder(width = 1.dp, color = pillBorder, cornerRadius = cornerRadius)
+                        .then(bgSurfaceMod)
                 )
             }
         }
