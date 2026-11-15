@@ -101,21 +101,21 @@ import kotlin.random.Random
  */
 private val DockHeight = 60.dp
 private const val DockPressedScale = 1.04f
-private val DockBlurRadius = 14.dp
+private val DockBlurRadius = 3.5.dp
 private val DockRefractionHeight = 12.dp
-private val DockRefractionAmount = 7.dp
-private val DockChromaticAberration = 2.0.dp
+private val DockRefractionAmount = 7.5.dp
+private val DockChromaticAberration = 2.4.dp
 
 private val GlassSurfaceTint = Color(0xFF6E7D96).copy(alpha = 0.03f)
-private const val GlassGrainAlpha = 0.10f
+private const val GlassGrainAlpha = 0.08f
 private const val GRAIN_TILE = 96
 
 private val SliderHorizontalOverhang = 10.dp
 private val SliderVerticalOverhang = 3.dp
 private val SliderDragStartSlop = 4.dp
 private val SliderRefractionHeight = 6.dp
-private val SliderRefractionAmount = 4.0.dp
-private val SliderChromaticAberration = 0.8.dp
+private val SliderRefractionAmount = 4.5.dp
+private val SliderChromaticAberration = 1.6.dp
 private val SliderPressedOverhang = 3.dp
 private const val SliderStretchMax = 0.18f
 
@@ -576,13 +576,14 @@ private fun LiquidGlassNavBarContent(
                         blurRadius = DockBlurRadius,
                         refractionHeight = DockRefractionHeight,
                         refractionAmount = DockRefractionAmount,
+                        chromaticAberration = DockChromaticAberration,
                         refraction = true,
                         surfaceTint = if (isDark) {
-                            Color(0xFF14161B).copy(alpha = 0.72f)
+                            Color(0xFF14161B).copy(alpha = 0.56f)
                         } else {
-                            Color(0xFFF6F7FB).copy(alpha = 0.78f)
+                            Color(0xFFF6F7FB).copy(alpha = 0.60f)
                         },
-                        grainAlpha = if (isDark) 0.06f else 0.08f,
+                        grainAlpha = if (isDark) 0.05f else 0.07f,
                         fallbackColor = MiuixTheme.colorScheme.surfaceContainer
                     )
             )

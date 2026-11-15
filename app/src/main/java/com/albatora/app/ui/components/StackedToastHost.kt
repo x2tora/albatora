@@ -235,16 +235,16 @@ private fun SwipeableToastCard(
             backdrop = backdrop,
             shape = shape,
             cornerRadius = corner,
-            blurRadius = 14.dp,
-            refractionHeight = 9.dp,
-            refractionAmount = 5.5.dp,
-            chromaticAberration = 1.5.dp,
+            blurRadius = 2.5.dp,
+            refractionHeight = 10.dp,
+            refractionAmount = 7.dp,
+            chromaticAberration = 2.4.dp,
             surfaceTint = if (isDark) {
-                Color(0xFF18202E).copy(alpha = if (isFront) 0.34f else 0.24f)
+                Color(0xFF141822).copy(alpha = if (isFront) 0.44f else 0.34f)
             } else {
-                Color.White.copy(alpha = if (isFront) 0.38f else 0.26f)
+                Color(0xFFF6F7FB).copy(alpha = if (isFront) 0.48f else 0.38f)
             },
-            grainAlpha = 0.08f,
+            grainAlpha = 0.06f,
             fallbackColor = containerColor
         )
     } else {

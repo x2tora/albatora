@@ -668,12 +668,12 @@ fun MiuixFloatingScrollTopBar(
     )
     val slideOffsetPx = with(density) { 48.dp.toPx() }
     val useShader = isRuntimeShaderSupported()
-    val edgeOverlayColor = surfaceBg.copy(alpha = if (useShader) 0.72f else 0.94f)
+    val edgeOverlayColor = surfaceBg.copy(alpha = if (useShader) 0.48f else 0.90f)
     val topEdgeBlurMod = if (backdrop != null && useShader) {
         Modifier.progressiveTextureBlur(
             backdrop = backdrop,
             shape = RectangleShape,
-            blurRadius = 16f,
+            blurRadius = 6f,
             gradient = ProgressiveBlur.Top,
             colors = BlurDefaults.blurColors(
                 blendColors = listOf(BlendColorEntry(edgeOverlayColor, BlurBlendMode.SrcOver))
@@ -801,16 +801,16 @@ private fun FloatingTopBarIsland(
                         backdrop = backdrop,
                         shape = pillShape,
                         cornerRadius = cornerRadius,
-                        blurRadius = 14.dp,
-                        refractionHeight = 8.dp,
-                        refractionAmount = 5.dp,
-                        chromaticAberration = 1.4.dp,
+                        blurRadius = 2.5.dp,
+                        refractionHeight = 10.dp,
+                        refractionAmount = 7.dp,
+                        chromaticAberration = 2.4.dp,
                         surfaceTint = if (isDark) {
-                            Color(0xFF1A2232).copy(alpha = 0.24f)
+                            Color(0xFF141822).copy(alpha = 0.40f)
                         } else {
-                            Color.White.copy(alpha = 0.22f)
+                            Color(0xFFF6F7FB).copy(alpha = 0.46f)
                         },
-                        grainAlpha = 0.08f,
+                        grainAlpha = 0.06f,
                         fallbackColor = if (isDark) MiuixTheme.colorScheme.surfaceContainerHigh else Color.White
                     )
                 } else {
@@ -818,7 +818,7 @@ private fun FloatingTopBarIsland(
                         Modifier.textureBlur(
                             backdrop = backdrop,
                             shape = pillShape,
-                            blurRadius = 18f,
+                            blurRadius = 10f,
                             colors = BlurDefaults.blurColors(
                                 blendColors = listOf(BlendColorEntry(pillFill, BlurBlendMode.SrcOver))
                             )
@@ -884,13 +884,13 @@ fun MiuixBottomEdgeBlur(
 ) {
     val surfaceBg = MiuixTheme.colorScheme.surface
     val useShader = isRuntimeShaderSupported()
-    val edgeOverlayColor = surfaceBg.copy(alpha = if (useShader) 0.72f else 0.94f)
+    val edgeOverlayColor = surfaceBg.copy(alpha = if (useShader) 0.48f else 0.90f)
     val navBottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val blurMod = if (useShader) {
         Modifier.progressiveTextureBlur(
             backdrop = backdrop,
             shape = RectangleShape,
-            blurRadius = 16f,
+            blurRadius = 6f,
             gradient = ProgressiveBlur.Bottom,
             colors = BlurDefaults.blurColors(
                 blendColors = listOf(BlendColorEntry(edgeOverlayColor, BlurBlendMode.SrcOver))
