@@ -154,19 +154,20 @@ fun FocusTimerRingCanvas(
     modifier: Modifier = Modifier
 ) {
     Canvas(modifier = modifier) {
-        val strokeWidth = 10.dp.toPx()
-        val inset = strokeWidth / 2f + 12.dp.toPx()
+        val scale = (size.minDimension / 230.dp.toPx()).coerceIn(1f, 1.8f)
+        val strokeWidth = (10f * scale).dp.toPx()
+        val inset = strokeWidth / 2f + (12f * scale).dp.toPx()
         val arcDiameter = size.minDimension - inset * 2f
         val topLeft = Offset((size.width - arcDiameter) / 2f, (size.height - arcDiameter) / 2f)
         val arcSize = Size(arcDiameter, arcDiameter)
         val center = Offset(size.width / 2f, size.height / 2f)
-        val outerR = arcDiameter / 2f + strokeWidth / 2f + 8.dp.toPx()
+        val outerR = arcDiameter / 2f + strokeWidth / 2f + (8f * scale).dp.toPx()
 
         // Chronometer dial ticks (60 crisp ticks around perimeter)
         for (i in 0 until 60) {
             val angleRad = (-90.0 + i * 6.0) * (PI / 180.0)
             val isMajor = i % 5 == 0
-            val innerLen = if (isMajor) 7.dp.toPx() else 3.5.dp.toPx()
+            val innerLen = (if (isMajor) 7f * scale else 3.5f * scale).dp.toPx()
             val start = Offset(
                 x = center.x + (outerR - innerLen) * cos(angleRad).toFloat(),
                 y = center.y + (outerR - innerLen) * sin(angleRad).toFloat()
@@ -179,7 +180,7 @@ fun FocusTimerRingCanvas(
                 color = if (isMajor) tickColor.copy(alpha = 0.55f) else tickColor.copy(alpha = 0.25f),
                 start = start,
                 end = end,
-                strokeWidth = if (isMajor) 1.5.dp.toPx() else 1.dp.toPx(),
+                strokeWidth = (if (isMajor) 1.5f * scale else 1f * scale).dp.toPx(),
                 cap = StrokeCap.Round
             )
         }
@@ -307,6 +308,8 @@ fun SquirclePillBadge(
     contentColor: Color,
     modifier: Modifier = Modifier,
     leadingIcon: ImageVector? = null,
+    textStyle: TextStyle = MiuixTheme.textStyles.footnote1.copy(fontWeight = FontWeight.SemiBold),
+    contentPadding: PaddingValues = PaddingValues(horizontal = 10.dp, vertical = 5.dp),
     onClick: (() -> Unit)? = null
 ) {
     val base = modifier
@@ -318,7 +321,7 @@ fun SquirclePillBadge(
         base
     }
     Box(
-        modifier = finalModifier.padding(horizontal = 10.dp, vertical = 5.dp),
+        modifier = finalModifier.padding(contentPadding),
         contentAlignment = Alignment.Center
     ) {
         Row(
@@ -335,7 +338,7 @@ fun SquirclePillBadge(
             }
             Text(
                 text = text,
-                style = MiuixTheme.textStyles.footnote1.copy(fontWeight = FontWeight.SemiBold),
+                style = textStyle,
                 color = contentColor,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis

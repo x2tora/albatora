@@ -62,13 +62,19 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import android.os.Build
 import kotlinx.coroutines.launch
 import com.albatora.app.domain.*
 import com.albatora.app.model.*
 import com.albatora.app.ui.components.*
 import com.albatora.app.ui.theme.AlbaIconCatalog
 import com.albatora.app.ui.theme.LocalIsDarkTheme
+import com.albatora.app.ui.theme.LocalLiquidGlassEnabled
 import top.yukonga.miuix.kmp.basic.*
+import top.yukonga.miuix.kmp.blur.LayerBackdrop
+import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
+import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.*
 import top.yukonga.miuix.kmp.overlay.OverlayBottomSheet
@@ -805,10 +811,16 @@ fun HomeScreen(
                         .weight(1f)
                         .fillMaxHeight()
                 ) {
+                    val surfaceBg = MiuixTheme.colorScheme.surface
+                    val feedBackdrop = rememberLayerBackdrop {
+                        drawRect(surfaceBg)
+                        drawContent()
+                    }
                     LazyColumn(
                         state = wideLeftListState,
                         modifier = Modifier
                             .fillMaxSize()
+                            .layerBackdrop(feedBackdrop)
                             .overScrollVertical()
                             .nestedScroll(scrollBehavior.nestedScrollConnection),
                         contentPadding = PaddingValues(top = topBarInset + 12.dp, bottom = bottomPad),
@@ -841,7 +853,8 @@ fun HomeScreen(
                                     scrollBehavior.state.contentOffset = 0f
                                 }
                             },
-                            onOpenFullscreen = { onToggleFullscreenFocus(true) }
+                            onOpenFullscreen = { onToggleFullscreenFocus(true) },
+                            backdrop = feedBackdrop
                         )
                     }
                 }
@@ -861,10 +874,16 @@ fun HomeScreen(
             }
         } else {
             Box(modifier = Modifier.fillMaxSize()) {
+                val surfaceBg = MiuixTheme.colorScheme.surface
+                val feedBackdrop = rememberLayerBackdrop {
+                    drawRect(surfaceBg)
+                    drawContent()
+                }
                 LazyColumn(
                     state = phoneListState,
                     modifier = Modifier
                         .fillMaxSize()
+                        .layerBackdrop(feedBackdrop)
                         .overScrollVertical()
                         .nestedScroll(scrollBehavior.nestedScrollConnection),
                     contentPadding = PaddingValues(
@@ -905,7 +924,8 @@ fun HomeScreen(
                                 scrollBehavior.state.contentOffset = 0f
                             }
                         },
-                        onOpenFullscreen = { onToggleFullscreenFocus(true) }
+                        onOpenFullscreen = { onToggleFullscreenFocus(true) },
+                        backdrop = feedBackdrop
                     )
                 }
             }
@@ -1642,7 +1662,8 @@ private fun HomeFloatingLiveStage(
     horizontalDockedPadding: Dp,
     onMeasureExpandedHeightDp: (Dp) -> Unit,
     onScrollToTop: () -> Unit,
-    onOpenFullscreen: () -> Unit
+    onOpenFullscreen: () -> Unit,
+    backdrop: LayerBackdrop? = null
 ) {
     val density = LocalDensity.current
     val haptic = LocalHapticFeedback.current
@@ -1849,6 +1870,7 @@ private fun HomeFloatingLiveStage(
             collapseFraction = smoothCollapse,
             pullExpandRatio = pullRatio,
             onToggleFullscreen = onOpenFullscreen,
+            backdrop = backdrop,
             modifier = Modifier.fillMaxWidth()
         )
     }
@@ -1869,6 +1891,7 @@ private fun FocusTimerStage(
     collapseFraction: Float = 0f,
     pullExpandRatio: Float = 0f,
     onToggleFullscreen: () -> Unit,
+    backdrop: LayerBackdrop? = null,
     modifier: Modifier = Modifier
 ) {
     val isDark = LocalIsDarkTheme.current
@@ -1901,22 +1924,49 @@ private fun FocusTimerStage(
         label = "focus_status_dot"
     )
     val stageCornerRadius = if (isFullscreen) 24.dp else 22.dp
-    val ringSize = if (isFullscreen) {
-        292.dp
-    } else {
-        androidx.compose.ui.unit.lerp(222.dp, 74.dp, collapse)
-    }
+    val ringSize = androidx.compose.ui.unit.lerp(222.dp, 74.dp, collapse)
     val cardPadH = if (isFullscreen) 20.dp else androidx.compose.ui.unit.lerp(20.dp, 14.dp, collapse)
     val cardPadV = if (isFullscreen) 20.dp else androidx.compose.ui.unit.lerp(18.dp, 11.dp, collapse)
     val cardElevation = if (isFullscreen) 0.dp else (12f * ((collapse - 0.06f) / 0.7f).coerceIn(0f, 1f)).dp
+    val isLiquidGlass = LocalLiquidGlassEnabled.current
+    val useRealLiquidGlass = isLiquidGlass &&
+        !isFullscreen &&
+        backdrop != null &&
+        isRuntimeShaderSupported() &&
+        Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
     val cardBgTint = when {
         isFullscreen -> MiuixTheme.colorScheme.surfaceContainer
         collapse > 0.04f -> androidx.compose.ui.graphics.lerp(
             MiuixTheme.colorScheme.surfaceContainer,
             if (isDark) MiuixTheme.colorScheme.surfaceContainerHigh else Color.White,
             collapse.coerceIn(0f, 1f)
-        )
+        ).let { base ->
+            if (isLiquidGlass && !useRealLiquidGlass) base.copy(alpha = 0.90f) else base
+        }
         else -> MiuixTheme.colorScheme.surfaceContainer
+    }
+    val stageShape = RoundedCornerShape(stageCornerRadius)
+    val glassWeight = ((collapse - 0.02f) / 0.28f).coerceIn(0f, 1f)
+    val surfaceBgMod = if (useRealLiquidGlass && collapse > 0.02f) {
+        val targetGlassTint = if (isDark) {
+            Color(0xFF141822).copy(alpha = 0.42f)
+        } else {
+            Color(0xFFF6F7FB).copy(alpha = 0.48f)
+        }
+        Modifier.liquidGlassSurface(
+            backdrop = backdrop,
+            shape = stageShape,
+            cornerRadius = stageCornerRadius,
+            blurRadius = (2.5f * glassWeight).dp,
+            refractionHeight = 10.dp,
+            refractionAmount = (7f * glassWeight).dp,
+            chromaticAberration = (2.4f * glassWeight).dp,
+            surfaceTint = androidx.compose.ui.graphics.lerp(cardBgTint, targetGlassTint, glassWeight),
+            grainAlpha = 0.06f * glassWeight,
+            fallbackColor = cardBgTint
+        )
+    } else {
+        Modifier.miuixGlassSurface(cornerRadius = stageCornerRadius, tintColor = cardBgTint)
     }
     val pullGlowAlpha = (pullExpandRatio * 0.45f).coerceIn(0f, 0.55f)
     val secondFraction = ((focusedShift.elapsedWorkMillis % 60_000L) / 60_000f).coerceIn(0f, 1f)
@@ -1930,13 +1980,13 @@ private fun FocusTimerStage(
                 if (cardElevation > 0.2.dp) {
                     Modifier.shadow(
                         elevation = cardElevation,
-                        shape = RoundedCornerShape(stageCornerRadius),
+                        shape = stageShape,
                         ambientColor = Color.Black.copy(alpha = if (isDark) 0.42f else 0.14f),
                         spotColor = Color.Black.copy(alpha = if (isDark) 0.42f else 0.16f)
                     )
                 } else Modifier
             )
-            .miuixGlassSurface(cornerRadius = stageCornerRadius, tintColor = cardBgTint)
+            .then(surfaceBgMod)
             .then(
                 if (pullGlowAlpha > 0.02f) {
                     Modifier.squircleBorder(
@@ -2072,70 +2122,107 @@ private fun FocusTimerStage(
             }
 
             if (isFullscreen) {
-                // Fullscreen chronometer ring and 0.1s odometer
-                Box(
+                // Fullscreen chronometer ring and 0.1s odometer scaled cleanly to fill available fullscreen space
+                BoxWithConstraints(
                     modifier = Modifier
-                        .weight(1f, fill = false)
-                        .padding(vertical = 8.dp)
-                        .size(ringSize),
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    FocusTimerRingCanvas(
-                        progress = if (isCombinedView) null else focusedShift.progressFraction,
-                        accentColor = accentColor,
-                        trackColor = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.08f),
-                        tickColor = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                        isPaused = isPaused,
-                        secondFraction = secondFraction,
-                        modifier = Modifier.fillMaxSize()
-                    )
+                    val resolvedRingSize = minOf(maxWidth - 8.dp, maxHeight - 8.dp)
+                        .coerceIn(240.dp, 500.dp)
+                    val ringScale = (resolvedRingSize / 222.dp).coerceIn(1.20f, 2.25f)
+                    val formattedLen = remember(displayEarned) {
+                        String.format(Locale.US, "%,.1f", displayEarned.coerceAtLeast(0.0)).length
+                    }
+                    val digitFitScale = (7.8f / formattedLen.coerceAtLeast(7)).coerceIn(0.66f, 1f)
+                    val odoFontSp = ((30f * ringScale).coerceIn(38f, 60f) * digitFitScale).sp
+                    val labelFontSp = (12.5f * ringScale.coerceAtMost(1.65f)).sp
+                    val rateFontSp = (12.5f * ringScale.coerceAtMost(1.75f)).sp
+                    val badgeFontSp = (11.5f * ringScale.coerceAtMost(1.60f)).sp
+                    val innerPadH = (resolvedRingSize * 0.14f).coerceIn(24.dp, 56.dp)
+                    val innerSpacing = (7.dp * ringScale.coerceAtMost(1.6f))
 
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(6.dp),
-                        modifier = Modifier.padding(horizontal = 24.dp)
+                    Box(
+                        modifier = Modifier.size(resolvedRingSize),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = if (isCombinedView) "통합 누적 수익" else "실시간 수익",
-                            style = MiuixTheme.textStyles.footnote2,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                        )
-                        OdometerCurrencyText(
-                            amountWon = displayEarned,
-                            textStyle = MiuixTheme.textStyles.title1.copy(
-                                fontSize = 34.sp,
-                                fontWeight = FontWeight.SemiBold
-                            ),
-                            color = MiuixTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            text = String.format(
-                                Locale.US,
-                                "+%.2f원/초 · +%.0f원/분",
-                                displayRatePerSec,
-                                displayRatePerMin
-                            ),
-                            style = MiuixTheme.textStyles.footnote1.copy(
-                                fontWeight = FontWeight.Medium,
-                                fontFeatureSettings = "tnum"
-                            ),
-                            color = accentColor
+                        FocusTimerRingCanvas(
+                            progress = if (isCombinedView) null else focusedShift.progressFraction,
+                            accentColor = accentColor,
+                            trackColor = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                            tickColor = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            isPaused = isPaused,
+                            secondFraction = secondFraction,
+                            modifier = Modifier.fillMaxSize()
                         )
 
-                        val progress = focusedShift.progressFraction
-                        val remMs = focusedShift.remainingMillis
-                        if (!isCombinedView && progress != null && remMs != null) {
-                            SquirclePillBadge(
-                                text = "${String.format(Locale.US, "%.1f", progress * 100f)}% · 남음 ${PayrollCalculator.formatCountdown(remMs)}",
-                                backgroundColor = MiuixTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
-                                contentColor = MiuixTheme.colorScheme.onSecondaryContainer
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(innerSpacing),
+                            modifier = Modifier.padding(horizontal = innerPadH)
+                        ) {
+                            Text(
+                                text = if (isCombinedView) "통합 누적 수익" else "실시간 수익",
+                                style = MiuixTheme.textStyles.footnote2.copy(
+                                    fontSize = labelFontSp,
+                                    fontWeight = FontWeight.Medium
+                                ),
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                             )
-                        } else {
-                            SquirclePillBadge(
-                                text = "실근무 ${PayrollCalculator.formatCountdown(focusedShift.elapsedWorkMillis)}",
-                                backgroundColor = MiuixTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
-                                contentColor = MiuixTheme.colorScheme.onSecondaryContainer
+                            OdometerCurrencyText(
+                                amountWon = displayEarned,
+                                textStyle = MiuixTheme.textStyles.title1.copy(
+                                    fontSize = odoFontSp,
+                                    fontWeight = FontWeight.SemiBold
+                                ),
+                                color = MiuixTheme.colorScheme.onSurface
                             )
+                            Text(
+                                text = String.format(
+                                    Locale.US,
+                                    "+%.2f원/초 · +%.0f원/분",
+                                    displayRatePerSec,
+                                    displayRatePerMin
+                                ),
+                                style = MiuixTheme.textStyles.footnote1.copy(
+                                    fontSize = rateFontSp,
+                                    fontWeight = FontWeight.Medium,
+                                    fontFeatureSettings = "tnum"
+                                ),
+                                color = accentColor,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+
+                            val progress = focusedShift.progressFraction
+                            val remMs = focusedShift.remainingMillis
+                            val badgeTextStyle = MiuixTheme.textStyles.footnote1.copy(
+                                fontSize = badgeFontSp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            val badgePad = PaddingValues(
+                                horizontal = (10f * ringScale.coerceAtMost(1.45f)).dp,
+                                vertical = (5f * ringScale.coerceAtMost(1.45f)).dp
+                            )
+                            if (!isCombinedView && progress != null && remMs != null) {
+                                SquirclePillBadge(
+                                    text = "${String.format(Locale.US, "%.1f", progress * 100f)}% · 남음 ${PayrollCalculator.formatCountdown(remMs)}",
+                                    backgroundColor = MiuixTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
+                                    contentColor = MiuixTheme.colorScheme.onSecondaryContainer,
+                                    textStyle = badgeTextStyle,
+                                    contentPadding = badgePad
+                                )
+                            } else {
+                                SquirclePillBadge(
+                                    text = "실근무 ${PayrollCalculator.formatCountdown(focusedShift.elapsedWorkMillis)}",
+                                    backgroundColor = MiuixTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
+                                    contentColor = MiuixTheme.colorScheme.onSecondaryContainer,
+                                    textStyle = badgeTextStyle,
+                                    contentPadding = badgePad
+                                )
+                            }
                         }
                     }
                 }

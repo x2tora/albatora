@@ -17,16 +17,23 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.albatora.app.domain.CalendarDayScheduleItem
 import com.albatora.app.domain.PayrollCalculator
 import com.albatora.app.model.*
@@ -47,6 +54,8 @@ import top.yukonga.miuix.kmp.squircle.squircleClip
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import java.time.DayOfWeek
+import kotlin.math.PI
+import kotlin.math.sin
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.YearMonth
@@ -187,11 +196,21 @@ fun CalendarScreen(
             }
         }
 
-        // Swipeable Monthly Grid Pager
+        // Swipeable Monthly Grid Pager (6 fixed rows so height never shifts; card-stack cover/uncover with spacing)
         item {
+            val density = LocalDensity.current
+            var pagerWidthPx by remember { mutableFloatStateOf(0f) }
+            val pageSpacingDp = 16.dp
+            val pageSpacingPx = with(density) { pageSpacingDp.toPx() }
+            val isDarkSurface = MiuixTheme.colorScheme.onSurface.red > 0.5f
+
             HorizontalPager(
                 state = pagerState,
-                modifier = Modifier.fillMaxWidth(),
+                pageSpacing = pageSpacingDp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clipToBounds()
+                    .onSizeChanged { pagerWidthPx = it.width.toFloat() },
                 beyondViewportPageCount = 1
             ) { page ->
                 val pageMonth = remember(page, baseMonth) {
@@ -207,8 +226,44 @@ fun CalendarScreen(
                     map
                 }
 
+                val relPos = (page - pagerState.currentPage) - pagerState.currentPageOffsetFraction
+                val stepPx = (pagerWidthPx + pageSpacingPx).coerceAtLeast(1f)
+                val coverFraction = (-relPos).coerceIn(0f, 1f)
+                val topElevation = if (relPos > 0.005f && relPos < 0.995f) {
+                    (14f * sin(relPos * PI).toFloat()).dp
+                } else {
+                    0.dp
+                }
+
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .zIndex(page.toFloat())
+                        .graphicsLayer {
+                            if (relPos < 0f && pagerWidthPx > 0f) {
+                                // Underlying month stays gently anchored in depth while next month covers or uncovers it
+                                translationX = coverFraction * stepPx * 0.80f
+                                val s = 1f - coverFraction * 0.06f
+                                scaleX = s
+                                scaleY = s
+                                val baseAlpha = 1f - coverFraction * 0.72f
+                                alpha = (if (coverFraction > 0.92f) {
+                                    baseAlpha * ((1f - coverFraction) / 0.08f).coerceIn(0f, 1f)
+                                } else {
+                                    baseAlpha
+                                }).coerceIn(0f, 1f)
+                            }
+                        }
+                        .then(
+                            if (topElevation > 0.2.dp) {
+                                Modifier.shadow(
+                                    elevation = topElevation,
+                                    shape = RoundedCornerShape(20.dp),
+                                    ambientColor = Color.Black.copy(alpha = if (isDarkSurface) 0.48f else 0.14f),
+                                    spotColor = Color.Black.copy(alpha = if (isDarkSurface) 0.48f else 0.18f)
+                                )
+                            } else Modifier
+                        ),
                     insideMargin = PaddingValues(12.dp)
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -769,7 +824,8 @@ private fun buildMonthGridDates(month: YearMonth): List<LocalDate?> {
     for (d in 1..month.lengthOfMonth()) {
         list.add(month.atDay(d))
     }
-    while (list.size % 7 != 0) {
+    // Always pad to 6 rows (42 cells) so 4/5/6-week months keep identical calendar height
+    while (list.size < 42) {
         list.add(null)
     }
     return list
