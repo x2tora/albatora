@@ -597,6 +597,17 @@ fun ConfirmActionDialog(
  * occupied slots (navigation button, title, action buttons), animating strictly left-to-right.
  */
 @Composable
+fun MiuixTopBarActionDivider(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .padding(horizontal = 2.dp, vertical = 8.dp)
+            .width(1.dp)
+            .height(18.dp)
+            .background(MiuixTheme.colorScheme.onSurface.copy(alpha = 0.14f))
+    )
+}
+
+@Composable
 fun MiuixFloatingScrollTopBar(
     title: String,
     scrollBehavior: ScrollBehavior,

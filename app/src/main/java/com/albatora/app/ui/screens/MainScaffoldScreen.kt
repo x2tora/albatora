@@ -71,6 +71,7 @@ import com.albatora.app.ui.theme.AlbaIconCatalog
 import com.albatora.app.ui.theme.LocalAppBackdrop
 import com.albatora.app.ui.theme.LocalIsDarkTheme
 import com.albatora.app.ui.theme.LocalLiquidGlassEnabled
+import com.albatora.app.ui.theme.LocalWideDualLayoutEnabled
 import com.albatora.app.viewmodel.AlbaToraViewModel
 import kotlinx.serialization.Serializable
 import top.yukonga.miuix.kmp.basic.*
@@ -181,7 +182,8 @@ fun MainScaffoldScreen(
 
         CompositionLocalProvider(
             LocalAppBackdrop provides ambientBackdrop,
-            LocalLiquidGlassEnabled provides (state.settings.navBarStyle == NavBarStyle.LIQUID_GLASS)
+            LocalLiquidGlassEnabled provides (state.settings.navBarStyle == NavBarStyle.LIQUID_GLASS),
+            LocalWideDualLayoutEnabled provides state.settings.wideDualLayoutEnabled
         ) {
             NavDisplay(
                 backStack = backStack,
@@ -922,6 +924,7 @@ private fun SettingsScreenHost(
                     onUpdateTheme = viewModel::updateTheme,
                     onUpdateThemeColorStyle = viewModel::updateThemeColorStyle,
                     onUpdateNavBarStyle = viewModel::updateNavBarStyle,
+                    onUpdateWideDualLayout = viewModel::updateWideDualLayout,
                     onUpdateCustomKeyColor = viewModel::updateCustomKeyColor,
                     onUpdateOngoingNotification = viewModel::updateOngoingNotification,
                     onUpdateAutoDnd = viewModel::updateAutoDnd,

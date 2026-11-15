@@ -301,6 +301,7 @@ data class AppSettings(
     val themeOption: ThemeOption = ThemeOption.SYSTEM,
     val themeColorStyle: ThemeColorStyle? = null,
     val navBarStyle: NavBarStyle = NavBarStyle.MIUIX,
+    val wideDualLayoutEnabled: Boolean = false,
     val monetEnabled: Boolean = false,
     val customKeyColorHex: Long? = null,
     val ongoingNotificationEnabled: Boolean = true,

@@ -70,6 +70,7 @@ import com.albatora.app.ui.components.*
 import com.albatora.app.ui.theme.AlbaIconCatalog
 import com.albatora.app.ui.theme.LocalIsDarkTheme
 import com.albatora.app.ui.theme.LocalLiquidGlassEnabled
+import com.albatora.app.ui.theme.LocalWideDualLayoutEnabled
 import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
@@ -194,8 +195,12 @@ fun HomeScreen(
         }
     }
 
+    val wideDualEnabled = LocalWideDualLayoutEnabled.current
+
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val isWide = maxWidth >= 600.dp
+        val hasActiveShifts = liveDashboard.activeShifts.isNotEmpty()
+        val isWideDual = wideDualEnabled && maxWidth >= 600.dp
+        val singleSidePad = ((maxWidth - 600.dp) / 2f).coerceAtLeast(20.dp)
         val density = LocalDensity.current
         val haptic = LocalHapticFeedback.current
         val coroutineScope = rememberCoroutineScope()
@@ -204,38 +209,54 @@ fun HomeScreen(
         val phoneListState = rememberLazyListState()
         val wideLeftListState = rememberLazyListState()
         val wideRightListState = rememberLazyListState()
-        val activeListState = if (isWide) wideLeftListState else phoneListState
+        val activeListState = if (isWideDual) wideLeftListState else phoneListState
 
-        var expandedHeroHeightDp by remember { mutableStateOf(416.dp) }
+        var expandedHeroHeightDp by remember(isWideDual) {
+            mutableStateOf(if (isWideDual) 276.dp else 416.dp)
+        }
         val collapseRangePx = with(density) { 210.dp.toPx() }.coerceAtLeast(1f)
 
         LaunchedEffect(scrollToTopTrigger) {
             if (scrollToTopTrigger > 0) {
-                activeListState.animateScrollToItem(0)
+                if (isWideDual) {
+                    launch { wideLeftListState.animateScrollToItem(0) }
+                    launch { wideRightListState.animateScrollToItem(0) }
+                } else {
+                    phoneListState.animateScrollToItem(0)
+                }
                 scrollBehavior.state.contentOffset = 0f
             }
         }
 
-        val rawCollapseFraction by remember(liveDashboard.activeShifts.isNotEmpty(), activeListState, collapseRangePx) {
+        val rawCollapseFraction by remember(hasActiveShifts, isWideDual, phoneListState, wideLeftListState, wideRightListState, collapseRangePx) {
             derivedStateOf {
-                if (liveDashboard.activeShifts.isEmpty()) {
+                if (!hasActiveShifts) {
                     0f
-                } else if (activeListState.firstVisibleItemIndex > 0) {
+                } else if (isWideDual) {
+                    val leftCollapse = if (wideLeftListState.firstVisibleItemIndex > 0) 1f
+                    else (wideLeftListState.firstVisibleItemScrollOffset / collapseRangePx).coerceIn(0f, 1f)
+                    val rightCollapse = if (wideRightListState.firstVisibleItemIndex > 0) 1f
+                    else (wideRightListState.firstVisibleItemScrollOffset / collapseRangePx).coerceIn(0f, 1f)
+                    maxOf(leftCollapse, rightCollapse)
+                } else if (phoneListState.firstVisibleItemIndex > 0) {
                     1f
                 } else {
-                    (activeListState.firstVisibleItemScrollOffset / collapseRangePx).coerceIn(0f, 1f)
+                    (phoneListState.firstVisibleItemScrollOffset / collapseRangePx).coerceIn(0f, 1f)
                 }
             }
         }
-        val isHomeScrolled by remember(activeListState, wideRightListState, isWide) {
+        val isHomeScrolled by remember(phoneListState, wideLeftListState, wideRightListState, isWideDual) {
             derivedStateOf {
-                val mainScrolled = activeListState.firstVisibleItemIndex > 0 ||
-                    activeListState.firstVisibleItemScrollOffset > 12
-                val sideScrolled = isWide && (
-                    wideRightListState.firstVisibleItemIndex > 0 ||
+                if (isWideDual) {
+                    val leftScrolled = wideLeftListState.firstVisibleItemIndex > 0 ||
+                        wideLeftListState.firstVisibleItemScrollOffset > 12
+                    val rightScrolled = wideRightListState.firstVisibleItemIndex > 0 ||
                         wideRightListState.firstVisibleItemScrollOffset > 12
-                    )
-                mainScrolled || sideScrolled
+                    leftScrolled || rightScrolled
+                } else {
+                    phoneListState.firstVisibleItemIndex > 0 ||
+                        phoneListState.firstVisibleItemScrollOffset > 12
+                }
             }
         }
 
@@ -799,28 +820,25 @@ fun HomeScreen(
             }
         }
 
-        if (isWide) {
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 20.dp),
-                horizontalArrangement = Arrangement.spacedBy(20.dp)
-            ) {
-                Box(
+        if (isWideDual) {
+            Box(modifier = Modifier.fillMaxSize()) {
+                val surfaceBg = MiuixTheme.colorScheme.surface
+                val feedBackdrop = rememberLayerBackdrop {
+                    drawRect(surfaceBg)
+                    drawContent()
+                }
+                Row(
                     modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
+                        .fillMaxSize()
+                        .layerBackdrop(feedBackdrop)
+                        .padding(horizontal = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
-                    val surfaceBg = MiuixTheme.colorScheme.surface
-                    val feedBackdrop = rememberLayerBackdrop {
-                        drawRect(surfaceBg)
-                        drawContent()
-                    }
                     LazyColumn(
                         state = wideLeftListState,
                         modifier = Modifier
-                            .fillMaxSize()
-                            .layerBackdrop(feedBackdrop)
+                            .weight(1f)
+                            .fillMaxHeight()
                             .overScrollVertical()
                             .nestedScroll(scrollBehavior.nestedScrollConnection),
                         contentPadding = PaddingValues(top = topBarInset + 12.dp, bottom = bottomPad),
@@ -829,47 +847,58 @@ fun HomeScreen(
                         focusSection()
                         overviewAndUnpaidSection()
                     }
-                    if (liveDashboard.activeShifts.isNotEmpty() && !isFullscreenFocus) {
-                        HomeFloatingLiveStage(
-                            snapshot = liveDashboard,
-                            selectedTab = selectedLiveTab,
-                            onSelectTab = { selectedLiveTab = it },
-                            selectedTangible = selectedTangible,
-                            allTangibles = state.tangibleItems,
-                            onSelectTangible = onSelectTangibleItem,
-                            onManageTangibles = { showTangibleManager = true },
-                            onToggleBreak = onToggleBreak,
-                            onClockOut = onClockOut,
-                            listState = activeListState,
-                            scrollBehavior = scrollBehavior,
-                            collapseFraction = rawCollapseFraction,
-                            topBarInset = topBarInset,
-                            horizontalBasePadding = 0.dp,
-                            horizontalDockedPadding = 0.dp,
-                            onMeasureExpandedHeightDp = { h -> expandedHeroHeightDp = h },
-                            onScrollToTop = {
-                                coroutineScope.launch {
-                                    activeListState.animateScrollToItem(0)
-                                    scrollBehavior.state.contentOffset = 0f
-                                }
-                            },
-                            onOpenFullscreen = { onToggleFullscreenFocus(true) },
-                            backdrop = feedBackdrop
-                        )
+                    LazyColumn(
+                        state = wideRightListState,
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .overScrollVertical()
+                            .nestedScroll(scrollBehavior.nestedScrollConnection),
+                        contentPadding = PaddingValues(top = topBarInset + 12.dp, bottom = bottomPad),
+                        verticalArrangement = Arrangement.spacedBy(18.dp)
+                    ) {
+                        if (hasActiveShifts) {
+                            item(key = "live_focus_stage_spacer_right") {
+                                Spacer(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(expandedHeroHeightDp)
+                                )
+                            }
+                        }
+                        quickActionHubSection()
+                        wishlistAndJobsSection()
                     }
                 }
-                LazyColumn(
-                    state = wideRightListState,
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .overScrollVertical()
-                        .nestedScroll(scrollBehavior.nestedScrollConnection),
-                    contentPadding = PaddingValues(top = topBarInset + 12.dp, bottom = bottomPad),
-                    verticalArrangement = Arrangement.spacedBy(18.dp)
-                ) {
-                    quickActionHubSection()
-                    wishlistAndJobsSection()
+                if (hasActiveShifts && !isFullscreenFocus) {
+                    HomeFloatingLiveStage(
+                        snapshot = liveDashboard,
+                        selectedTab = selectedLiveTab,
+                        onSelectTab = { selectedLiveTab = it },
+                        selectedTangible = selectedTangible,
+                        allTangibles = state.tangibleItems,
+                        onSelectTangible = onSelectTangibleItem,
+                        onManageTangibles = { showTangibleManager = true },
+                        onToggleBreak = onToggleBreak,
+                        onClockOut = onClockOut,
+                        listState = wideLeftListState,
+                        scrollBehavior = scrollBehavior,
+                        collapseFraction = rawCollapseFraction,
+                        topBarInset = topBarInset,
+                        horizontalBasePadding = 20.dp,
+                        horizontalDockedPadding = 12.dp,
+                        useWideHorizontalHero = true,
+                        onMeasureExpandedHeightDp = { h -> expandedHeroHeightDp = h },
+                        onScrollToTop = {
+                            coroutineScope.launch {
+                                launch { wideLeftListState.animateScrollToItem(0) }
+                                launch { wideRightListState.animateScrollToItem(0) }
+                                scrollBehavior.state.contentOffset = 0f
+                            }
+                        },
+                        onOpenFullscreen = { onToggleFullscreenFocus(true) },
+                        backdrop = feedBackdrop
+                    )
                 }
             }
         } else {
@@ -887,8 +916,8 @@ fun HomeScreen(
                         .overScrollVertical()
                         .nestedScroll(scrollBehavior.nestedScrollConnection),
                     contentPadding = PaddingValues(
-                        start = 20.dp,
-                        end = 20.dp,
+                        start = singleSidePad,
+                        end = singleSidePad,
                         top = topBarInset + 12.dp,
                         bottom = bottomPad
                     ),
@@ -900,7 +929,7 @@ fun HomeScreen(
                     wishlistAndJobsSection()
                 }
 
-                if (liveDashboard.activeShifts.isNotEmpty() && !isFullscreenFocus) {
+                if (hasActiveShifts && !isFullscreenFocus) {
                     HomeFloatingLiveStage(
                         snapshot = liveDashboard,
                         selectedTab = selectedLiveTab,
@@ -911,16 +940,17 @@ fun HomeScreen(
                         onManageTangibles = { showTangibleManager = true },
                         onToggleBreak = onToggleBreak,
                         onClockOut = onClockOut,
-                        listState = activeListState,
+                        listState = phoneListState,
                         scrollBehavior = scrollBehavior,
                         collapseFraction = rawCollapseFraction,
                         topBarInset = topBarInset,
-                        horizontalBasePadding = 20.dp,
-                        horizontalDockedPadding = 12.dp,
+                        horizontalBasePadding = singleSidePad,
+                        horizontalDockedPadding = (singleSidePad - 8.dp).coerceAtLeast(12.dp),
+                        useWideHorizontalHero = false,
                         onMeasureExpandedHeightDp = { h -> expandedHeroHeightDp = h },
                         onScrollToTop = {
                             coroutineScope.launch {
-                                activeListState.animateScrollToItem(0)
+                                phoneListState.animateScrollToItem(0)
                                 scrollBehavior.state.contentOffset = 0f
                             }
                         },
@@ -1660,6 +1690,7 @@ private fun HomeFloatingLiveStage(
     topBarInset: Dp,
     horizontalBasePadding: Dp,
     horizontalDockedPadding: Dp,
+    useWideHorizontalHero: Boolean = false,
     onMeasureExpandedHeightDp: (Dp) -> Unit,
     onScrollToTop: () -> Unit,
     onOpenFullscreen: () -> Unit,
@@ -1869,6 +1900,7 @@ private fun HomeFloatingLiveStage(
             isFullscreen = false,
             collapseFraction = smoothCollapse,
             pullExpandRatio = pullRatio,
+            useWideHorizontal = useWideHorizontalHero,
             onToggleFullscreen = onOpenFullscreen,
             backdrop = backdrop,
             modifier = Modifier.fillMaxWidth()
@@ -1890,6 +1922,7 @@ private fun FocusTimerStage(
     isFullscreen: Boolean,
     collapseFraction: Float = 0f,
     pullExpandRatio: Float = 0f,
+    useWideHorizontal: Boolean = false,
     onToggleFullscreen: () -> Unit,
     backdrop: LayerBackdrop? = null,
     modifier: Modifier = Modifier
@@ -1924,7 +1957,12 @@ private fun FocusTimerStage(
         label = "focus_status_dot"
     )
     val stageCornerRadius = if (isFullscreen) 24.dp else 22.dp
-    val ringSize = androidx.compose.ui.unit.lerp(222.dp, 74.dp, collapse)
+    val useWideSideSplit = useWideHorizontal && !isFullscreen
+    val ringSize = if (useWideSideSplit) {
+        androidx.compose.ui.unit.lerp(188.dp, 68.dp, collapse)
+    } else {
+        androidx.compose.ui.unit.lerp(222.dp, 74.dp, collapse)
+    }
     val cardPadH = if (isFullscreen) 20.dp else androidx.compose.ui.unit.lerp(20.dp, 14.dp, collapse)
     val cardPadV = if (isFullscreen) 20.dp else androidx.compose.ui.unit.lerp(18.dp, 11.dp, collapse)
     val cardElevation = if (isFullscreen) 0.dp else (12f * ((collapse - 0.06f) / 0.7f).coerceIn(0f, 1f)).dp
@@ -2240,10 +2278,18 @@ private fun FocusTimerStage(
                     onRequestClockOut = { pendingClockOutTarget = it }
                 )
             } else {
-                // Continuous morphing stage: same ring & odometer seamlessly glide from centered hero -> docked top card
+                // Continuous morphing stage: same ring & odometer seamlessly glide from hero -> docked top card
                 val expandedControlsAlpha = (1f - (collapse / 0.45f)).coerceIn(0f, 1f)
                 val dockedActionsAlpha = ((collapse - 0.50f) / 0.45f).coerceIn(0f, 1f)
-                val odometerFontSp = lerp(29f, 20.5f, collapse)
+                val formattedLen = remember(displayEarned) {
+                    String.format(Locale.US, "%,.1f", displayEarned.coerceAtLeast(0.0)).length
+                }
+                val baseHeroOdoSp = if (useWideSideSplit) {
+                    (25f * (8f / formattedLen.coerceAtLeast(8)).coerceIn(0.76f, 1f))
+                } else {
+                    29f
+                }
+                val odometerFontSp = lerp(baseHeroOdoSp, 20.5f, collapse)
                 val labelAlpha = (1f - (collapse / 0.42f)).coerceIn(0f, 1f)
 
                 Layout(
@@ -2320,7 +2366,7 @@ private fun FocusTimerStage(
                             }
                         }
 
-                        // 2: Expanded bottom controls (Tangible + full buttons)
+                        // 2: Expanded controls (phone: stacked below ring; wide dual hero: beside ring with right buttons)
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -2336,7 +2382,8 @@ private fun FocusTimerStage(
                                 onSelectTangible = onSelectTangible,
                                 onManageTangibles = onManageTangibles,
                                 onRequestBreak = { pendingBreakTarget = it },
-                                onRequestClockOut = { pendingClockOutTarget = it }
+                                onRequestClockOut = { pendingClockOutTarget = it },
+                                horizontalSplit = useWideSideSplit
                             )
                         }
 
@@ -2371,11 +2418,15 @@ private fun FocusTimerStage(
                     val ringH = ringPlaceable.height
 
                     val dockedActionPlaceable = measurables[3].measure(Constraints(maxWidth = maxW / 3))
-                    val expandedControlsPlaceable = measurables[2].measure(
-                        Constraints(minWidth = maxW, maxWidth = maxW)
-                    )
+                    val sideGapPx = 16.dp.roundToPx()
+                    val expandedControlsPlaceable = if (useWideSideSplit) {
+                        val sideAvailW = (maxW - ringW - sideGapPx).coerceAtLeast(160.dp.roundToPx())
+                        measurables[2].measure(Constraints(minWidth = sideAvailW, maxWidth = sideAvailW))
+                    } else {
+                        measurables[2].measure(Constraints(minWidth = maxW, maxWidth = maxW))
+                    }
 
-                    val metricsMaxWAtHero = (ringW - 24.dp.roundToPx()).coerceAtLeast(120.dp.roundToPx())
+                    val metricsMaxWAtHero = (ringW - 20.dp.roundToPx()).coerceAtLeast(116.dp.roundToPx())
                     val metricsMaxWAtDock = (maxW - ringW - dockedActionPlaceable.width - 20.dp.roundToPx())
                         .coerceAtLeast(100.dp.roundToPx())
                     val metricsMaxW = lerp(metricsMaxWAtHero.toFloat(), metricsMaxWAtDock.toFloat(), collapse)
@@ -2384,20 +2435,30 @@ private fun FocusTimerStage(
                     val metricsPlaceable = measurables[1].measure(Constraints(maxWidth = metricsMaxW))
 
                     val expandedGapPx = 12.dp.roundToPx()
-                    val expandedTotalH = ringH + expandedGapPx + expandedControlsPlaceable.height
+                    val expandedTotalH = if (useWideSideSplit) {
+                        maxOf(ringH, expandedControlsPlaceable.height)
+                    } else {
+                        ringH + expandedGapPx + expandedControlsPlaceable.height
+                    }
                     val dockedTotalH = maxOf(ringH, metricsPlaceable.height, dockedActionPlaceable.height)
                     val currentH = lerp(expandedTotalH.toFloat(), dockedTotalH.toFloat(), collapse)
                         .roundToInt()
                         .coerceAtLeast(1)
 
                     layout(maxW, currentH) {
-                        val ringX = lerp(((maxW - ringW) / 2f), 0f, collapse).roundToInt()
-                        val ringY = lerp(0f, ((dockedTotalH - ringH) / 2f), collapse).roundToInt()
+                        val ringXHero = if (useWideSideSplit) 0f else (maxW - ringW) / 2f
+                        val ringYHero = if (useWideSideSplit) (expandedTotalH - ringH) / 2f else 0f
+                        val ringX = lerp(ringXHero, 0f, collapse).roundToInt()
+                        val ringY = lerp(ringYHero, ((dockedTotalH - ringH) / 2f), collapse).roundToInt()
                         ringPlaceable.placeRelative(ringX, ringY)
 
-                        val metricsXHero = (maxW - metricsPlaceable.width) / 2f
+                        val metricsXHero = if (useWideSideSplit) {
+                            (ringW - metricsPlaceable.width) / 2f
+                        } else {
+                            (maxW - metricsPlaceable.width) / 2f
+                        }
                         val metricsXDock = (ringW + 10.dp.roundToPx()).toFloat()
-                        val metricsYHero = (ringH - metricsPlaceable.height) / 2f
+                        val metricsYHero = ringYHero + (ringH - metricsPlaceable.height) / 2f
                         val metricsYDock = (dockedTotalH - metricsPlaceable.height) / 2f
                         metricsPlaceable.placeRelative(
                             lerp(metricsXHero, metricsXDock, collapse).roundToInt(),
@@ -2405,7 +2466,14 @@ private fun FocusTimerStage(
                         )
 
                         if (expandedControlsAlpha > 0.01f) {
-                            expandedControlsPlaceable.placeRelative(0, ringH + expandedGapPx)
+                            if (useWideSideSplit) {
+                                expandedControlsPlaceable.placeRelative(
+                                    ringW + sideGapPx,
+                                    ((expandedTotalH - expandedControlsPlaceable.height) / 2f).roundToInt()
+                                )
+                            } else {
+                                expandedControlsPlaceable.placeRelative(0, ringH + expandedGapPx)
+                            }
                         }
                         if (dockedActionsAlpha > 0.01f) {
                             dockedActionPlaceable.placeRelative(
@@ -2486,12 +2554,10 @@ private fun FocusStageExpandedControls(
     onSelectTangible: (String) -> Unit,
     onManageTangibles: () -> Unit,
     onRequestBreak: (LiveShiftSnapshot) -> Unit,
-    onRequestClockOut: (LiveShiftSnapshot) -> Unit
+    onRequestClockOut: (LiveShiftSnapshot) -> Unit,
+    horizontalSplit: Boolean = false
 ) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
+    val tangibleContent: @Composable () -> Unit = {
         if (selectedTangible != null) {
             val qty = if (selectedTangible.unitPrice > 0L) displayEarned / selectedTangible.unitPrice else 0.0
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -2563,22 +2629,57 @@ private fun FocusStageExpandedControls(
                 )
             }
         }
+    }
 
+    if (horizontalSplit) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            TextButton(
-                text = if (focusedShift.isManualPaused) "휴게 종료" else "휴게 시작",
-                onClick = { onRequestBreak(focusedShift) },
-                modifier = Modifier.weight(1f)
-            )
-            TextButton(
-                text = "퇴근 완료",
-                onClick = { onRequestClockOut(focusedShift) },
-                colors = ButtonDefaults.textButtonColorsPrimary(),
-                modifier = Modifier.weight(1f)
-            )
+            Box(modifier = Modifier.weight(1f)) {
+                tangibleContent()
+            }
+            Column(
+                modifier = Modifier.widthIn(min = 112.dp, max = 148.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                TextButton(
+                    text = if (focusedShift.isManualPaused) "휴게 종료" else "휴게 시작",
+                    onClick = { onRequestBreak(focusedShift) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                TextButton(
+                    text = "퇴근 완료",
+                    onClick = { onRequestClockOut(focusedShift) },
+                    colors = ButtonDefaults.textButtonColorsPrimary(),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
+    } else {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            tangibleContent()
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                TextButton(
+                    text = if (focusedShift.isManualPaused) "휴게 종료" else "휴게 시작",
+                    onClick = { onRequestBreak(focusedShift) },
+                    modifier = Modifier.weight(1f)
+                )
+                TextButton(
+                    text = "퇴근 완료",
+                    onClick = { onRequestClockOut(focusedShift) },
+                    colors = ButtonDefaults.textButtonColorsPrimary(),
+                    modifier = Modifier.weight(1f)
+                )
+            }
         }
     }
 }

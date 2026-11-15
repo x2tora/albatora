@@ -292,6 +292,7 @@ class AlbaToraViewModel(application: Application) : AndroidViewModel(application
 
     fun updateTheme(option: ThemeOption) = stateHolder.updateSettings { it.copy(themeOption = option) }
     fun updateNavBarStyle(style: NavBarStyle) = stateHolder.updateSettings { it.copy(navBarStyle = style) }
+    fun updateWideDualLayout(enabled: Boolean) = stateHolder.updateSettings { it.copy(wideDualLayoutEnabled = enabled) }
     fun updateThemeColorStyle(style: ThemeColorStyle) = stateHolder.updateSettings {
         it.copy(
             themeColorStyle = style,

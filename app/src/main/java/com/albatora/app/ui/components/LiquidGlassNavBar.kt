@@ -99,7 +99,7 @@ import kotlin.random.Random
 /**
  * Liquid Glass bottom navigation bar built on miuix-blur, AGSL RuntimeShader, and miuix-squircle.
  */
-private val DockHeight = 60.dp
+private val DockHeight = 62.dp
 private const val DockPressedScale = 1.04f
 private val DockBlurRadius = 3.5.dp
 private val DockRefractionHeight = 12.dp
@@ -110,14 +110,13 @@ private val GlassSurfaceTint = Color(0xFF6E7D96).copy(alpha = 0.03f)
 private const val GlassGrainAlpha = 0.08f
 private const val GRAIN_TILE = 96
 
-private val SliderHorizontalOverhang = 10.dp
-private val SliderVerticalOverhang = 3.dp
+private val DockLensInset = 4.dp
 private val SliderDragStartSlop = 4.dp
 private val SliderRefractionHeight = 6.dp
 private val SliderRefractionAmount = 4.5.dp
 private val SliderChromaticAberration = 1.6.dp
-private val SliderPressedOverhang = 3.dp
-private const val SliderStretchMax = 0.18f
+private val SliderPressedOverhang = 1.5.dp
+private const val SliderStretchMax = 0.12f
 
 @Language("AGSL")
 private const val LIQUID_LENS_SHADER = """
@@ -411,12 +410,12 @@ private fun LiquidGlassNavBarContent(
     val slotCount = slots.size
     var barWidthPx by remember { mutableIntStateOf(0) }
 
-    val itemWidthPx = if (barWidthPx == 0) 0f else barWidthPx.toFloat() / slotCount
-    val horizontalOverhangPx = with(density) { SliderHorizontalOverhang.toPx() }
-    val verticalOverhangPx = with(density) { SliderVerticalOverhang.toPx() }
-    val baseOffsetPx = -horizontalOverhangPx
-    val sliderWidthPx = if (itemWidthPx > 0f) itemWidthPx + horizontalOverhangPx * 2f else 0f
-    val sliderHeightPx = (with(density) { contentHeight.toPx() } + verticalOverhangPx * 2f).coerceAtLeast(0f)
+    val insetPx = with(density) { DockLensInset.toPx() }
+    val innerWidthPx = (barWidthPx.toFloat() - insetPx * 2f).coerceAtLeast(0f)
+    val itemWidthPx = if (innerWidthPx <= 0f) 0f else innerWidthPx / slotCount
+    val baseOffsetPx = insetPx
+    val sliderWidthPx = itemWidthPx
+    val sliderHeightPx = (with(density) { contentHeight.toPx() } - insetPx * 2f).coerceAtLeast(0f)
 
     val targetSlot = if (isCenterAddSelected) 2 else tabToSlot(selectedTab.coerceIn(0, 3))
     val targetOffsetPx = itemWidthPx * targetSlot + baseOffsetPx
@@ -573,6 +572,7 @@ private fun LiquidGlassNavBarContent(
                     .liquidGlassSurface(
                         backdrop = pageBackdrop,
                         shape = RoundedCornerShape(50),
+                        cornerRadius = contentHeight / 2f,
                         blurRadius = DockBlurRadius,
                         refractionHeight = DockRefractionHeight,
                         refractionAmount = DockRefractionAmount,
@@ -591,7 +591,8 @@ private fun LiquidGlassNavBarContent(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(contentHeight),
+                    .height(contentHeight)
+                    .padding(horizontal = DockLensInset),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
@@ -707,9 +708,9 @@ private fun LiquidGlassNavBarContent(
         }
 
         // Layer 2 (on top of nav items, sibling of dockBackdrop):
-        // Oversized Liquid Glass Selector Lens extending smoothly beyond the dock bar so icons, labels,
-        // and notification badges remain inside the distortion-free center zone.
+        // Concentric Liquid Glass Selector Lens sitting neatly inside the dock with equal 4dp top/bottom/left/right margins.
         if (sliderWidthPx > 0f && sliderHeightPx > 0f) {
+            val lensCornerRadius = (contentHeight - DockLensInset * 2f) / 2f
             Box(
                 modifier = Modifier
                     .layout { measurable, constraints ->
@@ -721,7 +722,7 @@ private fun LiquidGlassNavBarContent(
                         layout(reportW, reportH) {
                             placeable.place(
                                 x = (sliderLeftPx - pressOutsetPx).roundToInt(),
-                                y = (-verticalOverhangPx - pressOutsetPx).roundToInt()
+                                y = (insetPx - pressOutsetPx).roundToInt()
                             )
                         }
                     }
@@ -732,6 +733,7 @@ private fun LiquidGlassNavBarContent(
                     .liquidGlassSurface(
                         backdrop = lensBackdrop,
                         shape = RoundedCornerShape(50),
+                        cornerRadius = lensCornerRadius,
                         blurRadius = if (draggingState.value) 1.5.dp else 0.8.dp,
                         refractionHeight = SliderRefractionHeight,
                         refractionAmount = SliderRefractionAmount,

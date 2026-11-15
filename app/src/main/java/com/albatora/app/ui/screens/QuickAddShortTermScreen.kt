@@ -28,6 +28,7 @@ import com.albatora.app.ui.components.EmojiAndColorIdentityRow
 import com.albatora.app.ui.components.MiuixDatePickerDialog
 import com.albatora.app.ui.components.MiuixBottomEdgeBlur
 import com.albatora.app.ui.components.MiuixFloatingScrollTopBar
+import com.albatora.app.ui.components.MiuixTopBarActionDivider
 import com.albatora.app.ui.components.MiuixTimePickerDialog
 import com.albatora.app.ui.components.SquirclePillBadge
 import com.albatora.app.ui.theme.AlbaIconCatalog
@@ -255,6 +256,7 @@ fun QuickAddShortTermScreen(
                                 tint = MiuixTheme.colorScheme.error
                             )
                         }
+                        MiuixTopBarActionDivider()
                     }
                     IconButton(onClick = ::handleSubmit) {
                         Icon(

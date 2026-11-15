@@ -30,6 +30,7 @@ import com.albatora.app.ui.components.MiuixEntityBadge
 import com.albatora.app.ui.components.MiuixGlassIcon
 import com.albatora.app.ui.components.SquirclePillBadge
 import com.albatora.app.ui.theme.AlbaIconCatalog
+import com.albatora.app.ui.theme.LocalWideDualLayoutEnabled
 import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.*
@@ -292,10 +293,12 @@ fun RecordsScreen(
         }
     }
 
+    val wideDualEnabled = LocalWideDualLayoutEnabled.current
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        val isWide = maxWidth >= 600.dp
+        val isWideDual = wideDualEnabled && maxWidth >= 600.dp
+        val singleSidePad = ((maxWidth - 600.dp) / 2f).coerceAtLeast(20.dp)
 
-        if (isWide) {
+        if (isWideDual) {
             Row(
                 modifier = Modifier
                     .fillMaxSize()
@@ -399,7 +402,7 @@ fun RecordsScreen(
                     .fillMaxSize()
                     .overScrollVertical()
                     .nestedScroll(scrollBehavior.nestedScrollConnection),
-                contentPadding = listPadding,
+                contentPadding = PaddingValues(start = singleSidePad, end = singleSidePad, top = topInset + 12.dp, bottom = 116.dp + navBottomInset),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 item { filterTabsCard() }

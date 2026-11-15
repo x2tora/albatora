@@ -56,6 +56,7 @@ fun MoreSettingsScreen(
     onUpdateTheme: (ThemeOption) -> Unit,
     onUpdateThemeColorStyle: (ThemeColorStyle) -> Unit,
     onUpdateNavBarStyle: (NavBarStyle) -> Unit,
+    onUpdateWideDualLayout: (Boolean) -> Unit,
     onUpdateCustomKeyColor: (Long?) -> Unit,
     onUpdateOngoingNotification: (Boolean) -> Unit,
     onUpdateAutoDnd: (Boolean) -> Unit,
@@ -134,14 +135,17 @@ fun MoreSettingsScreen(
         }
     }
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .overScrollVertical()
-            .nestedScroll(scrollBehavior.nestedScrollConnection),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = topInset + 8.dp, bottom = 110.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val sidePad = ((maxWidth - 620.dp) / 2f).coerceAtLeast(16.dp)
+
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .overScrollVertical()
+                .nestedScroll(scrollBehavior.nestedScrollConnection),
+            contentPadding = PaddingValues(start = sidePad, end = sidePad, top = topInset + 8.dp, bottom = 110.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
         item {
             SmallTitle(text = "화면 · 테마 설정")
             Card(modifier = Modifier.fillMaxWidth()) {
@@ -212,6 +216,22 @@ fun MoreSettingsScreen(
                     },
                     startAction = {
                         PreferenceStartIcon(MiuixIcons.Tune, Color(0xFF14B8A6))
+                    }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                SwitchPreference(
+                    title = "대화면 듀얼 칼럼 보기",
+                    summary = "태블릿·폴더블 등 넓은 화면에서 좌우 2단 분할 레이아웃 사용 (기본: 중앙 단일 보기)",
+                    checked = state.settings.wideDualLayoutEnabled,
+                    onCheckedChange = { enabled ->
+                        onUpdateWideDualLayout(enabled)
+                        onNotify(
+                            if (enabled) "넓은 화면에서 듀얼 칼럼 레이아웃이 활성화되었습니다."
+                            else "대화면에서도 모바일과 동일한 중앙 단일 보기로 표시됩니다."
+                        )
+                    },
+                    startAction = {
+                        PreferenceStartIcon(MiuixIcons.ScreenMirroring, Color(0xFF3482FF))
                     }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
@@ -373,6 +393,7 @@ fun MoreSettingsScreen(
                 )
             }
         }
+    }
     }
 
     MiuixColorPickerDialog(

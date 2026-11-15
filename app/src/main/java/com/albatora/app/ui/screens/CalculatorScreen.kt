@@ -25,6 +25,7 @@ import com.albatora.app.domain.PayrollCalculator
 import com.albatora.app.model.FeeType
 import com.albatora.app.model.TaxMode
 import com.albatora.app.ui.components.SquirclePillBadge
+import com.albatora.app.ui.theme.LocalWideDualLayoutEnabled
 import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
@@ -33,6 +34,11 @@ import top.yukonga.miuix.kmp.utils.overScrollVertical
 import java.util.Locale
 import kotlin.math.min
 import kotlin.math.roundToLong
+
+private data class CalcTabSections(
+    val input: @Composable () -> Unit,
+    val result: @Composable () -> Unit
+)
 
 @Composable
 fun CalculatorScreen(
@@ -44,42 +50,105 @@ fun CalculatorScreen(
     var selectedTab by remember { mutableIntStateOf(0) }
     val tabs = listOf("시급·월급", "주휴수당", "일용직·순수익", "퇴직금")
     val navBottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val wideDualEnabled = LocalWideDualLayoutEnabled.current
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .overScrollVertical()
-            .nestedScroll(scrollBehavior.nestedScrollConnection),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = topInset + 12.dp, bottom = 116.dp + navBottomInset),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        item {
-            TabRowWithContour(
-                tabs = tabs,
-                selectedTabIndex = selectedTab,
-                onTabSelected = { selectedTab = it }
+    val allSections = listOf(
+        rememberHourlyMonthlySections(defaultMinWage, onCreateJobWithWage),
+        rememberWeeklyHolidaySections(defaultMinWage, onCreateJobWithWage),
+        rememberDailyWorkerNetSections(),
+        rememberSeveranceSections()
+    )
+
+    val tabRow: @Composable () -> Unit = {
+        TabRowWithContour(
+            tabs = tabs,
+            selectedTabIndex = selectedTab,
+            onTabSelected = { selectedTab = it }
+        )
+    }
+
+    val tabTransitionSpec: androidx.compose.animation.AnimatedContentTransitionScope<Int>.() -> androidx.compose.animation.ContentTransform = {
+        val forward = targetState >= initialState
+        (slideInHorizontally(animationSpec = tween(220)) { w -> if (forward) w / 8 else -w / 8 } +
+            fadeIn(tween(200)))
+            .togetherWith(
+                slideOutHorizontally(animationSpec = tween(180)) { w -> if (forward) -w / 8 else w / 8 } +
+                    fadeOut(tween(150))
             )
-        }
+    }
 
-        item {
-            AnimatedContent(
-                targetState = selectedTab,
-                transitionSpec = {
-                    val forward = targetState >= initialState
-                    (slideInHorizontally(animationSpec = tween(220)) { w -> if (forward) w / 8 else -w / 8 } +
-                        fadeIn(tween(200)))
-                        .togetherWith(
-                            slideOutHorizontally(animationSpec = tween(180)) { w -> if (forward) -w / 8 else w / 8 } +
-                                fadeOut(tween(150))
-                        )
-                },
-                label = "calculator_subtab"
-            ) { tab ->
-                when (tab) {
-                    0 -> HourlyMonthlyCalculator(defaultMinWage, onCreateJobWithWage)
-                    1 -> WeeklyHolidayCalculator(defaultMinWage, onCreateJobWithWage)
-                    2 -> DailyWorkerNetCalculator()
-                    else -> SeveranceCalculator()
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val isWideDual = wideDualEnabled && maxWidth >= 600.dp
+        val singleSidePad = ((maxWidth - 600.dp) / 2f).coerceAtLeast(20.dp)
+
+        if (isWideDual) {
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 20.dp),
+                horizontalArrangement = Arrangement.spacedBy(20.dp)
+            ) {
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .overScrollVertical()
+                        .nestedScroll(scrollBehavior.nestedScrollConnection),
+                    contentPadding = PaddingValues(top = topInset + 12.dp, bottom = 116.dp + navBottomInset),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    item { tabRow() }
+                    item {
+                        AnimatedContent(
+                            targetState = selectedTab,
+                            transitionSpec = tabTransitionSpec,
+                            label = "calculator_subtab_input"
+                        ) { tab ->
+                            allSections[tab].input()
+                        }
+                    }
+                }
+                LazyColumn(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .overScrollVertical()
+                        .nestedScroll(scrollBehavior.nestedScrollConnection),
+                    contentPadding = PaddingValues(top = topInset + 12.dp, bottom = 116.dp + navBottomInset),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    item {
+                        AnimatedContent(
+                            targetState = selectedTab,
+                            transitionSpec = tabTransitionSpec,
+                            label = "calculator_subtab_result"
+                        ) { tab ->
+                            allSections[tab].result()
+                        }
+                    }
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .overScrollVertical()
+                    .nestedScroll(scrollBehavior.nestedScrollConnection),
+                contentPadding = PaddingValues(start = singleSidePad, end = singleSidePad, top = topInset + 12.dp, bottom = 116.dp + navBottomInset),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                item { tabRow() }
+                item {
+                    AnimatedContent(
+                        targetState = selectedTab,
+                        transitionSpec = tabTransitionSpec,
+                        label = "calculator_subtab"
+                    ) { tab ->
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            allSections[tab].input()
+                            allSections[tab].result()
+                        }
+                    }
                 }
             }
         }
@@ -87,10 +156,10 @@ fun CalculatorScreen(
 }
 
 @Composable
-private fun HourlyMonthlyCalculator(
+private fun rememberHourlyMonthlySections(
     defaultMinWage: Long,
     onCreateJobWithWage: (Long) -> Unit
-) {
+): CalcTabSections {
     var hourlyText by remember { mutableStateOf(defaultMinWage.toString()) }
     var dailyHoursText by remember { mutableStateOf("8") }
     var weeklyDaysText by remember { mutableStateOf("5") }
@@ -226,29 +295,14 @@ private fun HourlyMonthlyCalculator(
         }
     }
 
-    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
-        if (maxWidth >= 600.dp) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(20.dp)
-            ) {
-                Box(modifier = Modifier.weight(1f)) { inputSection() }
-                Box(modifier = Modifier.weight(1f)) { resultSection() }
-            }
-        } else {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                inputSection()
-                resultSection()
-            }
-        }
-    }
+    return CalcTabSections(input = inputSection, result = resultSection)
 }
 
 @Composable
-private fun WeeklyHolidayCalculator(
+private fun rememberWeeklyHolidaySections(
     defaultMinWage: Long,
     onCreateJobWithWage: (Long) -> Unit
-) {
+): CalcTabSections {
     var hourlyText by remember { mutableStateOf(defaultMinWage.toString()) }
     var weeklyHoursText by remember { mutableStateOf("20") }
     var forceInclude by remember { mutableStateOf(false) }
@@ -260,93 +314,102 @@ private fun WeeklyHolidayCalculator(
     val whHours = if (eligible) (capped / 40.0) * 8.0 else 0.0
     val whPay = (whHours * hourly).roundToLong()
 
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Card(modifier = Modifier.fillMaxWidth(), insideMargin = PaddingValues(16.dp)) {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                TextField(
-                    value = hourlyText,
-                    onValueChange = { hourlyText = it.filter(Char::isDigit) },
-                    label = "시급 (원)",
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                TextField(
-                    value = weeklyHoursText,
-                    onValueChange = { weeklyHoursText = it },
-                    label = "1주 소정 근로시간 (예: 15, 20, 40)",
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    item {
-                        SquirclePillBadge(
-                            text = "최저시급 ${PayrollCalculator.formatWon(defaultMinWage)}",
-                            backgroundColor = MiuixTheme.colorScheme.primary.copy(alpha = 0.14f),
-                            contentColor = MiuixTheme.colorScheme.primary,
-                            onClick = { hourlyText = defaultMinWage.toString() }
-                        )
-                    }
-                    item {
-                        SquirclePillBadge(
-                            text = "주 15h",
-                            backgroundColor = MiuixTheme.colorScheme.secondaryContainer,
-                            contentColor = MiuixTheme.colorScheme.onSecondaryContainer,
-                            onClick = { weeklyHoursText = "15" }
-                        )
-                    }
-                    item {
-                        SquirclePillBadge(
-                            text = "주 40h",
-                            backgroundColor = MiuixTheme.colorScheme.secondaryContainer,
-                            contentColor = MiuixTheme.colorScheme.onSecondaryContainer,
-                            onClick = { weeklyHoursText = "40" }
-                        )
+    val inputSection: @Composable () -> Unit = {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Card(modifier = Modifier.fillMaxWidth(), insideMargin = PaddingValues(16.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    TextField(
+                        value = hourlyText,
+                        onValueChange = { hourlyText = it.filter(Char::isDigit) },
+                        label = "시급 (원)",
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    TextField(
+                        value = weeklyHoursText,
+                        onValueChange = { weeklyHoursText = it },
+                        label = "1주 소정 근로시간 (예: 15, 20, 40)",
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        item {
+                            SquirclePillBadge(
+                                text = "최저시급 ${PayrollCalculator.formatWon(defaultMinWage)}",
+                                backgroundColor = MiuixTheme.colorScheme.primary.copy(alpha = 0.14f),
+                                contentColor = MiuixTheme.colorScheme.primary,
+                                onClick = { hourlyText = defaultMinWage.toString() }
+                            )
+                        }
+                        item {
+                            SquirclePillBadge(
+                                text = "주 15h",
+                                backgroundColor = MiuixTheme.colorScheme.secondaryContainer,
+                                contentColor = MiuixTheme.colorScheme.onSecondaryContainer,
+                                onClick = { weeklyHoursText = "15" }
+                            )
+                        }
+                        item {
+                            SquirclePillBadge(
+                                text = "주 40h",
+                                backgroundColor = MiuixTheme.colorScheme.secondaryContainer,
+                                contentColor = MiuixTheme.colorScheme.onSecondaryContainer,
+                                onClick = { weeklyHoursText = "40" }
+                            )
+                        }
                     }
                 }
             }
-        }
-        Card(modifier = Modifier.fillMaxWidth()) {
-            SwitchPreference(
-                title = "주 15시간 미만 강제 포함",
-                summary = "법정 기준은 주 15시간 이상 개근 시 지급 (최대 40시간 캡)",
-                checked = forceInclude,
-                onCheckedChange = { forceInclude = it }
-            )
-        }
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.secondaryContainer),
-            insideMargin = PaddingValues(16.dp)
-        ) {
-            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text(
-                    if (eligible) "이번 주 예상 주휴수당" else "주 15시간 미만 (미대상)",
-                    style = MiuixTheme.textStyles.footnote1
+            Card(modifier = Modifier.fillMaxWidth()) {
+                SwitchPreference(
+                    title = "주 15시간 미만 강제 포함",
+                    summary = "법정 기준은 주 15시간 이상 개근 시 지급 (최대 40시간 캡)",
+                    checked = forceInclude,
+                    onCheckedChange = { forceInclude = it }
                 )
-                Text(
-                    PayrollCalculator.formatWon(whPay),
-                    style = MiuixTheme.textStyles.title2.copy(fontWeight = FontWeight.Bold),
-                    color = MiuixTheme.colorScheme.primary
-                )
-                CalcLine("적용 주휴시간", "${String.format(Locale.US, "%.2f", whHours)}시간 (상한 8시간)")
-                CalcLine("실질 시급 환산", PayrollCalculator.formatWon(if (hours > 0) ((hours * hourly + whPay) / hours).roundToLong() else 0L))
             }
         }
-        if (hourly > 0L) {
-            TextButton(
-                text = "이 시급(${PayrollCalculator.formatWon(hourly)})으로 새 알바 등록",
-                onClick = { onCreateJobWithWage(hourly) },
-                colors = ButtonDefaults.textButtonColorsPrimary(),
-                modifier = Modifier.fillMaxWidth()
-            )
+    }
+
+    val resultSection: @Composable () -> Unit = {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.secondaryContainer),
+                insideMargin = PaddingValues(16.dp)
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        if (eligible) "이번 주 예상 주휴수당" else "주 15시간 미만 (미대상)",
+                        style = MiuixTheme.textStyles.footnote1
+                    )
+                    Text(
+                        PayrollCalculator.formatWon(whPay),
+                        style = MiuixTheme.textStyles.title2.copy(fontWeight = FontWeight.Bold),
+                        color = MiuixTheme.colorScheme.primary
+                    )
+                    CalcLine("적용 주휴시간", "${String.format(Locale.US, "%.2f", whHours)}시간 (상한 8시간)")
+                    CalcLine("실질 시급 환산", PayrollCalculator.formatWon(if (hours > 0) ((hours * hourly + whPay) / hours).roundToLong() else 0L))
+                }
+            }
+            if (hourly > 0L) {
+                TextButton(
+                    text = "이 시급(${PayrollCalculator.formatWon(hourly)})으로 새 알바 등록",
+                    onClick = { onCreateJobWithWage(hourly) },
+                    colors = ButtonDefaults.textButtonColorsPrimary(),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
     }
+
+    return CalcTabSections(input = inputSection, result = resultSection)
 }
 
 @Composable
-private fun DailyWorkerNetCalculator() {
+private fun rememberDailyWorkerNetSections(): CalcTabSections {
     var dailyPayText by remember { mutableStateOf("180000") }
     var bonusText by remember { mutableStateOf("0") }
     var transportText by remember { mutableStateOf("3000") }
@@ -364,106 +427,110 @@ private fun DailyWorkerNetCalculator() {
     val expenses = (transportText.toLongOrNull() ?: 0L) + (mealText.toLongOrNull() ?: 0L)
     val net = gross - tax - fee - expenses
 
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Card(modifier = Modifier.fillMaxWidth(), insideMargin = PaddingValues(16.dp)) {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    TextField(
-                        value = dailyPayText,
-                        onValueChange = { dailyPayText = it.filter(Char::isDigit) },
-                        label = "일당/건당 총액",
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true,
-                        modifier = Modifier.weight(1f)
-                    )
-                    TextField(
-                        value = bonusText,
-                        onValueChange = { bonusText = it.filter(Char::isDigit) },
-                        label = "현장 지원금(+)",
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    item {
-                        SquirclePillBadge(
-                            text = "150,000원 (비과세 한도)",
-                            backgroundColor = MiuixTheme.colorScheme.primary.copy(alpha = 0.14f),
-                            contentColor = MiuixTheme.colorScheme.primary,
-                            onClick = { dailyPayText = "150000" }
+    val inputSection: @Composable () -> Unit = {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Card(modifier = Modifier.fillMaxWidth(), insideMargin = PaddingValues(16.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        TextField(
+                            value = dailyPayText,
+                            onValueChange = { dailyPayText = it.filter(Char::isDigit) },
+                            label = "일당/건당 총액",
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextField(
+                            value = bonusText,
+                            onValueChange = { bonusText = it.filter(Char::isDigit) },
+                            label = "현장 지원금(+)",
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
                         )
                     }
-                    item {
-                        SquirclePillBadge(
-                            text = "180,000원",
-                            backgroundColor = MiuixTheme.colorScheme.secondaryContainer,
-                            contentColor = MiuixTheme.colorScheme.onSecondaryContainer,
-                            onClick = { dailyPayText = "180000" }
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        item {
+                            SquirclePillBadge(
+                                text = "150,000원 (비과세 한도)",
+                                backgroundColor = MiuixTheme.colorScheme.primary.copy(alpha = 0.14f),
+                                contentColor = MiuixTheme.colorScheme.primary,
+                                onClick = { dailyPayText = "150000" }
+                            )
+                        }
+                        item {
+                            SquirclePillBadge(
+                                text = "180,000원",
+                                backgroundColor = MiuixTheme.colorScheme.secondaryContainer,
+                                contentColor = MiuixTheme.colorScheme.onSecondaryContainer,
+                                onClick = { dailyPayText = "180000" }
+                            )
+                        }
+                        item {
+                            SquirclePillBadge(
+                                text = "초기화",
+                                backgroundColor = MiuixTheme.colorScheme.surfaceContainerHigh,
+                                contentColor = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                onClick = {
+                                    dailyPayText = "180000"
+                                    bonusText = "0"
+                                    transportText = "3000"
+                                    mealText = "0"
+                                    feeText = "10"
+                                }
+                            )
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        TextField(
+                            value = transportText,
+                            onValueChange = { transportText = it.filter(Char::isDigit) },
+                            label = "교통비(-)",
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextField(
+                            value = mealText,
+                            onValueChange = { mealText = it.filter(Char::isDigit) },
+                            label = "식비(-)",
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
                         )
                     }
-                    item {
-                        SquirclePillBadge(
-                            text = "초기화",
-                            backgroundColor = MiuixTheme.colorScheme.surfaceContainerHigh,
-                            contentColor = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                            onClick = {
-                                dailyPayText = "180000"
-                                bonusText = "0"
-                                transportText = "3000"
-                                mealText = "0"
-                                feeText = "10"
-                            }
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextField(
+                            value = feeText,
+                            onValueChange = { feeText = it },
+                            label = "수수료(-)",
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            singleLine = true,
+                            modifier = Modifier.weight(1.3f)
                         )
-                    }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    TextField(
-                        value = transportText,
-                        onValueChange = { transportText = it.filter(Char::isDigit) },
-                        label = "교통비(-)",
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true,
-                        modifier = Modifier.weight(1f)
-                    )
-                    TextField(
-                        value = mealText,
-                        onValueChange = { mealText = it.filter(Char::isDigit) },
-                        label = "식비(-)",
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true,
-                        modifier = Modifier.weight(1f)
-                    )
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextField(
-                        value = feeText,
-                        onValueChange = { feeText = it },
-                        label = "수수료(-)",
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        singleLine = true,
-                        modifier = Modifier.weight(1.3f)
-                    )
-                    Box(modifier = Modifier.weight(1f)) {
-                        TabRowWithContour(
-                            tabs = FeeType.entries.map { it.label },
-                            selectedTabIndex = FeeType.entries.indexOf(feeType),
-                            onTabSelected = { feeType = FeeType.entries[it] }
-                        )
+                        Box(modifier = Modifier.weight(1f)) {
+                            TabRowWithContour(
+                                tabs = FeeType.entries.map { it.label },
+                                selectedTabIndex = FeeType.entries.indexOf(feeType),
+                                onTabSelected = { feeType = FeeType.entries[it] }
+                            )
+                        }
                     }
                 }
             }
-        }
 
-        Card(modifier = Modifier.fillMaxWidth()) {
-            SwitchPreference(
-                title = "지방소득세 포함 실효 2.97%",
-                summary = "일 15만 원 비과세 공제 초과분(${PayrollCalculator.formatWon(excess)}) × ${if (includeLocalTax) "2.97%" else "2.7%"}",
-                checked = includeLocalTax,
-                onCheckedChange = { includeLocalTax = it }
-            )
+            Card(modifier = Modifier.fillMaxWidth()) {
+                SwitchPreference(
+                    title = "지방소득세 포함 실효 2.97%",
+                    summary = "일 15만 원 비과세 공제 초과분(${PayrollCalculator.formatWon(excess)}) × ${if (includeLocalTax) "2.97%" else "2.7%"}",
+                    checked = includeLocalTax,
+                    onCheckedChange = { includeLocalTax = it }
+                )
+            }
         }
+    }
 
+    val resultSection: @Composable () -> Unit = {
         Card(
             modifier = Modifier.fillMaxWidth(),
             colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.secondaryContainer),
@@ -492,10 +559,12 @@ private fun DailyWorkerNetCalculator() {
             }
         }
     }
+
+    return CalcTabSections(input = inputSection, result = resultSection)
 }
 
 @Composable
-private fun SeveranceCalculator() {
+private fun rememberSeveranceSections(): CalcTabSections {
     var monthlyAvgText by remember { mutableStateOf("2156880") }
     var workedDaysText by remember { mutableStateOf("365") }
     var weeklyAvgHoursText by remember { mutableStateOf("40") }
@@ -505,7 +574,7 @@ private fun SeveranceCalculator() {
     val weeklyHours = weeklyAvgHoursText.toDoubleOrNull() ?: 0.0
     val (eligible, reason, severance) = PayrollCalculator.calculateSeverancePay(monthlyAvg, workedDays, weeklyHours)
 
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    val inputSection: @Composable () -> Unit = {
         Card(modifier = Modifier.fillMaxWidth(), insideMargin = PaddingValues(16.dp)) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 TextField(
@@ -536,7 +605,9 @@ private fun SeveranceCalculator() {
                 }
             }
         }
+    }
 
+    val resultSection: @Composable () -> Unit = {
         val resultContainerColor by animateColorAsState(
             targetValue = if (eligible) MiuixTheme.colorScheme.secondaryContainer else MiuixTheme.colorScheme.errorContainer,
             label = "severance_container"
@@ -567,6 +638,8 @@ private fun SeveranceCalculator() {
             }
         }
     }
+
+    return CalcTabSections(input = inputSection, result = resultSection)
 }
 
 @Composable

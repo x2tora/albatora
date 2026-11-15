@@ -44,6 +44,7 @@ import com.albatora.app.ui.components.MiuixTimePickerDialog
 import com.albatora.app.ui.components.SquirclePillBadge
 import com.albatora.app.ui.components.dayOfWeekKorean
 import com.albatora.app.ui.theme.AlbaIconCatalog
+import com.albatora.app.ui.theme.LocalWideDualLayoutEnabled
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.icon.MiuixIcons
@@ -554,8 +555,12 @@ fun CalendarScreen(
         }
     }
 
+    val wideDualEnabled = LocalWideDualLayoutEnabled.current
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-        if (maxWidth >= 600.dp) {
+        val isWideDual = wideDualEnabled && maxWidth >= 600.dp
+        val singleSidePad = ((maxWidth - 600.dp) / 2f).coerceAtLeast(20.dp)
+
+        if (isWideDual) {
             Row(
                 modifier = Modifier
                     .fillMaxSize()
@@ -589,7 +594,7 @@ fun CalendarScreen(
                     .fillMaxSize()
                     .overScrollVertical()
                     .nestedScroll(scrollBehavior.nestedScrollConnection),
-                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = topInset + 12.dp, bottom = listBottomPadding),
+                contentPadding = PaddingValues(start = singleSidePad, end = singleSidePad, top = topInset + 12.dp, bottom = listBottomPadding),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 leftContent()
