@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.albatora.app.domain.PayrollCalculator
 import com.albatora.app.model.FeeType
@@ -37,6 +38,7 @@ import kotlin.math.roundToLong
 fun CalculatorScreen(
     defaultMinWage: Long,
     scrollBehavior: ScrollBehavior,
+    topInset: Dp = 0.dp,
     onCreateJobWithWage: (Long) -> Unit = {}
 ) {
     var selectedTab by remember { mutableIntStateOf(0) }
@@ -48,7 +50,7 @@ fun CalculatorScreen(
             .fillMaxSize()
             .overScrollVertical()
             .nestedScroll(scrollBehavior.nestedScrollConnection),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 116.dp + navBottomInset),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = topInset + 12.dp, bottom = 116.dp + navBottomInset),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {

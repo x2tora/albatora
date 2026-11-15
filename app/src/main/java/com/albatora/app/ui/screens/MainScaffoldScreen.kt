@@ -60,8 +60,7 @@ import com.albatora.app.model.ThemeColorStyle
 import com.albatora.app.service.BatteryOptimizationHelper
 import com.albatora.app.ui.components.AppUpdateDialog
 import com.albatora.app.ui.components.FloatingLiquidGlassNavBar
-import com.albatora.app.ui.components.LiveStatusDot
-import com.albatora.app.ui.components.OdometerCurrencyText
+import com.albatora.app.ui.components.MiuixFloatingScrollTopBar
 import com.albatora.app.ui.components.SquirclePillBadge
 import com.albatora.app.ui.components.StackedToastHost
 import com.albatora.app.ui.components.StackedToastState
@@ -307,7 +306,7 @@ private fun MainTabsHost(
     var isFullscreenFocus by remember { mutableStateOf(false) }
     var showHomeQuickMenu by remember { mutableStateOf(false) }
     var openStopwatchTrigger by remember { mutableIntStateOf(0) }
-    var homeLiveCollapseProgress by remember { mutableFloatStateOf(0f) }
+    var isHomeScrolled by remember { mutableStateOf(false) }
     var scrollHomeToTopTrigger by remember { mutableIntStateOf(0) }
     var measuredTopBarHeightDp by remember { mutableStateOf(0.dp) }
     val hostContext = LocalContext.current
@@ -353,7 +352,6 @@ private fun MainTabsHost(
     LaunchedEffect(liveDashboard.activeShifts.isEmpty()) {
         if (liveDashboard.activeShifts.isEmpty()) {
             isFullscreenFocus = false
-            homeLiveCollapseProgress = 0f
         }
     }
 
@@ -365,11 +363,10 @@ private fun MainTabsHost(
         PayrollCalculator.calculateGlobalUnpaidSummary(state).second.size
     }
 
-    val scrollBehavior = MiuixScrollBehavior(state = rememberTopAppBarState())
-    val useShader = isRuntimeShaderSupported()
-    val barOverlayColor = MiuixTheme.colorScheme.surface.copy(alpha = if (useShader) 0.72f else 0.96f)
+    val tabScrollBehaviors = List(4) { MiuixScrollBehavior(state = rememberTopAppBarState()) }
+    val activeScrollBehavior = tabScrollBehaviors[selectedTab]
     val showChrome = !(isFullscreenFocus && selectedTab == 0 && liveDashboard.activeShifts.isNotEmpty())
-    val defaultTopBarHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 56.dp
+    val defaultTopBarHeight = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 66.dp
     val resolvedTopBarInset = if (measuredTopBarHeightDp > 0.dp) measuredTopBarHeightDp else defaultTopBarHeight
 
     LaunchedEffect(showChrome) {
@@ -445,7 +442,7 @@ private fun MainTabsHost(
                             0 -> HomeScreen(
                                 state = state,
                                 liveDashboard = liveDashboard,
-                                scrollBehavior = scrollBehavior,
+                                scrollBehavior = tabScrollBehaviors[0],
                                 isFullscreenFocus = isFullscreenFocus,
                                 onToggleFullscreenFocus = { isFullscreenFocus = it },
                                 openStopwatchTrigger = openStopwatchTrigger,
@@ -492,75 +489,72 @@ private fun MainTabsHost(
                                 onOpenWidgetStudio = onOpenWidgetStudio,
                                 topBarInset = resolvedTopBarInset,
                                 scrollToTopTrigger = scrollHomeToTopTrigger,
-                                onLiveHeaderCollapseChange = { homeLiveCollapseProgress = it }
+                                onHomeScrollChange = { isHomeScrolled = it }
                             )
-                            1 -> Box(modifier = Modifier.fillMaxSize().padding(top = resolvedTopBarInset)) {
-                                CalendarScreen(
-                                    state = state,
-                                    selectedDate = calendarSelectedDate,
-                                    onSelectedDateChange = { calendarSelectedDate = it },
-                                    scrollBehavior = scrollBehavior,
-                                    onQuickAddShortTermForDate = { dateIso ->
-                                        onOpenQuickShortTerm(null, dateIso)
-                                    },
-                                    onEditRecord = { rec ->
-                                        if (rec.id.startsWith("cal_") || rec.id.startsWith("virtual_")) {
-                                            val realized = rec.copy(
-                                                id = java.util.UUID.randomUUID().toString(),
-                                                isScheduledOverride = true
-                                            )
-                                            viewModel.upsertRecord(realized)
-                                            onOpenQuickShortTerm(realized.id, realized.date)
-                                        } else {
-                                            onOpenQuickShortTerm(rec.id, rec.date)
-                                        }
-                                    },
-                                    onTogglePaymentStatus = viewModel::togglePaymentStatus,
-                                    onExtendOneHour = viewModel::extendOneHour,
-                                    onMarkEarlyLeave = { viewModel.markEarlyLeave(it, 60) },
-                                    onMarkAbsent = viewModel::markAbsent,
-                                    onAddSubstituteFromJob = viewModel::addSubstituteFromJob,
-                                    onStampTemplateOnDate = viewModel::stampTemplateOnDate,
-                                    onNotify = notify
-                                )
-                            }
-                            2 -> Box(modifier = Modifier.fillMaxSize().padding(top = resolvedTopBarInset)) {
-                                RecordsScreen(
-                                    state = state,
-                                    initialOnlyUnpaid = recordsOpenUnpaid,
-                                    scrollBehavior = scrollBehavior,
-                                    onEditRecord = { rec ->
-                                        if (rec.isScheduledOverride || !rec.id.startsWith("virtual_")) {
-                                            onOpenQuickShortTerm(rec.id, rec.date)
-                                        } else {
-                                            val realized = rec.copy(
-                                                id = java.util.UUID.randomUUID().toString(),
-                                                isScheduledOverride = true
-                                            )
-                                            viewModel.upsertRecord(realized)
-                                            onOpenQuickShortTerm(realized.id, realized.date)
-                                        }
-                                    },
-                                    onTogglePaymentStatus = viewModel::togglePaymentStatus,
-                                    onAddShortTerm = {
-                                        onOpenQuickShortTerm(null, PayrollCalculator.formatDate(LocalDate.now()))
-                                    },
-                                    onNotify = notify
-                                )
-                            }
-                            else -> Box(modifier = Modifier.fillMaxSize().padding(top = resolvedTopBarInset)) {
-                                CalculatorScreen(
-                                    defaultMinWage = state.settings.defaultMinWage,
-                                    scrollBehavior = scrollBehavior,
-                                    onCreateJobWithWage = { wage -> onOpenAddRegularJob(null, wage) }
-                                )
-                            }
+                            1 -> CalendarScreen(
+                                state = state,
+                                selectedDate = calendarSelectedDate,
+                                onSelectedDateChange = { calendarSelectedDate = it },
+                                scrollBehavior = tabScrollBehaviors[1],
+                                topInset = resolvedTopBarInset,
+                                onQuickAddShortTermForDate = { dateIso ->
+                                    onOpenQuickShortTerm(null, dateIso)
+                                },
+                                onEditRecord = { rec ->
+                                    if (rec.id.startsWith("cal_") || rec.id.startsWith("virtual_")) {
+                                        val realized = rec.copy(
+                                            id = java.util.UUID.randomUUID().toString(),
+                                            isScheduledOverride = true
+                                        )
+                                        viewModel.upsertRecord(realized)
+                                        onOpenQuickShortTerm(realized.id, realized.date)
+                                    } else {
+                                        onOpenQuickShortTerm(rec.id, rec.date)
+                                    }
+                                },
+                                onTogglePaymentStatus = viewModel::togglePaymentStatus,
+                                onExtendOneHour = viewModel::extendOneHour,
+                                onMarkEarlyLeave = { viewModel.markEarlyLeave(it, 60) },
+                                onMarkAbsent = viewModel::markAbsent,
+                                onAddSubstituteFromJob = viewModel::addSubstituteFromJob,
+                                onStampTemplateOnDate = viewModel::stampTemplateOnDate,
+                                onNotify = notify
+                            )
+                            2 -> RecordsScreen(
+                                state = state,
+                                initialOnlyUnpaid = recordsOpenUnpaid,
+                                scrollBehavior = tabScrollBehaviors[2],
+                                topInset = resolvedTopBarInset,
+                                onEditRecord = { rec ->
+                                    if (rec.isScheduledOverride || !rec.id.startsWith("virtual_")) {
+                                        onOpenQuickShortTerm(rec.id, rec.date)
+                                    } else {
+                                        val realized = rec.copy(
+                                            id = java.util.UUID.randomUUID().toString(),
+                                            isScheduledOverride = true
+                                        )
+                                        viewModel.upsertRecord(realized)
+                                        onOpenQuickShortTerm(realized.id, realized.date)
+                                    }
+                                },
+                                onTogglePaymentStatus = viewModel::togglePaymentStatus,
+                                onAddShortTerm = {
+                                    onOpenQuickShortTerm(null, PayrollCalculator.formatDate(LocalDate.now()))
+                                },
+                                onNotify = notify
+                            )
+                            else -> CalculatorScreen(
+                                defaultMinWage = state.settings.defaultMinWage,
+                                scrollBehavior = tabScrollBehaviors[3],
+                                topInset = resolvedTopBarInset,
+                                onCreateJobWithWage = { wage -> onOpenAddRegularJob(null, wage) }
+                            )
                         }
                     }
                 }
             }
 
-            // ② Floating frosted top bar with smooth collapsing live earnings header ticker
+            // ② Floating scroll-responsive top bar (background slides down cleanly when content scrolls)
             AnimatedVisibility(
                 visible = showChrome,
                 enter = slideInVertically(
@@ -580,57 +574,21 @@ private fun MainTabsHost(
                         }
                     }
             ) {
-                val topBlurMod = if (useShader) {
-                    Modifier.progressiveTextureBlur(
-                        backdrop = barBackdrop,
-                        shape = RectangleShape,
-                        blurRadius = 16f,
-                        gradient = ProgressiveBlur.Top,
-                        colors = BlurDefaults.blurColors(
-                            blendColors = listOf(BlendColorEntry(barOverlayColor, BlurBlendMode.SrcOver))
-                        )
-                    )
-                } else {
-                    Modifier.background(barOverlayColor)
-                }
-                val showLiveHeader = selectedTab == 0 && liveDashboard.activeShifts.isNotEmpty()
-                val liveTickerProgress by animateFloatAsState(
-                    targetValue = if (showLiveHeader && !isFullscreenFocus) homeLiveCollapseProgress else 0f,
-                    animationSpec = spring(dampingRatio = 0.90f, stiffness = Spring.StiffnessMedium),
-                    label = "top_header_live_ticker"
-                )
-                val titleAlpha = if (showLiveHeader) (1f - liveTickerProgress * 1.55f).coerceIn(0f, 1f) else 1f
-
-                Box(modifier = topBlurMod) {
-                    SmallTopAppBar(
-                        title = tabTitles[selectedTab],
-                        titleColor = MiuixTheme.colorScheme.onSurface.copy(alpha = titleAlpha),
-                        color = Color.Transparent,
-                        scrollBehavior = scrollBehavior,
-                        actions = {
-                            IconButton(onClick = onOpenSettings) {
-                                Icon(
-                                    imageVector = MiuixIcons.Regular.Settings,
-                                    contentDescription = "더보기 및 설정",
-                                    tint = MiuixTheme.colorScheme.onSurface
-                                )
-                            }
+                MiuixFloatingScrollTopBar(
+                    title = tabTitles[selectedTab],
+                    scrollBehavior = activeScrollBehavior,
+                    isScrolledOverride = if (selectedTab == 0) isHomeScrolled else null,
+                    backdrop = barBackdrop,
+                    actions = {
+                        IconButton(onClick = onOpenSettings) {
+                            Icon(
+                                imageVector = MiuixIcons.Regular.Settings,
+                                contentDescription = "더보기 및 설정",
+                                tint = MiuixTheme.colorScheme.onSurface
+                            )
                         }
-                    )
-
-                    if (showLiveHeader && liveTickerProgress > 0.02f) {
-                        PinnedHeaderLiveTicker(
-                            snapshot = liveDashboard,
-                            progress = liveTickerProgress,
-                            onScrollToTop = { scrollHomeToTopTrigger++ },
-                            onOpenFullscreen = { isFullscreenFocus = true },
-                            modifier = Modifier
-                                .matchParentSize()
-                                .statusBarsPadding()
-                                .padding(start = 16.dp, end = 60.dp)
-                        )
                     }
-                }
+                )
             }
 
             // ③ Quick-add dim scrim positioned BELOW the navigation dock so the lens on '+' stays crisp & lit
@@ -925,14 +883,18 @@ private fun SettingsScreenHost(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val updateUiState by viewModel.updateUiState.collectAsStateWithLifecycle()
     val scrollBehavior = MiuixScrollBehavior(state = rememberTopAppBarState())
+    val settingsBackdrop = rememberLayerBackdrop()
+    val surfaceBg = MiuixTheme.colorScheme.surface
     val notify: (String) -> Unit = { msg -> toastState.show(msg) }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
+        containerColor = Color.Transparent,
         topBar = {
-            SmallTopAppBar(
+            MiuixFloatingScrollTopBar(
                 title = "더보기 · 설정",
                 scrollBehavior = scrollBehavior,
+                backdrop = settingsBackdrop,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -944,30 +906,34 @@ private fun SettingsScreenHost(
             )
         }
     ) { paddingValues ->
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(top = paddingValues.calculateTopPadding())
-        ) {
-            MoreSettingsScreen(
-                state = state,
-                scrollBehavior = scrollBehavior,
-                updateUiState = updateUiState,
-                onUpdateTheme = viewModel::updateTheme,
-                onUpdateThemeColorStyle = viewModel::updateThemeColorStyle,
-                onUpdateNavBarStyle = viewModel::updateNavBarStyle,
-                onUpdateCustomKeyColor = viewModel::updateCustomKeyColor,
-                onUpdateOngoingNotification = viewModel::updateOngoingNotification,
-                onUpdateAutoDnd = viewModel::updateAutoDnd,
-                onUpdateDefaultMinWage = viewModel::updateDefaultMinWage,
-                onDeleteTemplate = viewModel::deleteTemplate,
-                onExportJson = viewModel::exportBackupJson,
-                onImportJson = viewModel::importBackupJson,
-                onResetAllData = viewModel::resetAllData,
-                onCheckForUpdate = { viewModel.checkForUpdate(manual = true, onFeedback = notify) },
-                onOpenWidgetStudio = onOpenWidgetStudio,
-                onNotify = notify
-            )
+        Box(modifier = Modifier.fillMaxSize()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .layerBackdrop(settingsBackdrop)
+                    .background(surfaceBg)
+            ) {
+                MoreSettingsScreen(
+                    state = state,
+                    scrollBehavior = scrollBehavior,
+                    topInset = paddingValues.calculateTopPadding(),
+                    updateUiState = updateUiState,
+                    onUpdateTheme = viewModel::updateTheme,
+                    onUpdateThemeColorStyle = viewModel::updateThemeColorStyle,
+                    onUpdateNavBarStyle = viewModel::updateNavBarStyle,
+                    onUpdateCustomKeyColor = viewModel::updateCustomKeyColor,
+                    onUpdateOngoingNotification = viewModel::updateOngoingNotification,
+                    onUpdateAutoDnd = viewModel::updateAutoDnd,
+                    onUpdateDefaultMinWage = viewModel::updateDefaultMinWage,
+                    onDeleteTemplate = viewModel::deleteTemplate,
+                    onExportJson = viewModel::exportBackupJson,
+                    onImportJson = viewModel::importBackupJson,
+                    onResetAllData = viewModel::resetAllData,
+                    onCheckForUpdate = { viewModel.checkForUpdate(manual = true, onFeedback = notify) },
+                    onOpenWidgetStudio = onOpenWidgetStudio,
+                    onNotify = notify
+                )
+            }
 
             StackedToastHost(
                 state = toastState,
@@ -985,112 +951,6 @@ private fun SettingsScreenHost(
                 onStartDownload = viewModel::startUpdateDownloadAndInstall,
                 onRetryInstall = viewModel::retryApkInstall,
                 onOpenPermissionSettings = viewModel::openInstallUnknownSourcesSettings
-            )
-        }
-    }
-}
-
-@Composable
-private fun PinnedHeaderLiveTicker(
-    snapshot: LiveDashboardSnapshot,
-    progress: Float,
-    onScrollToTop: () -> Unit,
-    onOpenFullscreen: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val p = progress.coerceIn(0f, 1f)
-    val density = LocalDensity.current
-    val primaryShift = snapshot.activeShifts.firstOrNull() ?: return
-    val allPaused = snapshot.activeShifts.all { it.isPaused }
-    val statusColor = if (allPaused) {
-        MiuixTheme.colorScheme.onSurfaceVariantActions
-    } else {
-        MiuixTheme.colorScheme.primary
-    }
-    val shiftLabel = if (snapshot.activeShifts.size > 1) {
-        "${primaryShift.title} 외 ${snapshot.activeShifts.size - 1}건"
-    } else {
-        primaryShift.title
-    }
-    val elapsedText = PayrollCalculator.formatCountdown(primaryShift.elapsedWorkMillis)
-
-    Row(
-        modifier = modifier
-            .fillMaxHeight()
-            .graphicsLayer {
-                alpha = p
-                translationY = (1f - p) * with(density) { 10.dp.toPx() }
-                scaleX = lerpFloat(0.95f, 1f, p)
-                scaleY = lerpFloat(0.95f, 1f, p)
-            }
-            .clickable(
-                interactionSource = null,
-                indication = null,
-                onClick = onScrollToTop
-            ),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .weight(1f)
-                .squircleBackground(
-                    color = MiuixTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.88f),
-                    cornerRadius = 15.dp
-                )
-                .squircleBorder(
-                    width = 1.dp,
-                    color = statusColor.copy(alpha = 0.24f),
-                    cornerRadius = 15.dp
-                )
-                .padding(horizontal = 11.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            LiveStatusDot(
-                color = statusColor,
-                size = 8.dp
-            )
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(1.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text(
-                        text = shiftLabel,
-                        style = MiuixTheme.textStyles.footnote1.copy(fontWeight = FontWeight.SemiBold),
-                        color = MiuixTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false)
-                    )
-                    Text(
-                        text = if (allPaused) "휴게 · $elapsedText" else elapsedText,
-                        style = MiuixTheme.textStyles.footnote2.copy(
-                            fontSize = 10.5.sp,
-                            fontFeatureSettings = "tnum"
-                        ),
-                        color = statusColor,
-                        maxLines = 1
-                    )
-                }
-                OdometerCurrencyText(
-                    amountWon = snapshot.totalEarnedWon,
-                    textStyle = MiuixTheme.textStyles.subtitle.copy(
-                        fontSize = 15.5.sp,
-                        fontWeight = FontWeight.ExtraBold
-                    ),
-                    color = MiuixTheme.colorScheme.onSurface
-                )
-            }
-            SquirclePillBadge(
-                text = "전체",
-                backgroundColor = statusColor.copy(alpha = 0.14f),
-                contentColor = statusColor,
-                onClick = onOpenFullscreen
             )
         }
     }

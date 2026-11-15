@@ -1,5 +1,6 @@
 package com.albatora.app.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -25,10 +26,13 @@ import com.albatora.app.model.*
 import com.albatora.app.ui.components.ConfirmActionDialog
 import com.albatora.app.ui.components.EmojiAndColorIdentityRow
 import com.albatora.app.ui.components.MiuixDatePickerDialog
+import com.albatora.app.ui.components.MiuixFloatingScrollTopBar
 import com.albatora.app.ui.components.MiuixTimePickerDialog
 import com.albatora.app.ui.components.SquirclePillBadge
 import com.albatora.app.ui.theme.AlbaIconCatalog
 import top.yukonga.miuix.kmp.basic.*
+import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.AddCircle
 import top.yukonga.miuix.kmp.icon.extended.Back
@@ -145,6 +149,11 @@ fun QuickAddShortTermScreen(
     )
     val preview = PayrollCalculator.calculateShiftFinancials(previewRecord)
     val scrollBehavior = MiuixScrollBehavior(state = rememberTopAppBarState())
+    val surfaceBg = MiuixTheme.colorScheme.surface
+    val barBackdrop = rememberLayerBackdrop {
+        drawRect(surfaceBg)
+        drawContent()
+    }
 
     fun handleSubmit() {
         val cleanTitle = title.trim()
@@ -227,9 +236,10 @@ fun QuickAddShortTermScreen(
 
     Scaffold(
         topBar = {
-            SmallTopAppBar(
+            MiuixFloatingScrollTopBar(
                 title = if (isEditing) "근무 내역 수정" else "단기/일용직 10초 퀵 등록",
                 scrollBehavior = scrollBehavior,
+                backdrop = barBackdrop,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(MiuixIcons.Back, contentDescription = "뒤로가기")
@@ -259,10 +269,16 @@ fun QuickAddShortTermScreen(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .layerBackdrop(barBackdrop)
+                .background(surfaceBg)
                 .overScrollVertical()
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                end = 16.dp,
+                top = paddingValues.calculateTopPadding() + 12.dp,
+                bottom = paddingValues.calculateBottomPadding() + 24.dp
+            ),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item(key = "error_banner") {

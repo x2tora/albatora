@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.albatora.app.domain.CalendarDayScheduleItem
 import com.albatora.app.domain.PayrollCalculator
@@ -60,6 +61,7 @@ fun CalendarScreen(
     selectedDate: LocalDate,
     onSelectedDateChange: (LocalDate) -> Unit,
     scrollBehavior: ScrollBehavior,
+    topInset: Dp = 0.dp,
     onQuickAddShortTermForDate: (String) -> Unit,
     onEditRecord: (WorkRecord) -> Unit,
     onTogglePaymentStatus: (String) -> Unit,
@@ -511,7 +513,7 @@ fun CalendarScreen(
                         .fillMaxHeight()
                         .overScrollVertical()
                         .nestedScroll(scrollBehavior.nestedScrollConnection),
-                    contentPadding = PaddingValues(top = 12.dp, bottom = listBottomPadding),
+                    contentPadding = PaddingValues(top = topInset + 12.dp, bottom = listBottomPadding),
                     verticalArrangement = Arrangement.spacedBy(16.dp),
                     content = leftContent
                 )
@@ -521,7 +523,7 @@ fun CalendarScreen(
                         .fillMaxHeight()
                         .overScrollVertical()
                         .nestedScroll(scrollBehavior.nestedScrollConnection),
-                    contentPadding = PaddingValues(top = 12.dp, bottom = listBottomPadding),
+                    contentPadding = PaddingValues(top = topInset + 12.dp, bottom = listBottomPadding),
                     verticalArrangement = Arrangement.spacedBy(14.dp),
                     content = rightContent
                 )
@@ -532,7 +534,7 @@ fun CalendarScreen(
                     .fillMaxSize()
                     .overScrollVertical()
                     .nestedScroll(scrollBehavior.nestedScrollConnection),
-                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = listBottomPadding),
+                contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = topInset + 12.dp, bottom = listBottomPadding),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 leftContent()

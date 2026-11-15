@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.albatora.app.model.*
 import com.albatora.app.ui.components.MiuixColorPickerDialog
+import com.albatora.app.ui.components.MiuixFloatingScrollTopBar
 import com.albatora.app.ui.components.MiuixGlassIcon
 import com.albatora.app.ui.components.SquirclePillBadge
 import com.albatora.app.ui.components.formatRgbHex
@@ -49,6 +50,8 @@ import com.albatora.app.widget.LiveEarningsWidgetProvider
 import com.albatora.app.widget.MonthlySummaryWidgetProvider
 import com.albatora.app.widget.WeeklyScheduleWidgetProvider
 import top.yukonga.miuix.kmp.basic.*
+import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.AddCircle
 import top.yukonga.miuix.kmp.icon.extended.Back
@@ -112,11 +115,18 @@ fun WidgetStudioScreen(
     }
     val previewOnAccent = if (previewAccent.luminance() > 0.62f) Color(0xFF111827) else Color.White
 
+    val surfaceBg = MiuixTheme.colorScheme.surface
+    val barBackdrop = rememberLayerBackdrop {
+        drawRect(surfaceBg)
+        drawContent()
+    }
+
     Scaffold(
         topBar = {
-            SmallTopAppBar(
+            MiuixFloatingScrollTopBar(
                 title = "바탕화면 위젯 꾸미기",
                 scrollBehavior = scrollBehavior,
+                backdrop = barBackdrop,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(MiuixIcons.Back, contentDescription = "뒤로가기")
@@ -137,6 +147,8 @@ fun WidgetStudioScreen(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
+                .layerBackdrop(barBackdrop)
+                .background(surfaceBg)
                 .nestedScroll(scrollBehavior.nestedScrollConnection)
                 .overScrollVertical(),
             contentPadding = PaddingValues(

@@ -25,6 +25,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.albatora.app.BuildConfig
 import com.albatora.app.domain.PayrollCalculator
@@ -65,7 +66,8 @@ fun MoreSettingsScreen(
     onResetAllData: () -> Unit,
     onCheckForUpdate: () -> Unit,
     onOpenWidgetStudio: () -> Unit,
-    onNotify: (String) -> Unit
+    onNotify: (String) -> Unit,
+    topInset: Dp = 0.dp
 ) {
     val context = LocalContext.current
     @Suppress("DEPRECATION")
@@ -137,7 +139,7 @@ fun MoreSettingsScreen(
             .fillMaxSize()
             .overScrollVertical()
             .nestedScroll(scrollBehavior.nestedScrollConnection),
-        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 110.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = topInset + 8.dp, bottom = 110.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {

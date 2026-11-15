@@ -29,11 +29,14 @@ import com.albatora.app.model.*
 import com.albatora.app.ui.components.ConfirmActionDialog
 import com.albatora.app.ui.components.EmojiAndColorIdentityRow
 import com.albatora.app.ui.components.MiuixDatePickerDialog
+import com.albatora.app.ui.components.MiuixFloatingScrollTopBar
 import com.albatora.app.ui.components.MiuixTimePickerDialog
 import com.albatora.app.ui.components.SquirclePillBadge
 import com.albatora.app.ui.components.dayOfWeekKorean
 import com.albatora.app.ui.theme.JobAccentPalette
 import top.yukonga.miuix.kmp.basic.*
+import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Add
 import top.yukonga.miuix.kmp.icon.extended.Back
@@ -113,12 +116,18 @@ fun AddEditRegularJobScreen(
     var errorMsg by remember { mutableStateOf<String?>(null) }
 
     val scrollBehavior = MiuixScrollBehavior(state = rememberTopAppBarState())
+    val surfaceBg = MiuixTheme.colorScheme.surface
+    val barBackdrop = rememberLayerBackdrop {
+        drawRect(surfaceBg)
+        drawContent()
+    }
 
     Scaffold(
         topBar = {
-            SmallTopAppBar(
+            MiuixFloatingScrollTopBar(
                 title = if (isEditing) "정규 알바 수정" else "정규/고정 알바 추가",
                 scrollBehavior = scrollBehavior,
+                backdrop = barBackdrop,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -205,10 +214,16 @@ fun AddEditRegularJobScreen(
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(paddingValues)
+                .layerBackdrop(barBackdrop)
+                .background(surfaceBg)
                 .overScrollVertical()
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+            contentPadding = PaddingValues(
+                start = 16.dp,
+                end = 16.dp,
+                top = paddingValues.calculateTopPadding() + 12.dp,
+                bottom = paddingValues.calculateBottomPadding() + 24.dp
+            ),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item(key = "error_banner") {

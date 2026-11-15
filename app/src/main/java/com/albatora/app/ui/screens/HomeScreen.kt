@@ -15,28 +15,54 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.scrollable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.input.pointer.util.VelocityTracker
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.util.lerp
+import kotlin.math.abs
+import kotlin.math.roundToInt
+import kotlinx.coroutines.launch
 import com.albatora.app.domain.*
 import com.albatora.app.model.*
 import com.albatora.app.ui.components.*
@@ -101,7 +127,8 @@ fun HomeScreen(
     onOpenWidgetStudio: () -> Unit = {},
     topBarInset: Dp = 0.dp,
     scrollToTopTrigger: Int = 0,
-    onLiveHeaderCollapseChange: (Float) -> Unit = {}
+    onLiveHeaderCollapseChange: (Float) -> Unit = {},
+    onHomeScrollChange: (Boolean) -> Unit = {}
 ) {
     val isDark = LocalIsDarkTheme.current
     val currentMonth = remember { YearMonth.now() }
@@ -163,68 +190,69 @@ fun HomeScreen(
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val isWide = maxWidth >= 600.dp
+        val density = LocalDensity.current
+        val haptic = LocalHapticFeedback.current
+        val coroutineScope = rememberCoroutineScope()
         val navBottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
         val bottomPad = 116.dp + navBottomInset
         val phoneListState = rememberLazyListState()
         val wideLeftListState = rememberLazyListState()
+        val wideRightListState = rememberLazyListState()
         val activeListState = if (isWide) wideLeftListState else phoneListState
+
+        var expandedHeroHeightDp by remember { mutableStateOf(416.dp) }
+        val collapseRangePx = with(density) { 210.dp.toPx() }.coerceAtLeast(1f)
 
         LaunchedEffect(scrollToTopTrigger) {
             if (scrollToTopTrigger > 0) {
                 activeListState.animateScrollToItem(0)
+                scrollBehavior.state.contentOffset = 0f
             }
         }
 
-        val rawCollapseFraction by remember(liveDashboard.activeShifts.isNotEmpty(), activeListState) {
+        val rawCollapseFraction by remember(liveDashboard.activeShifts.isNotEmpty(), activeListState, collapseRangePx) {
             derivedStateOf {
                 if (liveDashboard.activeShifts.isEmpty()) {
                     0f
                 } else if (activeListState.firstVisibleItemIndex > 0) {
                     1f
                 } else {
-                    val firstItem = activeListState.layoutInfo.visibleItemsInfo.firstOrNull()
-                    val itemHeight = (firstItem?.size ?: 1).coerceAtLeast(1).toFloat()
-                    val startPx = itemHeight * 0.22f
-                    val endPx = itemHeight * 0.68f
-                    ((activeListState.firstVisibleItemScrollOffset - startPx) / (endPx - startPx).coerceAtLeast(1f))
-                        .coerceIn(0f, 1f)
+                    (activeListState.firstVisibleItemScrollOffset / collapseRangePx).coerceIn(0f, 1f)
                 }
+            }
+        }
+        val isHomeScrolled by remember(activeListState, wideRightListState, isWide) {
+            derivedStateOf {
+                val mainScrolled = activeListState.firstVisibleItemIndex > 0 ||
+                    activeListState.firstVisibleItemScrollOffset > 12
+                val sideScrolled = isWide && (
+                    wideRightListState.firstVisibleItemIndex > 0 ||
+                        wideRightListState.firstVisibleItemScrollOffset > 12
+                    )
+                mainScrolled || sideScrolled
             }
         }
 
         LaunchedEffect(rawCollapseFraction) {
             onLiveHeaderCollapseChange(rawCollapseFraction)
         }
+        LaunchedEffect(isHomeScrolled) {
+            onHomeScrollChange(isHomeScrolled)
+        }
         DisposableEffect(Unit) {
-            onDispose { onLiveHeaderCollapseChange(0f) }
+            onDispose {
+                onLiveHeaderCollapseChange(0f)
+                onHomeScrollChange(false)
+            }
         }
 
         val focusSection: androidx.compose.foundation.lazy.LazyListScope.() -> Unit = {
             if (liveDashboard.activeShifts.isNotEmpty()) {
-                item(key = "live_focus_stage") {
-                    val cardScrollScale = 1f - 0.12f * rawCollapseFraction
-                    val cardScrollAlpha = (1f - rawCollapseFraction * 0.95f).coerceIn(0.12f, 1f)
-                    FocusTimerStage(
-                        snapshot = liveDashboard,
-                        selectedTab = selectedLiveTab,
-                        onSelectTab = { selectedLiveTab = it },
-                        selectedTangible = selectedTangible,
-                        allTangibles = state.tangibleItems,
-                        onSelectTangible = onSelectTangibleItem,
-                        onManageTangibles = { showTangibleManager = true },
-                        onToggleBreak = onToggleBreak,
-                        onClockOut = onClockOut,
-                        isFullscreen = false,
-                        onToggleFullscreen = { onToggleFullscreenFocus(true) },
+                item(key = "live_focus_stage_spacer") {
+                    Spacer(
                         modifier = Modifier
-                            .animateItem()
-                            .heightIn(min = 380.dp, max = 490.dp)
-                            .graphicsLayer {
-                                scaleX = cardScrollScale
-                                scaleY = cardScrollScale
-                                transformOrigin = TransformOrigin(0.5f, 0.08f)
-                                alpha = cardScrollAlpha
-                            }
+                            .fillMaxWidth()
+                            .height(expandedHeroHeightDp)
                     )
                 }
             } else if (completelyEmpty) {
@@ -768,18 +796,51 @@ fun HomeScreen(
                     .padding(horizontal = 20.dp),
                 horizontalArrangement = Arrangement.spacedBy(20.dp)
             ) {
-                LazyColumn(
-                    state = wideLeftListState,
+                Box(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight()
-                        .overScrollVertical()
-                        .nestedScroll(scrollBehavior.nestedScrollConnection),
-                    contentPadding = PaddingValues(top = topBarInset + 12.dp, bottom = bottomPad),
-                    verticalArrangement = Arrangement.spacedBy(18.dp),
-                    content = focusSection
-                )
+                ) {
+                    LazyColumn(
+                        state = wideLeftListState,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .overScrollVertical()
+                            .nestedScroll(scrollBehavior.nestedScrollConnection),
+                        contentPadding = PaddingValues(top = topBarInset + 12.dp, bottom = bottomPad),
+                        verticalArrangement = Arrangement.spacedBy(18.dp),
+                        content = focusSection
+                    )
+                    if (liveDashboard.activeShifts.isNotEmpty() && !isFullscreenFocus) {
+                        HomeFloatingLiveStage(
+                            snapshot = liveDashboard,
+                            selectedTab = selectedLiveTab,
+                            onSelectTab = { selectedLiveTab = it },
+                            selectedTangible = selectedTangible,
+                            allTangibles = state.tangibleItems,
+                            onSelectTangible = onSelectTangibleItem,
+                            onManageTangibles = { showTangibleManager = true },
+                            onToggleBreak = onToggleBreak,
+                            onClockOut = onClockOut,
+                            listState = activeListState,
+                            scrollBehavior = scrollBehavior,
+                            collapseFraction = rawCollapseFraction,
+                            topBarInset = topBarInset,
+                            horizontalBasePadding = 0.dp,
+                            horizontalDockedPadding = 0.dp,
+                            onMeasureExpandedHeightDp = { h -> expandedHeroHeightDp = h },
+                            onScrollToTop = {
+                                coroutineScope.launch {
+                                    activeListState.animateScrollToItem(0)
+                                    scrollBehavior.state.contentOffset = 0f
+                                }
+                            },
+                            onOpenFullscreen = { onToggleFullscreenFocus(true) }
+                        )
+                    }
+                }
                 LazyColumn(
+                    state = wideRightListState,
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight()
@@ -791,26 +852,56 @@ fun HomeScreen(
                 )
             }
         } else {
-            LazyColumn(
-                state = phoneListState,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .overScrollVertical()
-                    .nestedScroll(scrollBehavior.nestedScrollConnection),
-                contentPadding = PaddingValues(
-                    start = 20.dp,
-                    end = 20.dp,
-                    top = topBarInset + 12.dp,
-                    bottom = bottomPad
-                ),
-                verticalArrangement = Arrangement.spacedBy(20.dp)
-            ) {
-                focusSection()
-                hubAndDetailsSection()
+            Box(modifier = Modifier.fillMaxSize()) {
+                LazyColumn(
+                    state = phoneListState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .overScrollVertical()
+                        .nestedScroll(scrollBehavior.nestedScrollConnection),
+                    contentPadding = PaddingValues(
+                        start = 20.dp,
+                        end = 20.dp,
+                        top = topBarInset + 12.dp,
+                        bottom = bottomPad
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                ) {
+                    focusSection()
+                    hubAndDetailsSection()
+                }
+
+                if (liveDashboard.activeShifts.isNotEmpty() && !isFullscreenFocus) {
+                    HomeFloatingLiveStage(
+                        snapshot = liveDashboard,
+                        selectedTab = selectedLiveTab,
+                        onSelectTab = { selectedLiveTab = it },
+                        selectedTangible = selectedTangible,
+                        allTangibles = state.tangibleItems,
+                        onSelectTangible = onSelectTangibleItem,
+                        onManageTangibles = { showTangibleManager = true },
+                        onToggleBreak = onToggleBreak,
+                        onClockOut = onClockOut,
+                        listState = activeListState,
+                        scrollBehavior = scrollBehavior,
+                        collapseFraction = rawCollapseFraction,
+                        topBarInset = topBarInset,
+                        horizontalBasePadding = 20.dp,
+                        horizontalDockedPadding = 12.dp,
+                        onMeasureExpandedHeightDp = { h -> expandedHeroHeightDp = h },
+                        onScrollToTop = {
+                            coroutineScope.launch {
+                                activeListState.animateScrollToItem(0)
+                                scrollBehavior.state.contentOffset = 0f
+                            }
+                        },
+                        onOpenFullscreen = { onToggleFullscreenFocus(true) }
+                    )
+                }
             }
         }
 
-        // Smooth animated Fullscreen focus mode overlay
+        // Smooth animated Fullscreen focus mode overlay with interactive pull-down-to-collapse gesture
         AnimatedVisibility(
             visible = isFullscreenFocus && liveDashboard.activeShifts.isNotEmpty(),
             enter = fadeIn(tween(260, easing = FastOutSlowInEasing)) +
@@ -832,28 +923,154 @@ fun HomeScreen(
                     )
                 )
         ) {
+            var fsDragY by remember { mutableFloatStateOf(0f) }
+            var isFsDragging by remember { mutableStateOf(false) }
+            var fsHapticFired by remember { mutableStateOf(false) }
+            val dismissThresholdPx = with(density) { 108.dp.toPx() }
+
+            LaunchedEffect(isFullscreenFocus) {
+                if (!isFullscreenFocus) {
+                    fsDragY = 0f
+                    isFsDragging = false
+                    fsHapticFired = false
+                }
+            }
+
+            val animatedFsDragY by animateFloatAsState(
+                targetValue = if (isFsDragging) fsDragY else 0f,
+                animationSpec = spring(
+                    dampingRatio = 0.85f,
+                    stiffness = Spring.StiffnessMediumLow
+                ),
+                label = "fullscreen_drag_y"
+            )
+            val activeFsDrag = if (isFsDragging) fsDragY else animatedFsDragY
+            val dismissProgress = (activeFsDrag / dismissThresholdPx).coerceIn(0f, 1.35f)
+            val scrimAlpha = (1f - dismissProgress * 0.42f).coerceIn(0.35f, 1f)
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .squircleBackground(MiuixTheme.colorScheme.surface, 0.dp)
-                    .clickable(enabled = true, onClick = {})
+                    .background(MiuixTheme.colorScheme.surface.copy(alpha = scrimAlpha))
+                    .pointerInput(Unit) {
+                        val slop = viewConfiguration.touchSlop
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            val tracker = VelocityTracker()
+                            tracker.addPosition(down.uptimeMillis, down.position)
+                            var totalDx = 0f
+                            var totalDy = 0f
+                            var draggingDown = false
+                            fsHapticFired = false
+
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                val change = event.changes.firstOrNull { it.id == down.id }
+                                    ?: event.changes.firstOrNull()
+                                    ?: break
+                                if (!change.pressed) {
+                                    break
+                                }
+                                val delta = change.positionChange()
+                                totalDx += delta.x
+                                totalDy += delta.y
+                                tracker.addPosition(change.uptimeMillis, change.position)
+
+                                if (!draggingDown) {
+                                    if (totalDy > slop && totalDy > abs(totalDx)) {
+                                        draggingDown = true
+                                        isFsDragging = true
+                                    } else if (abs(totalDx) > slop && abs(totalDx) > abs(totalDy)) {
+                                        break
+                                    } else if (totalDy < -slop) {
+                                        break
+                                    }
+                                }
+
+                                if (draggingDown) {
+                                    change.consume()
+                                    val nextY = totalDy.coerceAtLeast(0f)
+                                    fsDragY = nextY
+                                    if (!fsHapticFired && nextY >= dismissThresholdPx) {
+                                        fsHapticFired = true
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    }
+                                }
+                            }
+
+                            if (draggingDown) {
+                                val vy = tracker.calculateVelocity().y
+                                val shouldCollapse = fsDragY >= dismissThresholdPx || (fsDragY > 36f && vy > 650f)
+                                isFsDragging = false
+                                if (shouldCollapse) {
+                                    fsDragY = 0f
+                                    onToggleFullscreenFocus(false)
+                                } else {
+                                    fsDragY = 0f
+                                }
+                            }
+                        }
+                    }
                     .systemBarsPadding()
                     .padding(16.dp)
             ) {
-                FocusTimerStage(
-                    snapshot = liveDashboard,
-                    selectedTab = selectedLiveTab,
-                    onSelectTab = { selectedLiveTab = it },
-                    selectedTangible = selectedTangible,
-                    allTangibles = state.tangibleItems,
-                    onSelectTangible = onSelectTangibleItem,
-                    onManageTangibles = { showTangibleManager = true },
-                    onToggleBreak = onToggleBreak,
-                    onClockOut = onClockOut,
-                    isFullscreen = true,
-                    onToggleFullscreen = { onToggleFullscreenFocus(false) },
-                    modifier = Modifier.fillMaxSize()
-                )
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            translationY = activeFsDrag * 0.88f
+                            val scale = 1f - 0.10f * dismissProgress.coerceIn(0f, 1f)
+                            scaleX = scale
+                            scaleY = scale
+                            transformOrigin = TransformOrigin(0.5f, 0.25f)
+                        },
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Intuitive pull-down cue at top of fullscreen focus mode
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.padding(bottom = 10.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .width(38.dp)
+                                .height(4.dp)
+                                .clip(RoundedCornerShape(50))
+                                .background(
+                                    if (dismissProgress >= 1f) MiuixTheme.colorScheme.primary
+                                    else MiuixTheme.colorScheme.onSurface.copy(alpha = 0.22f)
+                                )
+                        )
+                        Text(
+                            text = if (dismissProgress >= 1f) "놓으면 축소됩니다" else "아래로 당겨 축소",
+                            style = MiuixTheme.textStyles.footnote2.copy(fontSize = 11.sp),
+                            color = if (dismissProgress >= 1f) {
+                                MiuixTheme.colorScheme.primary
+                            } else {
+                                MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.78f)
+                            }
+                        )
+                    }
+
+                    FocusTimerStage(
+                        snapshot = liveDashboard,
+                        selectedTab = selectedLiveTab,
+                        onSelectTab = { selectedLiveTab = it },
+                        selectedTangible = selectedTangible,
+                        allTangibles = state.tangibleItems,
+                        onSelectTangible = onSelectTangibleItem,
+                        onManageTangibles = { showTangibleManager = true },
+                        onToggleBreak = onToggleBreak,
+                        onClockOut = onClockOut,
+                        isFullscreen = true,
+                        collapseFraction = 0f,
+                        onToggleFullscreen = { onToggleFullscreenFocus(false) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                    )
+                }
             }
         }
 
@@ -1397,6 +1614,237 @@ private fun StandbyFocusCard(
 }
 
 @Composable
+private fun HomeFloatingLiveStage(
+    snapshot: LiveDashboardSnapshot,
+    selectedTab: Int,
+    onSelectTab: (Int) -> Unit,
+    selectedTangible: TangibleItem?,
+    allTangibles: List<TangibleItem>,
+    onSelectTangible: (String) -> Unit,
+    onManageTangibles: () -> Unit,
+    onToggleBreak: (String) -> Unit,
+    onClockOut: (String) -> Unit,
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    scrollBehavior: ScrollBehavior,
+    collapseFraction: Float,
+    topBarInset: Dp,
+    horizontalBasePadding: Dp,
+    horizontalDockedPadding: Dp,
+    onMeasureExpandedHeightDp: (Dp) -> Unit,
+    onScrollToTop: () -> Unit,
+    onOpenFullscreen: () -> Unit
+) {
+    val density = LocalDensity.current
+    val haptic = LocalHapticFeedback.current
+    val thresholdPx = with(density) { 64.dp.toPx() }
+    var pullDownPx by remember { mutableFloatStateOf(0f) }
+    var isPulling by remember { mutableStateOf(false) }
+    var pullHapticFired by remember { mutableStateOf(false) }
+
+    val smoothCollapse = collapseFraction.coerceIn(0f, 1f).let { t -> t * t * (3f - 2f * t) }
+    val isDocked = smoothCollapse >= 0.45f
+
+    val animatedPullPx by animateFloatAsState(
+        targetValue = if (isPulling) pullDownPx else 0f,
+        animationSpec = spring(
+            dampingRatio = 0.82f,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "home_pull_expand_px"
+    )
+    val activePullPx = if (isPulling) pullDownPx else animatedPullPx
+    val pullRatio = (activePullPx / thresholdPx).coerceIn(0f, 1.35f)
+
+    val pullNestedConn = remember(listState, thresholdPx) {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (pullDownPx > 0f && available.y < 0f && source == NestedScrollSource.UserInput) {
+                    val consumedY = maxOf(available.y, -pullDownPx)
+                    pullDownPx = (pullDownPx + consumedY).coerceAtLeast(0f)
+                    return Offset(0f, consumedY)
+                }
+                return Offset.Zero
+            }
+
+            override fun onPostScroll(
+                consumed: Offset,
+                available: Offset,
+                source: NestedScrollSource
+            ): Offset {
+                if (source == NestedScrollSource.UserInput &&
+                    available.y > 0f &&
+                    !listState.canScrollBackward
+                ) {
+                    isPulling = true
+                    val next = (pullDownPx + available.y * 0.60f).coerceIn(0f, thresholdPx * 1.45f)
+                    pullDownPx = next
+                    if (!pullHapticFired && next >= thresholdPx) {
+                        pullHapticFired = true
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    }
+                    return Offset(0f, available.y)
+                }
+                return Offset.Zero
+            }
+
+            override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+                if (pullDownPx >= thresholdPx || (pullDownPx > 20f && available.y > 550f)) {
+                    isPulling = false
+                    pullDownPx = 0f
+                    pullHapticFired = false
+                    onOpenFullscreen()
+                } else if (pullDownPx > 0f) {
+                    isPulling = false
+                    pullDownPx = 0f
+                    pullHapticFired = false
+                }
+                return Velocity.Zero
+            }
+        }
+    }
+
+    val topPadding = topBarInset + androidx.compose.ui.unit.lerp(12.dp, 4.dp, smoothCollapse)
+    val sidePadding = androidx.compose.ui.unit.lerp(horizontalBasePadding, horizontalDockedPadding, smoothCollapse)
+
+    val gestureMod = if (!isDocked) {
+        Modifier
+            .nestedScroll(scrollBehavior.nestedScrollConnection)
+            .nestedScroll(pullNestedConn)
+            .scrollable(
+                state = listState,
+                orientation = Orientation.Vertical,
+                reverseDirection = true
+            )
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    awaitFirstDown(requireUnconsumed = false)
+                    while (true) {
+                        val ev = awaitPointerEvent(androidx.compose.ui.input.pointer.PointerEventPass.Final)
+                        if (ev.changes.all { !it.pressed }) {
+                            if (isPulling || pullDownPx > 0f) {
+                                if (pullDownPx >= thresholdPx) {
+                                    isPulling = false
+                                    pullDownPx = 0f
+                                    pullHapticFired = false
+                                    onOpenFullscreen()
+                                } else {
+                                    isPulling = false
+                                    pullDownPx = 0f
+                                    pullHapticFired = false
+                                }
+                            }
+                            break
+                        }
+                    }
+                }
+            }
+    } else {
+        Modifier.pointerInput(thresholdPx) {
+            val slop = viewConfiguration.touchSlop
+            awaitEachGesture {
+                val down = awaitFirstDown(requireUnconsumed = false)
+                val tracker = VelocityTracker()
+                tracker.addPosition(down.uptimeMillis, down.position)
+                var totalDx = 0f
+                var totalDy = 0f
+                var pullingDown = false
+                pullHapticFired = false
+
+                while (true) {
+                    val event = awaitPointerEvent()
+                    val change = event.changes.firstOrNull { it.id == down.id }
+                        ?: event.changes.firstOrNull()
+                        ?: break
+                    if (!change.pressed) break
+
+                    val delta = change.positionChange()
+                    totalDx += delta.x
+                    totalDy += delta.y
+                    tracker.addPosition(change.uptimeMillis, change.position)
+
+                    if (!pullingDown) {
+                        if (totalDy > slop && totalDy > abs(totalDx)) {
+                            pullingDown = true
+                            isPulling = true
+                        } else if (abs(totalDx) > slop && abs(totalDx) > abs(totalDy)) {
+                            break
+                        } else if (totalDy < -slop) {
+                            break
+                        }
+                    }
+
+                    if (pullingDown) {
+                        change.consume()
+                        val next = totalDy.coerceAtLeast(0f) * 0.62f
+                        pullDownPx = next.coerceIn(0f, thresholdPx * 1.45f)
+                        if (!pullHapticFired && next >= thresholdPx) {
+                            pullHapticFired = true
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        }
+                    }
+                }
+
+                if (pullingDown) {
+                    val vy = tracker.calculateVelocity().y
+                    val shouldOpen = pullDownPx >= thresholdPx || (pullDownPx > 24f && vy > 520f)
+                    isPulling = false
+                    pullDownPx = 0f
+                    pullHapticFired = false
+                    if (shouldOpen) {
+                        onOpenFullscreen()
+                    }
+                }
+            }
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = topPadding, start = sidePadding, end = sidePadding)
+            .onSizeChanged { sz ->
+                if (collapseFraction < 0.02f && sz.height > 0) {
+                    onMeasureExpandedHeightDp(with(density) { sz.height.toDp() })
+                }
+            }
+            .graphicsLayer {
+                translationY = activePullPx * 0.34f
+                val s = 1f + 0.036f * pullRatio.coerceIn(0f, 1f)
+                scaleX = s
+                scaleY = s
+                transformOrigin = TransformOrigin(0.5f, 0.15f)
+            }
+            .then(gestureMod)
+            .then(
+                if (isDocked) {
+                    Modifier.clickable(
+                        interactionSource = null,
+                        indication = null,
+                        onClick = onScrollToTop
+                    )
+                } else Modifier
+            )
+    ) {
+        FocusTimerStage(
+            snapshot = snapshot,
+            selectedTab = selectedTab,
+            onSelectTab = onSelectTab,
+            selectedTangible = selectedTangible,
+            allTangibles = allTangibles,
+            onSelectTangible = onSelectTangible,
+            onManageTangibles = onManageTangibles,
+            onToggleBreak = onToggleBreak,
+            onClockOut = onClockOut,
+            isFullscreen = false,
+            collapseFraction = smoothCollapse,
+            pullExpandRatio = pullRatio,
+            onToggleFullscreen = onOpenFullscreen,
+            modifier = Modifier.fillMaxWidth()
+        )
+    }
+}
+
+@Composable
 private fun FocusTimerStage(
     snapshot: LiveDashboardSnapshot,
     selectedTab: Int,
@@ -1408,9 +1856,13 @@ private fun FocusTimerStage(
     onToggleBreak: (String) -> Unit,
     onClockOut: (String) -> Unit,
     isFullscreen: Boolean,
+    collapseFraction: Float = 0f,
+    pullExpandRatio: Float = 0f,
     onToggleFullscreen: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val isDark = LocalIsDarkTheme.current
+    val collapse = if (isFullscreen) 0f else collapseFraction.coerceIn(0f, 1f)
     val hasMultiple = snapshot.activeShifts.size >= 2
     val clampedTab = if (hasMultiple) selectedTab.coerceIn(0, snapshot.activeShifts.size) else 0
     val isCombinedView = hasMultiple && clampedTab == 0
@@ -1438,16 +1890,25 @@ private fun FocusTimerStage(
         animationSpec = tween(220),
         label = "focus_status_dot"
     )
-    val stageCornerRadius by animateDpAsState(
-        targetValue = if (isFullscreen) 24.dp else 22.dp,
-        animationSpec = spring(dampingRatio = 0.88f, stiffness = Spring.StiffnessMediumLow),
-        label = "focus_corner"
-    )
-    val ringSize by animateDpAsState(
-        targetValue = if (isFullscreen) 292.dp else 256.dp,
-        animationSpec = spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow),
-        label = "focus_ring_size"
-    )
+    val stageCornerRadius = if (isFullscreen) 24.dp else 22.dp
+    val ringSize = if (isFullscreen) {
+        292.dp
+    } else {
+        androidx.compose.ui.unit.lerp(222.dp, 74.dp, collapse)
+    }
+    val cardPadH = if (isFullscreen) 20.dp else androidx.compose.ui.unit.lerp(20.dp, 14.dp, collapse)
+    val cardPadV = if (isFullscreen) 20.dp else androidx.compose.ui.unit.lerp(18.dp, 11.dp, collapse)
+    val cardElevation = if (isFullscreen) 0.dp else (12f * ((collapse - 0.06f) / 0.7f).coerceIn(0f, 1f)).dp
+    val cardBgTint = when {
+        isFullscreen -> MiuixTheme.colorScheme.surfaceContainer
+        collapse > 0.04f -> androidx.compose.ui.graphics.lerp(
+            MiuixTheme.colorScheme.surfaceContainer,
+            if (isDark) MiuixTheme.colorScheme.surfaceContainerHigh else Color.White,
+            collapse.coerceIn(0f, 1f)
+        )
+        else -> MiuixTheme.colorScheme.surfaceContainer
+    }
+    val pullGlowAlpha = (pullExpandRatio * 0.45f).coerceIn(0f, 0.55f)
     val secondFraction = ((focusedShift.elapsedWorkMillis % 60_000L) / 60_000f).coerceIn(0f, 1f)
     var pendingBreakTarget by remember { mutableStateOf<LiveShiftSnapshot?>(null) }
     var pendingClockOutTarget by remember { mutableStateOf<LiveShiftSnapshot?>(null) }
@@ -1455,30 +1916,57 @@ private fun FocusTimerStage(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .miuixGlassSurface(cornerRadius = stageCornerRadius)
-            .animateContentSize()
-            .padding(20.dp)
+            .then(
+                if (cardElevation > 0.2.dp) {
+                    Modifier.shadow(
+                        elevation = cardElevation,
+                        shape = RoundedCornerShape(stageCornerRadius),
+                        ambientColor = Color.Black.copy(alpha = if (isDark) 0.42f else 0.14f),
+                        spotColor = Color.Black.copy(alpha = if (isDark) 0.42f else 0.16f)
+                    )
+                } else Modifier
+            )
+            .miuixGlassSurface(cornerRadius = stageCornerRadius, tintColor = cardBgTint)
+            .then(
+                if (pullGlowAlpha > 0.02f) {
+                    Modifier.squircleBorder(
+                        width = 1.5.dp,
+                        color = accentColor.copy(alpha = pullGlowAlpha),
+                        cornerRadius = stageCornerRadius
+                    )
+                } else Modifier
+            )
+            .padding(horizontal = cardPadH, vertical = cardPadV)
     ) {
+        val headerSubAlpha = if (isFullscreen) 1f else (1f - collapse * 2.2f).coerceIn(0f, 1f)
+        val badgeSize = if (isFullscreen) 34.dp else androidx.compose.ui.unit.lerp(34.dp, 26.dp, collapse)
+        val badgeCorner = if (isFullscreen) 10.dp else androidx.compose.ui.unit.lerp(10.dp, 8.dp, collapse)
+
         Column(
-            modifier = Modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.SpaceBetween,
+            modifier = if (isFullscreen) Modifier.fillMaxSize() else Modifier.fillMaxWidth(),
+            verticalArrangement = if (isFullscreen) Arrangement.SpaceBetween else Arrangement.spacedBy(
+                androidx.compose.ui.unit.lerp(10.dp, 8.dp, collapse)
+            ),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Top bar: concurrent shift switcher, status, boost badge, and fullscreen toggle
             Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                if (hasMultiple) {
+                if (hasMultiple && (isFullscreen || collapse < 0.72f)) {
+                    val tabAlpha = if (isFullscreen) 1f else (1f - collapse / 0.72f).coerceIn(0f, 1f)
                     val tabLabels = buildList {
                         add("통합 (${snapshot.activeShifts.size})")
                         snapshot.activeShifts.forEach { add(it.title) }
                     }
-                    TabRowWithContour(
-                        tabs = tabLabels,
-                        selectedTabIndex = clampedTab,
-                        onTabSelected = onSelectTab
-                    )
+                    Box(modifier = Modifier.graphicsLayer { alpha = tabAlpha }) {
+                        TabRowWithContour(
+                            tabs = tabLabels,
+                            selectedTabIndex = clampedTab,
+                            onTabSelected = onSelectTab
+                        )
+                    }
                 }
 
                 Row(
@@ -1497,8 +1985,8 @@ private fun FocusTimerStage(
                                 emoji = focusedShift.emoji,
                                 fallbackIcon = MiuixIcons.Stopwatch,
                                 accentColor = accentColor,
-                                size = 34.dp,
-                                cornerRadius = 10.dp
+                                size = badgeSize,
+                                cornerRadius = badgeCorner
                             )
                         }
                         Column {
@@ -1508,15 +1996,21 @@ private fun FocusTimerStage(
                                     focusedShift.isPaused -> focusedShift.pauseReason ?: "휴게 시간"
                                     else -> focusedShift.title
                                 },
-                                style = MiuixTheme.textStyles.body1.copy(fontWeight = FontWeight.SemiBold),
+                                style = MiuixTheme.textStyles.body1.copy(
+                                    fontSize = if (isFullscreen) 16.sp else lerp(16f, 14f, collapse).sp,
+                                    fontWeight = FontWeight.SemiBold
+                                ),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
-                            Text(
-                                text = if (isCombinedView) "합산 실시간 포커스" else if (isPaused) "적립 일시정지" else "실시간 적립 중",
-                                style = MiuixTheme.textStyles.footnote2,
-                                color = if (isPaused) Color(0xFFD97706) else MiuixTheme.colorScheme.onSurfaceVariantSummary
-                            )
+                            if (headerSubAlpha > 0.05f) {
+                                Text(
+                                    text = if (isCombinedView) "합산 실시간 포커스" else if (isPaused) "적립 일시정지" else "실시간 적립 중",
+                                    style = MiuixTheme.textStyles.footnote2,
+                                    color = if (isPaused) Color(0xFFD97706) else MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                    modifier = Modifier.graphicsLayer { alpha = headerSubAlpha }
+                                )
+                            }
                         }
                     }
 
@@ -1525,7 +2019,7 @@ private fun FocusTimerStage(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         AnimatedVisibility(
-                            visible = showBoost,
+                            visible = showBoost && collapse < 0.7f,
                             enter = fadeIn(tween(200)) + scaleIn(initialScale = 0.85f),
                             exit = fadeOut(tween(150)) + scaleOut(targetScale = 0.85f)
                         ) {
@@ -1537,17 +2031,29 @@ private fun FocusTimerStage(
                             )
                         }
                         AnimatedContent(
-                            targetState = isFullscreen,
+                            targetState = Pair(isFullscreen, pullExpandRatio >= 1f),
                             transitionSpec = {
                                 (fadeIn(tween(180)) + scaleIn(initialScale = 0.92f))
                                     .togetherWith(fadeOut(tween(150)) + scaleOut(targetScale = 0.92f))
                             },
                             label = "fullscreen_toggle_label"
-                        ) { full ->
+                        ) { (full, pullReady) ->
                             SquirclePillBadge(
-                                text = if (full) "축소" else "전체 화면",
-                                backgroundColor = MiuixTheme.colorScheme.surfaceContainer,
-                                contentColor = MiuixTheme.colorScheme.onSurfaceVariantActions,
+                                text = when {
+                                    full -> "축소"
+                                    pullReady -> "놓으면 전체"
+                                    else -> "전체 화면"
+                                },
+                                backgroundColor = if (pullReady) {
+                                    accentColor.copy(alpha = 0.18f)
+                                } else {
+                                    MiuixTheme.colorScheme.surfaceContainer
+                                },
+                                contentColor = if (pullReady) {
+                                    accentColor
+                                } else {
+                                    MiuixTheme.colorScheme.onSurfaceVariantActions
+                                },
                                 onClick = onToggleFullscreen
                             )
                         }
@@ -1555,166 +2061,280 @@ private fun FocusTimerStage(
                 }
             }
 
-            // Focus chronometer ring and 0.1s odometer
-            Box(
-                modifier = Modifier
-                    .weight(1f, fill = false)
-                    .padding(vertical = 8.dp)
-                    .size(ringSize),
-                contentAlignment = Alignment.Center
-            ) {
-                FocusTimerRingCanvas(
-                    progress = if (isCombinedView) null else focusedShift.progressFraction,
-                    accentColor = accentColor,
-                    trackColor = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.08f),
-                    tickColor = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    isPaused = isPaused,
-                    secondFraction = secondFraction,
-                    modifier = Modifier.fillMaxSize()
-                )
-
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.padding(horizontal = 24.dp)
+            if (isFullscreen) {
+                // Fullscreen chronometer ring and 0.1s odometer
+                Box(
+                    modifier = Modifier
+                        .weight(1f, fill = false)
+                        .padding(vertical = 8.dp)
+                        .size(ringSize),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = if (isCombinedView) "통합 누적 수익" else "실시간 수익",
-                        style = MiuixTheme.textStyles.footnote2,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                    )
-                    OdometerCurrencyText(
-                        amountWon = displayEarned,
-                        textStyle = MiuixTheme.textStyles.title1.copy(
-                            fontSize = if (isFullscreen) 34.sp else 30.sp,
-                            fontWeight = FontWeight.SemiBold
-                        ),
-                        color = MiuixTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        text = String.format(
-                            Locale.US,
-                            "+%.2f원/초 · +%.0f원/분",
-                            displayRatePerSec,
-                            displayRatePerMin
-                        ),
-                        style = MiuixTheme.textStyles.footnote1.copy(
-                            fontWeight = FontWeight.Medium,
-                            fontFeatureSettings = "tnum"
-                        ),
-                        color = accentColor
+                    FocusTimerRingCanvas(
+                        progress = if (isCombinedView) null else focusedShift.progressFraction,
+                        accentColor = accentColor,
+                        trackColor = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                        tickColor = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        isPaused = isPaused,
+                        secondFraction = secondFraction,
+                        modifier = Modifier.fillMaxSize()
                     )
 
-                    val progress = focusedShift.progressFraction
-                    val remMs = focusedShift.remainingMillis
-                    if (!isCombinedView && progress != null && remMs != null) {
-                        SquirclePillBadge(
-                            text = "${String.format(Locale.US, "%.1f", progress * 100f)}% · 남음 ${PayrollCalculator.formatCountdown(remMs)}",
-                            backgroundColor = MiuixTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
-                            contentColor = MiuixTheme.colorScheme.onSecondaryContainer
-                        )
-                    } else {
-                        SquirclePillBadge(
-                            text = "실근무 ${PayrollCalculator.formatCountdown(focusedShift.elapsedWorkMillis)}",
-                            backgroundColor = MiuixTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
-                            contentColor = MiuixTheme.colorScheme.onSecondaryContainer
-                        )
-                    }
-                }
-            }
-
-            // Tangible conversion and break/clock-out controls
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                if (selectedTangible != null) {
-                    val qty = if (selectedTangible.unitPrice > 0L) displayEarned / selectedTangible.unitPrice else 0.0
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                MiuixEntityBadge(
-                                    emoji = selectedTangible.emoji,
-                                    fallbackIcon = MiuixIcons.Store,
-                                    accentColor = accentColor,
-                                    size = 24.dp,
-                                    cornerRadius = 7.dp
-                                )
-                                Text(
-                                    text = "${selectedTangible.name} ${String.format(Locale.US, "%.2f", qty)}개",
-                                    style = MiuixTheme.textStyles.body2.copy(
-                                        fontWeight = FontWeight.Medium,
-                                        fontFeatureSettings = "tnum"
-                                    ),
-                                    color = MiuixTheme.colorScheme.onSurface
-                                )
-                            }
-                            Text(
-                                text = "체감 항목 관리",
-                                style = MiuixTheme.textStyles.footnote1.copy(fontWeight = FontWeight.Medium),
-                                color = MiuixTheme.colorScheme.primary,
-                                modifier = Modifier
-                                    .squircleClip(8.dp)
-                                    .clickable(onClick = onManageTangibles)
-                                    .padding(horizontal = 8.dp, vertical = 4.dp)
-                            )
-                        }
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            items(allTangibles, key = { it.id }) { item ->
-                                val active = item.id == selectedTangible.id
-                                SquirclePillBadge(
-                                    text = item.name,
-                                    backgroundColor = if (active) accentColor else MiuixTheme.colorScheme.secondaryContainer,
-                                    contentColor = if (active) Color.White else MiuixTheme.colorScheme.onSecondaryContainer,
-                                    leadingIcon = AlbaIconCatalog.resolveIcon(item.emoji, MiuixIcons.Store),
-                                    onClick = { onSelectTangible(item.id) }
-                                )
-                            }
-                        }
-                    }
-                } else {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.padding(horizontal = 24.dp)
                     ) {
-                        SquirclePillBadge(
-                            text = "체감 항목 추가",
-                            backgroundColor = accentColor.copy(alpha = 0.14f),
-                            contentColor = accentColor,
-                            leadingIcon = MiuixIcons.Add,
-                            onClick = onManageTangibles
-                        )
                         Text(
-                            text = "시급 체감 환산",
-                            style = MiuixTheme.textStyles.footnote1,
+                            text = if (isCombinedView) "통합 누적 수익" else "실시간 수익",
+                            style = MiuixTheme.textStyles.footnote2,
                             color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                         )
+                        OdometerCurrencyText(
+                            amountWon = displayEarned,
+                            textStyle = MiuixTheme.textStyles.title1.copy(
+                                fontSize = 34.sp,
+                                fontWeight = FontWeight.SemiBold
+                            ),
+                            color = MiuixTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = String.format(
+                                Locale.US,
+                                "+%.2f원/초 · +%.0f원/분",
+                                displayRatePerSec,
+                                displayRatePerMin
+                            ),
+                            style = MiuixTheme.textStyles.footnote1.copy(
+                                fontWeight = FontWeight.Medium,
+                                fontFeatureSettings = "tnum"
+                            ),
+                            color = accentColor
+                        )
+
+                        val progress = focusedShift.progressFraction
+                        val remMs = focusedShift.remainingMillis
+                        if (!isCombinedView && progress != null && remMs != null) {
+                            SquirclePillBadge(
+                                text = "${String.format(Locale.US, "%.1f", progress * 100f)}% · 남음 ${PayrollCalculator.formatCountdown(remMs)}",
+                                backgroundColor = MiuixTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
+                                contentColor = MiuixTheme.colorScheme.onSecondaryContainer
+                            )
+                        } else {
+                            SquirclePillBadge(
+                                text = "실근무 ${PayrollCalculator.formatCountdown(focusedShift.elapsedWorkMillis)}",
+                                backgroundColor = MiuixTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
+                                contentColor = MiuixTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
                     }
                 }
 
-                val actionTarget = focusedShift
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    TextButton(
-                        text = if (actionTarget.isManualPaused) "휴게 종료" else "휴게 시작",
-                        onClick = { pendingBreakTarget = actionTarget },
-                        modifier = Modifier.weight(1f)
+                FocusStageExpandedControls(
+                    snapshot = snapshot,
+                    focusedShift = focusedShift,
+                    displayEarned = displayEarned,
+                    accentColor = accentColor,
+                    selectedTangible = selectedTangible,
+                    allTangibles = allTangibles,
+                    onSelectTangible = onSelectTangible,
+                    onManageTangibles = onManageTangibles,
+                    onRequestBreak = { pendingBreakTarget = it },
+                    onRequestClockOut = { pendingClockOutTarget = it }
+                )
+            } else {
+                // Continuous morphing stage: same ring & odometer seamlessly glide from centered hero -> docked top card
+                val expandedControlsAlpha = (1f - (collapse / 0.45f)).coerceIn(0f, 1f)
+                val dockedActionsAlpha = ((collapse - 0.50f) / 0.45f).coerceIn(0f, 1f)
+                val odometerFontSp = lerp(29f, 20.5f, collapse)
+                val labelAlpha = (1f - (collapse / 0.42f)).coerceIn(0f, 1f)
+
+                Layout(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clipToBounds(),
+                    content = {
+                        // 0: Chronometer ring canvas
+                        FocusTimerRingCanvas(
+                            progress = if (isCombinedView) null else focusedShift.progressFraction,
+                            accentColor = accentColor,
+                            trackColor = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                            tickColor = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            isPaused = isPaused,
+                            secondFraction = secondFraction,
+                            modifier = Modifier.size(ringSize)
+                        )
+
+                        // 1: Odometer, rate & elapsed/progress readout
+                        Column(
+                            horizontalAlignment = if (collapse < 0.5f) Alignment.CenterHorizontally else Alignment.Start,
+                            verticalArrangement = Arrangement.spacedBy(androidx.compose.ui.unit.lerp(5.dp, 2.dp, collapse))
+                        ) {
+                            if (labelAlpha > 0.04f) {
+                                Text(
+                                    text = if (isCombinedView) "통합 누적 수익" else "실시간 수익",
+                                    style = MiuixTheme.textStyles.footnote2,
+                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                                    modifier = Modifier.graphicsLayer { alpha = labelAlpha }
+                                )
+                            }
+                            OdometerCurrencyText(
+                                amountWon = displayEarned,
+                                textStyle = MiuixTheme.textStyles.title1.copy(
+                                    fontSize = odometerFontSp.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                ),
+                                color = MiuixTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = if (collapse < 0.65f) {
+                                    String.format(Locale.US, "+%.2f원/초 · +%.0f원/분", displayRatePerSec, displayRatePerMin)
+                                } else {
+                                    String.format(Locale.US, "+%.2f원/초 · %s", displayRatePerSec, PayrollCalculator.formatCountdown(focusedShift.elapsedWorkMillis))
+                                },
+                                style = MiuixTheme.textStyles.footnote1.copy(
+                                    fontSize = lerp(12.5f, 11.5f, collapse).sp,
+                                    fontWeight = FontWeight.Medium,
+                                    fontFeatureSettings = "tnum"
+                                ),
+                                color = accentColor,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+
+                            if (collapse < 0.65f) {
+                                val progress = focusedShift.progressFraction
+                                val remMs = focusedShift.remainingMillis
+                                Box(modifier = Modifier.graphicsLayer { alpha = (1f - collapse / 0.65f).coerceIn(0f, 1f) }) {
+                                    if (!isCombinedView && progress != null && remMs != null) {
+                                        SquirclePillBadge(
+                                            text = "${String.format(Locale.US, "%.1f", progress * 100f)}% · 남음 ${PayrollCalculator.formatCountdown(remMs)}",
+                                            backgroundColor = MiuixTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
+                                            contentColor = MiuixTheme.colorScheme.onSecondaryContainer
+                                        )
+                                    } else {
+                                        SquirclePillBadge(
+                                            text = "실근무 ${PayrollCalculator.formatCountdown(focusedShift.elapsedWorkMillis)}",
+                                            backgroundColor = MiuixTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
+                                            contentColor = MiuixTheme.colorScheme.onSecondaryContainer
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        // 2: Expanded bottom controls (Tangible + full buttons)
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .graphicsLayer { alpha = expandedControlsAlpha }
+                        ) {
+                            FocusStageExpandedControls(
+                                snapshot = snapshot,
+                                focusedShift = focusedShift,
+                                displayEarned = displayEarned,
+                                accentColor = accentColor,
+                                selectedTangible = selectedTangible,
+                                allTangibles = allTangibles,
+                                onSelectTangible = onSelectTangible,
+                                onManageTangibles = onManageTangibles,
+                                onRequestBreak = { pendingBreakTarget = it },
+                                onRequestClockOut = { pendingClockOutTarget = it }
+                            )
+                        }
+
+                        // 3: Compact docked right action buttons
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                            horizontalAlignment = Alignment.End,
+                            modifier = Modifier.graphicsLayer {
+                                alpha = dockedActionsAlpha
+                                val shiftX = (1f - dockedActionsAlpha) * 16f
+                                translationX = shiftX
+                            }
+                        ) {
+                            SquirclePillBadge(
+                                text = if (focusedShift.isManualPaused) "재개" else "휴게",
+                                backgroundColor = MiuixTheme.colorScheme.secondaryContainer,
+                                contentColor = MiuixTheme.colorScheme.onSecondaryContainer,
+                                onClick = { if (dockedActionsAlpha > 0.25f) pendingBreakTarget = focusedShift }
+                            )
+                            SquirclePillBadge(
+                                text = "퇴근",
+                                backgroundColor = MiuixTheme.colorScheme.primary,
+                                contentColor = Color.White,
+                                onClick = { if (dockedActionsAlpha > 0.25f) pendingClockOutTarget = focusedShift }
+                            )
+                        }
+                    }
+                ) { measurables, constraints ->
+                    val maxW = constraints.maxWidth
+                    val ringPlaceable = measurables[0].measure(Constraints())
+                    val ringW = ringPlaceable.width
+                    val ringH = ringPlaceable.height
+
+                    val dockedActionPlaceable = measurables[3].measure(Constraints(maxWidth = maxW / 3))
+                    val expandedControlsPlaceable = measurables[2].measure(
+                        Constraints(minWidth = maxW, maxWidth = maxW)
                     )
-                    TextButton(
-                        text = "퇴근 완료",
-                        onClick = { pendingClockOutTarget = actionTarget },
-                        colors = ButtonDefaults.textButtonColorsPrimary(),
-                        modifier = Modifier.weight(1f)
+
+                    val metricsMaxWAtHero = (ringW - 24.dp.roundToPx()).coerceAtLeast(120.dp.roundToPx())
+                    val metricsMaxWAtDock = (maxW - ringW - dockedActionPlaceable.width - 20.dp.roundToPx())
+                        .coerceAtLeast(100.dp.roundToPx())
+                    val metricsMaxW = lerp(metricsMaxWAtHero.toFloat(), metricsMaxWAtDock.toFloat(), collapse)
+                        .roundToInt()
+                        .coerceIn(80, maxW)
+                    val metricsPlaceable = measurables[1].measure(Constraints(maxWidth = metricsMaxW))
+
+                    val expandedGapPx = 12.dp.roundToPx()
+                    val expandedTotalH = ringH + expandedGapPx + expandedControlsPlaceable.height
+                    val dockedTotalH = maxOf(ringH, metricsPlaceable.height, dockedActionPlaceable.height)
+                    val currentH = lerp(expandedTotalH.toFloat(), dockedTotalH.toFloat(), collapse)
+                        .roundToInt()
+                        .coerceAtLeast(1)
+
+                    layout(maxW, currentH) {
+                        val ringX = lerp(((maxW - ringW) / 2f), 0f, collapse).roundToInt()
+                        val ringY = lerp(0f, ((dockedTotalH - ringH) / 2f), collapse).roundToInt()
+                        ringPlaceable.placeRelative(ringX, ringY)
+
+                        val metricsXHero = (maxW - metricsPlaceable.width) / 2f
+                        val metricsXDock = (ringW + 10.dp.roundToPx()).toFloat()
+                        val metricsYHero = (ringH - metricsPlaceable.height) / 2f
+                        val metricsYDock = (dockedTotalH - metricsPlaceable.height) / 2f
+                        metricsPlaceable.placeRelative(
+                            lerp(metricsXHero, metricsXDock, collapse).roundToInt(),
+                            lerp(metricsYHero, metricsYDock, collapse).roundToInt()
+                        )
+
+                        if (expandedControlsAlpha > 0.01f) {
+                            expandedControlsPlaceable.placeRelative(0, ringH + expandedGapPx)
+                        }
+                        if (dockedActionsAlpha > 0.01f) {
+                            dockedActionPlaceable.placeRelative(
+                                maxW - dockedActionPlaceable.width,
+                                ((dockedTotalH - dockedActionPlaceable.height) / 2f).roundToInt()
+                            )
+                        }
+                    }
+                }
+
+                // Bottom pull-down-to-fullscreen affordance grabber
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 2.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .width(androidx.compose.ui.unit.lerp(28.dp, 34.dp, pullExpandRatio.coerceIn(0f, 1f)))
+                            .height(3.5.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(
+                                if (pullExpandRatio >= 1f) accentColor
+                                else MiuixTheme.colorScheme.onSurface.copy(alpha = 0.16f)
+                            )
                     )
                 }
             }
@@ -1753,6 +2373,114 @@ private fun FocusTimerStage(
                     pendingClockOutTarget = null
                     onClockOut(key)
                 }
+            )
+        }
+    }
+}
+
+@Composable
+private fun FocusStageExpandedControls(
+    snapshot: LiveDashboardSnapshot,
+    focusedShift: LiveShiftSnapshot,
+    displayEarned: Double,
+    accentColor: Color,
+    selectedTangible: TangibleItem?,
+    allTangibles: List<TangibleItem>,
+    onSelectTangible: (String) -> Unit,
+    onManageTangibles: () -> Unit,
+    onRequestBreak: (LiveShiftSnapshot) -> Unit,
+    onRequestClockOut: (LiveShiftSnapshot) -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        if (selectedTangible != null) {
+            val qty = if (selectedTangible.unitPrice > 0L) displayEarned / selectedTangible.unitPrice else 0.0
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        MiuixEntityBadge(
+                            emoji = selectedTangible.emoji,
+                            fallbackIcon = MiuixIcons.Store,
+                            accentColor = accentColor,
+                            size = 24.dp,
+                            cornerRadius = 7.dp
+                        )
+                        Text(
+                            text = "${selectedTangible.name} ${String.format(Locale.US, "%.2f", qty)}개",
+                            style = MiuixTheme.textStyles.body2.copy(
+                                fontWeight = FontWeight.Medium,
+                                fontFeatureSettings = "tnum"
+                            ),
+                            color = MiuixTheme.colorScheme.onSurface
+                        )
+                    }
+                    Text(
+                        text = "체감 항목 관리",
+                        style = MiuixTheme.textStyles.footnote1.copy(fontWeight = FontWeight.Medium),
+                        color = MiuixTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .squircleClip(8.dp)
+                            .clickable(onClick = onManageTangibles)
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(allTangibles, key = { it.id }) { item ->
+                        val active = item.id == selectedTangible.id
+                        SquirclePillBadge(
+                            text = item.name,
+                            backgroundColor = if (active) accentColor else MiuixTheme.colorScheme.secondaryContainer,
+                            contentColor = if (active) Color.White else MiuixTheme.colorScheme.onSecondaryContainer,
+                            leadingIcon = AlbaIconCatalog.resolveIcon(item.emoji, MiuixIcons.Store),
+                            onClick = { onSelectTangible(item.id) }
+                        )
+                    }
+                }
+            }
+        } else {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SquirclePillBadge(
+                    text = "체감 항목 추가",
+                    backgroundColor = accentColor.copy(alpha = 0.14f),
+                    contentColor = accentColor,
+                    leadingIcon = MiuixIcons.Add,
+                    onClick = onManageTangibles
+                )
+                Text(
+                    text = "시급 체감 환산",
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                )
+            }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            TextButton(
+                text = if (focusedShift.isManualPaused) "휴게 종료" else "휴게 시작",
+                onClick = { onRequestBreak(focusedShift) },
+                modifier = Modifier.weight(1f)
+            )
+            TextButton(
+                text = "퇴근 완료",
+                onClick = { onRequestClockOut(focusedShift) },
+                colors = ButtonDefaults.textButtonColorsPrimary(),
+                modifier = Modifier.weight(1f)
             )
         }
     }

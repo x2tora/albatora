@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.albatora.app.domain.PayrollCalculator
 import com.albatora.app.domain.ResolvedRecordItem
@@ -41,6 +42,7 @@ fun RecordsScreen(
     state: AlbaToraDataState,
     initialOnlyUnpaid: Boolean,
     scrollBehavior: ScrollBehavior,
+    topInset: Dp = 0.dp,
     onEditRecord: (WorkRecord) -> Unit,
     onTogglePaymentStatus: (String) -> Unit,
     onAddShortTerm: () -> Unit,
@@ -84,7 +86,7 @@ fun RecordsScreen(
     }
 
     val navBottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    val listPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 116.dp + navBottomInset)
+    val listPadding = PaddingValues(start = 20.dp, end = 20.dp, top = topInset + 12.dp, bottom = 116.dp + navBottomInset)
 
     val filterTabsCard: @Composable () -> Unit = {
         TabRowWithContour(
@@ -306,7 +308,7 @@ fun RecordsScreen(
                         .fillMaxHeight()
                         .overScrollVertical()
                         .nestedScroll(scrollBehavior.nestedScrollConnection),
-                    contentPadding = PaddingValues(top = 12.dp, bottom = 116.dp + navBottomInset),
+                    contentPadding = PaddingValues(top = topInset + 12.dp, bottom = 116.dp + navBottomInset),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
                     item { filterTabsCard() }
@@ -325,7 +327,7 @@ fun RecordsScreen(
                         .fillMaxHeight()
                         .overScrollVertical()
                         .nestedScroll(scrollBehavior.nestedScrollConnection),
-                    contentPadding = PaddingValues(top = 12.dp, bottom = 116.dp + navBottomInset),
+                    contentPadding = PaddingValues(top = topInset + 12.dp, bottom = 116.dp + navBottomInset),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     if (!onlyUnpaid) {

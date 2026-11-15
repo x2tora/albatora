@@ -2,6 +2,9 @@ package com.albatora.app.ui.components
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -18,12 +21,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -38,6 +45,7 @@ import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.blur.BlendColorEntry
 import top.yukonga.miuix.kmp.blur.BlurBlendMode
 import top.yukonga.miuix.kmp.blur.BlurDefaults
+import top.yukonga.miuix.kmp.blur.LayerBackdrop
 import top.yukonga.miuix.kmp.blur.highlight.Highlight
 import top.yukonga.miuix.kmp.blur.textureBlur
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
@@ -569,5 +577,111 @@ fun ConfirmActionDialog(
                 modifier = Modifier.weight(1f)
             )
         }
+    }
+}
+
+/**
+ * Shared floating top bar that reveals a frosted floating squircle background sliding down
+ * smoothly from the top when scrolling so titles and action icons always stay crisp and legible.
+ */
+@Composable
+fun MiuixFloatingScrollTopBar(
+    title: String,
+    scrollBehavior: ScrollBehavior,
+    modifier: Modifier = Modifier,
+    isScrolledOverride: Boolean? = null,
+    backdrop: LayerBackdrop? = null,
+    navigationIcon: @Composable () -> Unit = {},
+    actions: @Composable RowScope.() -> Unit = {}
+) {
+    val isDark = LocalIsDarkTheme.current
+    val density = LocalDensity.current
+    val surfaceBg = MiuixTheme.colorScheme.surface
+    val isScrolled by remember(scrollBehavior, isScrolledOverride) {
+        derivedStateOf {
+            isScrolledOverride ?: (scrollBehavior.state.contentOffset < -12f ||
+                scrollBehavior.state.overlappedFraction > 0.04f)
+        }
+    }
+    val floatProgress by animateFloatAsState(
+        targetValue = if (isScrolled) 1f else 0f,
+        animationSpec = spring(
+            dampingRatio = 0.84f,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "floating_top_bar_progress"
+    )
+    val slideOffsetPx = with(density) { 64.dp.toPx() }
+    val pillCorner = 22.dp
+    val pillShape = RoundedCornerShape(pillCorner)
+    val pillFill = if (isDark) {
+        MiuixTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f)
+    } else {
+        Color.White.copy(alpha = 0.94f)
+    }
+    val pillBorder = MiuixTheme.colorScheme.onSurface.copy(alpha = if (isDark) 0.14f else 0.08f)
+
+    Box(modifier = modifier.fillMaxWidth()) {
+        // Subtle top fade protecting status bar icons when content scrolls underneath
+        if (floatProgress > 0.005f) {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .graphicsLayer { alpha = floatProgress }
+                    .background(
+                        Brush.verticalGradient(
+                            0.0f to surfaceBg.copy(alpha = 0.88f),
+                            0.55f to surfaceBg.copy(alpha = 0.42f),
+                            1.0f to Color.Transparent
+                        )
+                    )
+            )
+
+            val blurMod = if (backdrop != null && isRuntimeShaderSupported()) {
+                Modifier.textureBlur(
+                    backdrop = backdrop,
+                    shape = pillShape,
+                    blurRadius = 18f,
+                    colors = BlurDefaults.blurColors(
+                        blendColors = listOf(BlendColorEntry(pillFill, BlurBlendMode.SrcOver))
+                    )
+                )
+            } else {
+                Modifier
+            }
+
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .statusBarsPadding()
+                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                    .graphicsLayer {
+                        val p = floatProgress.coerceIn(0f, 1f)
+                        translationY = (1f - p) * -slideOffsetPx
+                        alpha = p
+                        val scale = 0.96f + 0.04f * p
+                        scaleX = scale
+                        scaleY = scale
+                    }
+                    .shadow(
+                        elevation = (10f * floatProgress.coerceIn(0f, 1f)).dp,
+                        shape = pillShape,
+                        ambientColor = Color.Black.copy(alpha = if (isDark) 0.42f else 0.14f),
+                        spotColor = Color.Black.copy(alpha = if (isDark) 0.42f else 0.16f)
+                    )
+                    .clip(pillShape)
+                    .then(blurMod)
+                    .squircleBackground(color = pillFill, cornerRadius = pillCorner)
+                    .squircleBorder(width = 1.dp, color = pillBorder, cornerRadius = pillCorner)
+            )
+        }
+
+        SmallTopAppBar(
+            title = title,
+            color = Color.Transparent,
+            scrollBehavior = scrollBehavior,
+            navigationIcon = navigationIcon,
+            actions = actions
+        )
     }
 }
