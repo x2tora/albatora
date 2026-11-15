@@ -33,6 +33,13 @@ class AppUpdaterTest {
         assertFalse(AppUpdater.isNewerVersion("v1.1.4_hotfix", "1.1.4_hotfix"))
         assertFalse(AppUpdater.isNewerVersion("v1.1.4.1_hotfix", "1.1.4_hotfix"))
         assertFalse(AppUpdater.isNewerVersion("v1.1.4", "1.1.4_hotfix"))
+
+        // Hyphenated hotfix tags & 1.5.1.1_hotfix -> 1.6.0 progression
+        assertTrue(AppUpdater.isNewerVersion("v1.5.1-hotfix", "1.5.1"))
+        assertTrue(AppUpdater.isNewerVersion("v1.5.1-hotfix2", "1.5.1-hotfix"))
+        assertFalse(AppUpdater.isNewerVersion("1.5.1", "1.5.1-hotfix"))
+        assertTrue(AppUpdater.isNewerVersion("v1.6.0", "1.5.1.1_hotfix"))
+        assertFalse(AppUpdater.isNewerVersion("v1.5.1", "1.5.1.1_hotfix"))
     }
 
     @Test

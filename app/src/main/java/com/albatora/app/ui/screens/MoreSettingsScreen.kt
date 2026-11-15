@@ -12,6 +12,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.*
@@ -36,7 +37,9 @@ import com.albatora.app.ui.components.AppUpdateUiState
 import com.albatora.app.ui.components.ConfirmActionDialog
 import com.albatora.app.ui.components.MiuixColorPickerDialog
 import com.albatora.app.ui.components.MiuixGlassIcon
+import com.albatora.app.ui.components.SquirclePillBadge
 import com.albatora.app.ui.components.formatRgbHex
+import com.albatora.app.ui.theme.JobAccentPalette
 import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.*
@@ -47,6 +50,7 @@ import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import java.time.LocalDate
+import java.util.UUID
 
 @Composable
 fun MoreSettingsScreen(
@@ -61,8 +65,10 @@ fun MoreSettingsScreen(
     onUpdateOngoingNotification: (Boolean) -> Unit,
     onUpdateAutoDnd: (Boolean) -> Unit,
     onUpdateDefaultMinWage: (Long) -> Unit,
+    onUpsertTemplate: (ShortTermTemplate) -> Unit,
     onDeleteTemplate: (String) -> Unit,
     onExportJson: () -> String,
+    onPreviewBackupJson: (String) -> Result<AlbaToraDataState>,
     onImportJson: (String) -> Result<Unit>,
     onResetAllData: () -> Unit,
     onCheckForUpdate: () -> Unit,
@@ -79,6 +85,8 @@ fun MoreSettingsScreen(
     var showTemplatesDialog by remember { mutableStateOf(false) }
     var showPasteRestoreDialog by remember { mutableStateOf(false) }
     var showDndPermissionDialog by remember { mutableStateOf(false) }
+    var pendingDndAutoEnable by remember { mutableStateOf(false) }
+    var pendingImportBackup by remember { mutableStateOf<Pair<String, AlbaToraDataState>?>(null) }
     var hasDndAccess by remember { mutableStateOf(AutoDndController.hasPolicyAccess(context)) }
     var hasBatteryExemption by remember {
         mutableStateOf(BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context))
@@ -89,6 +97,13 @@ fun MoreSettingsScreen(
             if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
                 hasDndAccess = AutoDndController.hasPolicyAccess(context)
                 hasBatteryExemption = BatteryOptimizationHelper.isIgnoringBatteryOptimizations(context)
+                if (pendingDndAutoEnable) {
+                    pendingDndAutoEnable = false
+                    if (hasDndAccess) {
+                        onUpdateAutoDnd(true)
+                        onNotify("방해금지 권한이 허용되어 자동 방해금지가 켜졌습니다.")
+                    }
+                }
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -122,8 +137,8 @@ fun MoreSettingsScreen(
                 } ?: error("파일을 읽을 수 없습니다.")
             }.fold(
                 onSuccess = { jsonText ->
-                    onImportJson(jsonText).onSuccess {
-                        onNotify("백업 데이터를 복원했습니다.")
+                    onPreviewBackupJson(jsonText).onSuccess { parsed ->
+                        pendingImportBackup = jsonText to parsed
                     }.onFailure {
                         onNotify("올바른 알바토라 백업 파일이 아닙니다.")
                     }
@@ -415,6 +430,7 @@ fun MoreSettingsScreen(
             confirmText = "설정으로 이동",
             onDismiss = { showDndPermissionDialog = false },
             onConfirm = {
+                pendingDndAutoEnable = true
                 showDndPermissionDialog = false
                 AutoDndController.openPolicyAccessSettings(context)
             }
@@ -440,6 +456,32 @@ fun MoreSettingsScreen(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
             )
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                item {
+                    SquirclePillBadge(
+                        text = "2026 최저 (10,320원)",
+                        backgroundColor = MiuixTheme.colorScheme.primary.copy(alpha = 0.14f),
+                        contentColor = MiuixTheme.colorScheme.primary,
+                        onClick = { wageText = DEFAULT_2026_MIN_WAGE.toString() }
+                    )
+                }
+                item {
+                    SquirclePillBadge(
+                        text = "+100원",
+                        backgroundColor = MiuixTheme.colorScheme.secondaryContainer,
+                        contentColor = MiuixTheme.colorScheme.onSecondaryContainer,
+                        onClick = { wageText = ((wageText.toLongOrNull() ?: DEFAULT_2026_MIN_WAGE) + 100L).toString() }
+                    )
+                }
+                item {
+                    SquirclePillBadge(
+                        text = "+500원",
+                        backgroundColor = MiuixTheme.colorScheme.secondaryContainer,
+                        contentColor = MiuixTheme.colorScheme.onSecondaryContainer,
+                        onClick = { wageText = ((wageText.toLongOrNull() ?: DEFAULT_2026_MIN_WAGE) + 500L).toString() }
+                    )
+                }
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 TextButton(text = "취소", onClick = { showMinWageDialog = false }, modifier = Modifier.weight(1f))
                 TextButton(
@@ -457,17 +499,21 @@ fun MoreSettingsScreen(
         }
     }
 
-    // Saved short-term templates list
+    // Saved short-term templates list & inline creator
     var pendingDeleteTemplate by remember { mutableStateOf<ShortTermTemplate?>(null) }
+    var showAddTemplateForm by remember(showTemplatesDialog) { mutableStateOf(false) }
+    var newTplName by remember(showTemplatesDialog, showAddTemplateForm) { mutableStateOf("") }
+    var newTplAmount by remember(showTemplatesDialog, showAddTemplateForm) { mutableStateOf("140000") }
+    var newTplPayType by remember(showTemplatesDialog, showAddTemplateForm) { mutableStateOf(PayType.DAILY) }
     OverlayDialog(
         show = showTemplatesDialog,
         title = "단기 알바 프리셋 관리",
         onDismissRequest = { showTemplatesDialog = false }
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             if (state.templates.isEmpty()) {
                 Text(
-                    "저장된 프리셋이 없습니다. [단기/일용직 10초 퀵 등록]에서 '프리셋으로 저장'을 켜고 등록해 보세요.",
+                    "저장된 프리셋이 없습니다. 아래 버튼이나 [단기/일용직 10초 퀵 등록]에서 프리셋을 만들어 보세요.",
                     style = MiuixTheme.textStyles.body2,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                 )
@@ -475,7 +521,8 @@ fun MoreSettingsScreen(
                 state.templates.forEach { tpl ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(tpl.name, style = MiuixTheme.textStyles.body2)
@@ -491,11 +538,85 @@ fun MoreSettingsScreen(
                     }
                 }
             }
-            TextButton(
-                text = "닫기",
-                onClick = { showTemplatesDialog = false },
-                modifier = Modifier.fillMaxWidth()
-            )
+
+            AnimatedVisibility(visible = showAddTemplateForm) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    HorizontalDivider()
+                    TextField(
+                        value = newTplName,
+                        onValueChange = { newTplName = it },
+                        label = "프리셋 이름 (예: 물류 상하차)",
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        SquirclePillBadge(
+                            text = if (newTplPayType == PayType.DAILY) "일급 기준" else "시급 기준",
+                            backgroundColor = MiuixTheme.colorScheme.secondaryContainer,
+                            contentColor = MiuixTheme.colorScheme.onSecondaryContainer,
+                            onClick = {
+                                newTplPayType = if (newTplPayType == PayType.DAILY) PayType.HOURLY else PayType.DAILY
+                                if (newTplPayType == PayType.HOURLY && newTplAmount == "140000") {
+                                    newTplAmount = state.settings.defaultMinWage.toString()
+                                } else if (newTplPayType == PayType.DAILY && newTplAmount == state.settings.defaultMinWage.toString()) {
+                                    newTplAmount = "140000"
+                                }
+                            }
+                        )
+                        TextField(
+                            value = newTplAmount,
+                            onValueChange = { newTplAmount = it.filter(Char::isDigit) },
+                            label = "금액 (원)",
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    TextButton(
+                        text = "새 프리셋 저장",
+                        onClick = {
+                            val clean = newTplName.trim()
+                            val amt = newTplAmount.toLongOrNull() ?: 0L
+                            if (clean.isEmpty() || amt <= 0L) {
+                                onNotify("프리셋 이름과 금액을 입력해 주세요.")
+                                return@TextButton
+                            }
+                            onUpsertTemplate(
+                                ShortTermTemplate(
+                                    id = UUID.randomUUID().toString(),
+                                    name = clean,
+                                    emoji = "⚡",
+                                    colorHex = JobAccentPalette.random().second,
+                                    startMinute = 9 * 60,
+                                    endMinute = 18 * 60,
+                                    payType = newTplPayType,
+                                    unitAmount = amt,
+                                    breakMinutes = 60,
+                                    breakPayType = BreakPayType.UNPAID,
+                                    taxMode = TaxMode.DAILY_WORKER
+                                )
+                            )
+                            showAddTemplateForm = false
+                            onNotify("'$clean' 프리셋을 추가했습니다.")
+                        },
+                        colors = ButtonDefaults.textButtonColorsPrimary(),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                TextButton(
+                    text = if (showAddTemplateForm) "입력 닫기" else "+ 새 프리셋",
+                    onClick = { showAddTemplateForm = !showAddTemplateForm },
+                    modifier = Modifier.weight(1f)
+                )
+                TextButton(
+                    text = "닫기",
+                    onClick = { showTemplatesDialog = false },
+                    modifier = Modifier.weight(1f)
+                )
+            }
         }
     }
 
@@ -543,9 +664,9 @@ fun MoreSettingsScreen(
                 TextButton(
                     text = "복원 실행",
                     onClick = {
-                        onImportJson(pasteJson).onSuccess {
+                        onPreviewBackupJson(pasteJson).onSuccess { parsed ->
                             showPasteRestoreDialog = false
-                            onNotify("클립보드 데이터로 복원을 완료했습니다.")
+                            pendingImportBackup = pasteJson to parsed
                         }.onFailure {
                             onNotify("유효한 JSON 형식이 아닙니다.")
                         }
@@ -555,6 +676,32 @@ fun MoreSettingsScreen(
                 )
             }
         }
+    }
+
+    val importPair = pendingImportBackup
+    if (importPair != null) {
+        val (rawJsonToRestore, preview) = importPair
+        ConfirmActionDialog(
+            show = true,
+            title = "백업 데이터 복원 확인",
+            summary = "현재 저장된 데이터가 아래 백업 내용으로 덮어씌워집니다.\n\n" +
+                "• 정규/고정 알바 ${preview.jobs.size}개\n" +
+                "• 근무 기록 ${preview.records.size}건\n" +
+                "• 단기 프리셋 ${preview.templates.size}개\n" +
+                "• 목표 ${preview.wishlistGoals.size}개\n\n" +
+                "복원을 계속할까요?",
+            confirmText = "덮어쓰고 복원",
+            isDestructive = true,
+            onDismiss = { pendingImportBackup = null },
+            onConfirm = {
+                pendingImportBackup = null
+                onImportJson(rawJsonToRestore).onSuccess {
+                    onNotify("백업 데이터를 복원했습니다.")
+                }.onFailure {
+                    onNotify("백업 복원 중 오류가 발생했습니다.")
+                }
+            }
+        )
     }
 
     OverlayDialog(

@@ -1,11 +1,13 @@
 package com.albatora.app.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.expandVertically
@@ -49,6 +51,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import java.time.LocalDate
 import java.util.UUID
+import kotlinx.coroutines.launch
 
 @Composable
 fun QuickAddShortTermScreen(
@@ -58,7 +61,8 @@ fun QuickAddShortTermScreen(
     defaultMinWage: Long,
     onBack: () -> Unit,
     onSave: (WorkRecord, ShortTermTemplate?) -> Unit,
-    onDelete: ((String) -> Unit)? = null
+    onDelete: ((String) -> Unit)? = null,
+    onNotify: (String) -> Unit = {}
 ) {
     val isEditing = existingRecord != null
     val fallbackDate = remember { LocalDate.now() }
@@ -116,8 +120,66 @@ fun QuickAddShortTermScreen(
     var showDatePicker by remember { mutableStateOf(false) }
     var pickTimeMode by remember { mutableStateOf<String?>(null) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showDiscardConfirm by remember { mutableStateOf(false) }
     var pendingEditSave by remember { mutableStateOf<Pair<WorkRecord, ShortTermTemplate?>?>(null) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
+
+    val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+    val initialSignature = remember(existingRecord?.id, initialDateIso) {
+        val initDate = existingRecord?.date ?: initialDateIso ?: PayrollCalculator.formatDate(fallbackDate)
+        val initPayType = existingRecord?.payType ?: PayType.DAILY
+        val initUnitAmt = existingRecord?.unitAmount?.toString()
+            ?: if (initPayType == PayType.HOURLY) defaultMinWage.toString() else "140000"
+        val initRawDur = PayrollCalculator.rawDurationMinutes(
+            existingRecord?.startMinute ?: 9 * 60,
+            existingRecord?.endMinute ?: 18 * 60
+        )
+        listOf(
+            existingRecord?.title ?: "",
+            existingRecord?.emoji ?: "",
+            (existingRecord?.colorHex ?: 0xFF10B981).toString(),
+            initDate,
+            (existingRecord?.startMinute ?: 9 * 60).toString(),
+            (existingRecord?.endMinute ?: 18 * 60).toString(),
+            initPayType.name,
+            initUnitAmt,
+            (existingRecord == null).toString(),
+            (existingRecord?.breakMinutes ?: PayrollCalculator.recommendedBreakMinutes(initRawDur)).toString(),
+            (existingRecord?.breakPayType ?: BreakPayType.UNPAID).name,
+            (existingRecord?.transportExpense ?: 0L).toString(),
+            (existingRecord?.mealExpense ?: 0L).toString(),
+            (existingRecord?.siteBonus ?: 0L).toString(),
+            if ((existingRecord?.agencyFeeValue ?: 0.0) > 0.0) existingRecord!!.agencyFeeValue.toString() else "",
+            (existingRecord?.agencyFeeType ?: FeeType.PERCENT).name,
+            (existingRecord?.taxMode ?: TaxMode.DAILY_WORKER).name,
+            (existingRecord?.customTaxRatePercent ?: 3.3).toString(),
+            (existingRecord?.dailyWorkerIncludeLocalTax ?: true).toString(),
+            (existingRecord?.paymentStatus ?: PaymentStatus.UNPAID).name,
+            (existingRecord?.allowance?.nightAllowanceEnabled ?: false).toString(),
+            (existingRecord?.allowance?.overtimeAllowanceEnabled ?: false).toString(),
+            (existingRecord?.allowance?.holidayAllowanceEnabled ?: false).toString(),
+            "false",
+            existingRecord?.memo ?: ""
+        ).joinToString("|")
+    }
+    val currentSignature = listOf(
+        title, emoji, colorHex.toString(), dateIso, startMin.toString(), endMin.toString(),
+        payType.name, unitAmountText, autoRecBreak.toString(), breakMinText, breakPayType.name,
+        transportText, mealText, siteBonusText, agencyFeeText, agencyFeeType.name,
+        taxMode.name, customTaxText, includeLocalTax.toString(), paymentStatus.name,
+        nightEnabled.toString(), overtimeEnabled.toString(), holidayEnabled.toString(),
+        saveAsTemplate.toString(), memo
+    ).joinToString("|")
+    val isDirty = currentSignature != initialSignature
+
+    BackHandler(enabled = isDirty) {
+        showDiscardConfirm = true
+    }
+
+    val handleBackAttempt: () -> Unit = {
+        if (isDirty) showDiscardConfirm = true else onBack()
+    }
 
     val effectiveBreakMins = if (autoRecBreak) PayrollCalculator.recommendedBreakMinutes(rawDur) else (breakMinText.toIntOrNull() ?: 0)
 
@@ -161,13 +223,20 @@ fun QuickAddShortTermScreen(
         val cleanTitle = title.trim()
         val unitAmt = unitAmountText.toLongOrNull() ?: 0L
         if (cleanTitle.isEmpty()) {
-            errorMsg = "일자리 이름(예: 물류센터, 행사 스태프)을 입력해 주세요."
+            val msg = "일자리 이름(예: 물류센터, 행사 스태프)을 입력해 주세요."
+            errorMsg = msg
+            onNotify(msg)
+            coroutineScope.launch { listState.animateScrollToItem(0) }
             return
         }
         if (unitAmt <= 0L) {
-            errorMsg = "급여 금액을 입력해 주세요."
+            val msg = "급여 금액을 입력해 주세요."
+            errorMsg = msg
+            onNotify(msg)
+            coroutineScope.launch { listState.animateScrollToItem(0) }
             return
         }
+        errorMsg = null
         val finalRecord = WorkRecord(
             id = existingRecord?.id ?: UUID.randomUUID().toString(),
             jobId = existingRecord?.jobId,
@@ -242,8 +311,9 @@ fun QuickAddShortTermScreen(
                 title = if (isEditing) "근무 내역 수정" else "단기/일용직 10초 퀵 등록",
                 scrollBehavior = scrollBehavior,
                 backdrop = barBackdrop,
+                maxContentWidth = 620.dp,
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = handleBackAttempt) {
                         Icon(MiuixIcons.Back, contentDescription = "뒤로가기")
                     }
                 },
@@ -269,17 +339,20 @@ fun QuickAddShortTermScreen(
             )
         }
     ) { paddingValues ->
-        Box(modifier = Modifier.fillMaxSize()) {
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val sidePad = ((maxWidth - 620.dp) / 2f).coerceAtLeast(16.dp)
             LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .layerBackdrop(barBackdrop)
                 .background(surfaceBg)
+                .imePadding()
                 .overScrollVertical()
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
             contentPadding = PaddingValues(
-                start = 16.dp,
-                end = 16.dp,
+                start = sidePad,
+                end = sidePad,
                 top = paddingValues.calculateTopPadding() + 12.dp,
                 bottom = paddingValues.calculateBottomPadding() + 24.dp
             ),
@@ -744,6 +817,21 @@ fun QuickAddShortTermScreen(
                 onConfirm = {
                     pendingEditSave = null
                     onSave(editPair.first, editPair.second)
+                }
+            )
+        }
+
+        if (showDiscardConfirm) {
+            ConfirmActionDialog(
+                show = true,
+                title = "변경 사항이 저장되지 않았습니다",
+                summary = "입력하거나 수정한 내용이 사라집니다. 저장하지 않고 나가시겠습니까?",
+                confirmText = "나가기",
+                isDestructive = true,
+                onDismiss = { showDiscardConfirm = false },
+                onConfirm = {
+                    showDiscardConfirm = false
+                    onBack()
                 }
             )
         }

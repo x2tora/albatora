@@ -239,7 +239,7 @@ class AlbaToraViewModel(application: Application) : AndroidViewModel(application
 
     fun upsertTemplate(template: ShortTermTemplate) = stateHolder.upsertTemplate(template)
     fun deleteTemplate(templateId: String) = stateHolder.deleteTemplate(templateId)
-    fun stampTemplateOnDate(template: ShortTermTemplate, date: LocalDate) = stateHolder.stampTemplateOnDate(template, date)
+    fun stampTemplateOnDate(template: ShortTermTemplate, date: LocalDate): String = stateHolder.stampTemplateOnDate(template, date)
 
     fun startStopwatch(
         title: String,
@@ -316,6 +316,7 @@ class AlbaToraViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun exportBackupJson(): String = stateHolder.exportBackupJson()
+    fun previewBackupJson(raw: String): Result<AlbaToraDataState> = stateHolder.previewBackupJson(raw)
     fun importBackupJson(raw: String): Result<Unit> = stateHolder.importBackupJson(raw)
     fun resetAllData() = stateHolder.resetAllData()
 }

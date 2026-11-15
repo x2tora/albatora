@@ -131,6 +131,7 @@ fun WidgetStudioScreen(
                 title = "바탕화면 위젯 꾸미기",
                 scrollBehavior = scrollBehavior,
                 backdrop = barBackdrop,
+                maxContentWidth = 620.dp,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(MiuixIcons.Back, contentDescription = "뒤로가기")
@@ -148,7 +149,8 @@ fun WidgetStudioScreen(
             )
         }
     ) { paddingValues ->
-        Box(modifier = Modifier.fillMaxSize()) {
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val sidePad = ((maxWidth - 620.dp) / 2f).coerceAtLeast(16.dp)
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
@@ -157,8 +159,8 @@ fun WidgetStudioScreen(
                     .nestedScroll(scrollBehavior.nestedScrollConnection)
                     .overScrollVertical(),
             contentPadding = PaddingValues(
-                start = 16.dp,
-                end = 16.dp,
+                start = sidePad,
+                end = sidePad,
                 top = paddingValues.calculateTopPadding() + 10.dp,
                 bottom = paddingValues.calculateBottomPadding() + 64.dp
             ),

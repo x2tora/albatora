@@ -64,7 +64,6 @@ object AppUpdater {
      */
     private fun parseHotfixLevel(version: String): Int {
         val cleaned = version.trim().removePrefix("v").removePrefix("V")
-            .substringBefore('-')
             .substringBefore('+')
         val match = Regex("""(?:^|[._-])hotfix(?:[._-]?(\d+))?$""", RegexOption.IGNORE_CASE)
             .find(cleaned) ?: return 0

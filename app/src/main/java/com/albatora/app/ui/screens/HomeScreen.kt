@@ -62,6 +62,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import com.albatora.app.domain.*
 import com.albatora.app.model.*
@@ -206,9 +207,80 @@ fun HomeScreen(
         val activeListState = if (isWideDual) wideLeftListState else phoneListState
 
         var expandedHeroHeightDp by remember(isWideDual) {
-            mutableStateOf(if (isWideDual) 276.dp else 416.dp)
+            mutableStateOf(if (isWideDual) 256.dp else 380.dp)
         }
-        val collapseRangePx = with(density) { 210.dp.toPx() }.coerceAtLeast(1f)
+        val collapseRangePx = with(density) {
+            (expandedHeroHeightDp - 110.dp).coerceIn(140.dp, 260.dp).toPx()
+        }.coerceAtLeast(1f)
+        val requiredHeadroomPx = collapseRangePx + with(density) { 180.dp.toPx() }
+        val expandedHeroMaxScrollPx = with(density) { (expandedHeroHeightDp + topBarInset + 32.dp).toPx() }
+
+        val canCollapseLiveStage by remember(
+            hasActiveShifts,
+            isWideDual,
+            phoneListState,
+            wideLeftListState,
+            wideRightListState,
+            requiredHeadroomPx
+        ) {
+            derivedStateOf {
+                if (!hasActiveShifts) {
+                    false
+                } else if (isWideDual) {
+                    hasGenerousScrollHeadroom(wideLeftListState, requiredHeadroomPx) &&
+                        hasGenerousScrollHeadroom(wideRightListState, requiredHeadroomPx)
+                } else {
+                    hasGenerousScrollHeadroom(phoneListState, requiredHeadroomPx)
+                }
+            }
+        }
+
+        // Synchronize dual columns within the hero collapse range when collapsing is active
+        val collapseRangeInt = collapseRangePx.roundToInt()
+        LaunchedEffect(isWideDual, hasActiveShifts, canCollapseLiveStage, collapseRangeInt) {
+            if (isWideDual && hasActiveShifts && canCollapseLiveStage) {
+                launch {
+                    snapshotFlow {
+                        Triple(
+                            wideLeftListState.isScrollInProgress,
+                            wideLeftListState.firstVisibleItemIndex,
+                            wideLeftListState.firstVisibleItemScrollOffset
+                        )
+                    }.collect { (scrolling, idx, off) ->
+                        if (scrolling && !wideRightListState.isScrollInProgress) {
+                            val target = if (idx > 0) collapseRangeInt else off.coerceAtMost(collapseRangeInt)
+                            val rightOff = if (wideRightListState.firstVisibleItemIndex > 0) collapseRangeInt
+                            else wideRightListState.firstVisibleItemScrollOffset
+                            if (idx == 0 && wideRightListState.firstVisibleItemIndex == 0 && abs(rightOff - target) > 2) {
+                                wideRightListState.scrollToItem(0, target)
+                            } else if (idx > 0 && wideRightListState.firstVisibleItemIndex == 0 && rightOff < collapseRangeInt) {
+                                wideRightListState.scrollToItem(0, collapseRangeInt)
+                            }
+                        }
+                    }
+                }
+                launch {
+                    snapshotFlow {
+                        Triple(
+                            wideRightListState.isScrollInProgress,
+                            wideRightListState.firstVisibleItemIndex,
+                            wideRightListState.firstVisibleItemScrollOffset
+                        )
+                    }.collect { (scrolling, idx, off) ->
+                        if (scrolling && !wideLeftListState.isScrollInProgress) {
+                            val target = if (idx > 0) collapseRangeInt else off.coerceAtMost(collapseRangeInt)
+                            val leftOff = if (wideLeftListState.firstVisibleItemIndex > 0) collapseRangeInt
+                            else wideLeftListState.firstVisibleItemScrollOffset
+                            if (idx == 0 && wideLeftListState.firstVisibleItemIndex == 0 && abs(leftOff - target) > 2) {
+                                wideLeftListState.scrollToItem(0, target)
+                            } else if (idx > 0 && wideLeftListState.firstVisibleItemIndex == 0 && leftOff < collapseRangeInt) {
+                                wideLeftListState.scrollToItem(0, collapseRangeInt)
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
         LaunchedEffect(scrollToTopTrigger) {
             if (scrollToTopTrigger > 0) {
@@ -222,9 +294,17 @@ fun HomeScreen(
             }
         }
 
-        val rawCollapseFraction by remember(hasActiveShifts, isWideDual, phoneListState, wideLeftListState, wideRightListState, collapseRangePx) {
+        val rawCollapseFraction by remember(
+            hasActiveShifts,
+            canCollapseLiveStage,
+            isWideDual,
+            phoneListState,
+            wideLeftListState,
+            wideRightListState,
+            collapseRangePx
+        ) {
             derivedStateOf {
-                if (!hasActiveShifts) {
+                if (!hasActiveShifts || !canCollapseLiveStage) {
                     0f
                 } else if (isWideDual) {
                     val leftCollapse = if (wideLeftListState.firstVisibleItemIndex > 0) 1f
@@ -236,6 +316,58 @@ fun HomeScreen(
                     1f
                 } else {
                     (phoneListState.firstVisibleItemScrollOffset / collapseRangePx).coerceIn(0f, 1f)
+                }
+            }
+        }
+
+        val nonCollapsingScrollOffsetPx by remember(
+            hasActiveShifts,
+            canCollapseLiveStage,
+            isWideDual,
+            phoneListState,
+            wideLeftListState,
+            wideRightListState,
+            expandedHeroMaxScrollPx
+        ) {
+            derivedStateOf {
+                if (!hasActiveShifts || canCollapseLiveStage) {
+                    0f
+                } else if (isWideDual) {
+                    val leftOff = if (wideLeftListState.firstVisibleItemIndex > 0) expandedHeroMaxScrollPx
+                    else wideLeftListState.firstVisibleItemScrollOffset.toFloat()
+                    val rightOff = if (wideRightListState.firstVisibleItemIndex > 0) expandedHeroMaxScrollPx
+                    else wideRightListState.firstVisibleItemScrollOffset.toFloat()
+                    maxOf(leftOff, rightOff).coerceIn(0f, expandedHeroMaxScrollPx)
+                } else {
+                    val singleOff = if (phoneListState.firstVisibleItemIndex > 0) expandedHeroMaxScrollPx
+                    else phoneListState.firstVisibleItemScrollOffset.toFloat()
+                    singleOff.coerceIn(0f, expandedHeroMaxScrollPx)
+                }
+            }
+        }
+
+        // Snap cleanly to either fully expanded (0f) or fully docked (1f) when user releases scroll mid-collapse
+        val anyScrolling = if (isWideDual) {
+            wideLeftListState.isScrollInProgress || wideRightListState.isScrollInProgress
+        } else {
+            phoneListState.isScrollInProgress
+        }
+        LaunchedEffect(anyScrolling, canCollapseLiveStage, isWideDual, collapseRangeInt) {
+            if (hasActiveShifts && canCollapseLiveStage && !anyScrolling) {
+                if (rawCollapseFraction in 0.02f..0.98f) {
+                    val targetOffset = if (rawCollapseFraction < 0.48f) 0 else collapseRangeInt
+                    if (isWideDual) {
+                        coroutineScope {
+                            if (wideLeftListState.firstVisibleItemIndex == 0) {
+                                launch { wideLeftListState.animateScrollToItem(0, targetOffset) }
+                            }
+                            if (wideRightListState.firstVisibleItemIndex == 0) {
+                                launch { wideRightListState.animateScrollToItem(0, targetOffset) }
+                            }
+                        }
+                    } else if (phoneListState.firstVisibleItemIndex == 0) {
+                        phoneListState.animateScrollToItem(0, targetOffset)
+                    }
                 }
             }
         }
@@ -872,6 +1004,8 @@ fun HomeScreen(
                         listState = wideLeftListState,
                         scrollBehavior = scrollBehavior,
                         collapseFraction = rawCollapseFraction,
+                        scrollTranslationYPx = nonCollapsingScrollOffsetPx,
+                        hideWhenScrolledPast = !canCollapseLiveStage && nonCollapsingScrollOffsetPx >= expandedHeroMaxScrollPx - 1f,
                         topBarInset = topBarInset,
                         horizontalBasePadding = 20.dp,
                         horizontalDockedPadding = 12.dp,
@@ -924,6 +1058,8 @@ fun HomeScreen(
                         listState = phoneListState,
                         scrollBehavior = scrollBehavior,
                         collapseFraction = rawCollapseFraction,
+                        scrollTranslationYPx = nonCollapsingScrollOffsetPx,
+                        hideWhenScrolledPast = !canCollapseLiveStage && nonCollapsingScrollOffsetPx >= expandedHeroMaxScrollPx - 1f,
                         topBarInset = topBarInset,
                         horizontalBasePadding = singleSidePad,
                         horizontalDockedPadding = (singleSidePad - 8.dp).coerceAtLeast(12.dp),
@@ -1008,7 +1144,7 @@ fun HomeScreen(
                                 val change = event.changes.firstOrNull { it.id == down.id }
                                     ?: event.changes.firstOrNull()
                                     ?: break
-                                if (!change.pressed) {
+                                if (!change.pressed || (change.isConsumed && !draggingDown)) {
                                     break
                                 }
                                 val delta = change.positionChange()
@@ -1531,7 +1667,11 @@ private fun StandbyFocusCard(
                             style = MiuixTheme.textStyles.body1.copy(fontWeight = FontWeight.SemiBold)
                         )
                         Text(
-                            text = "아래 근무지를 누르면 바로 실시간 출근이 시작됩니다",
+                            text = if (jobs.isEmpty() && templates.isEmpty()) {
+                                "아래 버튼으로 첫 근무를 등록하거나 스톱워치를 시작해 보세요"
+                            } else {
+                                "아래 근무지를 누르면 바로 실시간 출근이 시작됩니다"
+                            },
                             style = MiuixTheme.textStyles.footnote2,
                             color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                         )
@@ -1667,6 +1807,8 @@ private fun HomeFloatingLiveStage(
     listState: androidx.compose.foundation.lazy.LazyListState,
     scrollBehavior: ScrollBehavior,
     collapseFraction: Float,
+    scrollTranslationYPx: Float = 0f,
+    hideWhenScrolledPast: Boolean = false,
     topBarInset: Dp,
     horizontalBasePadding: Dp,
     horizontalDockedPadding: Dp,
@@ -1843,16 +1985,12 @@ private fun HomeFloatingLiveStage(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = topPadding, start = sidePadding, end = sidePadding)
-            .onSizeChanged { sz ->
-                if (collapseFraction < 0.02f && sz.height > 0) {
-                    onMeasureExpandedHeightDp(with(density) { sz.height.toDp() })
-                }
-            }
             .graphicsLayer {
-                translationY = activePullPx * 0.34f
+                translationY = activePullPx * 0.34f - scrollTranslationYPx
                 val s = 1f + 0.036f * pullRatio.coerceIn(0f, 1f)
                 scaleX = s
                 scaleY = s
+                alpha = if (hideWhenScrolledPast) 0f else 1f
                 transformOrigin = TransformOrigin(0.5f, 0.15f)
             }
             .then(gestureMod)
@@ -1881,7 +2019,13 @@ private fun HomeFloatingLiveStage(
             pullExpandRatio = pullRatio,
             useWideHorizontal = useWideHorizontalHero,
             onToggleFullscreen = onOpenFullscreen,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .onSizeChanged { sz ->
+                    if (collapseFraction < 0.02f && sz.height > 0) {
+                        onMeasureExpandedHeightDp(with(density) { sz.height.toDp() })
+                    }
+                }
         )
     }
 }
@@ -2115,13 +2259,13 @@ private fun FocusTimerStage(
                     contentAlignment = Alignment.Center
                 ) {
                     val resolvedRingSize = minOf(maxWidth - 8.dp, maxHeight - 8.dp)
-                        .coerceIn(240.dp, 500.dp)
-                    val ringScale = (resolvedRingSize / 222.dp).coerceIn(1.20f, 2.25f)
+                        .coerceIn(140.dp, 500.dp)
+                    val ringScale = (resolvedRingSize / 222.dp).coerceIn(0.75f, 2.25f)
                     val formattedLen = remember(displayEarned) {
                         String.format(Locale.US, "%,.1f", displayEarned.coerceAtLeast(0.0)).length
                     }
                     val digitFitScale = (7.8f / formattedLen.coerceAtLeast(7)).coerceIn(0.66f, 1f)
-                    val odoFontSp = ((30f * ringScale).coerceIn(38f, 60f) * digitFitScale).sp
+                    val odoFontSp = ((30f * ringScale).coerceIn(22f, 60f) * digitFitScale).sp
                     val labelFontSp = (12.5f * ringScale.coerceAtMost(1.65f)).sp
                     val rateFontSp = (12.5f * ringScale.coerceAtMost(1.75f)).sp
                     val badgeFontSp = (11.5f * ringScale.coerceAtMost(1.60f)).sp
@@ -2224,8 +2368,10 @@ private fun FocusTimerStage(
                     onRequestClockOut = { pendingClockOutTarget = it }
                 )
             } else {
-                // Continuous morphing stage: same ring & odometer seamlessly glide from hero -> docked top card
+                // Continuous morphing stage: ring smoothly scales down; centered hero readout cross-fades cleanly to docked row readout
                 val expandedControlsAlpha = (1f - (collapse / 0.45f)).coerceIn(0f, 1f)
+                val heroMetricsAlpha = (1f - (collapse / 0.38f)).coerceIn(0f, 1f)
+                val dockedMetricsAlpha = ((collapse - 0.48f) / 0.42f).coerceIn(0f, 1f)
                 val dockedActionsAlpha = ((collapse - 0.50f) / 0.45f).coerceIn(0f, 1f)
                 val formattedLen = remember(displayEarned) {
                     String.format(Locale.US, "%,.1f", displayEarned.coerceAtLeast(0.0)).length
@@ -2235,8 +2381,6 @@ private fun FocusTimerStage(
                 } else {
                     29f
                 }
-                val odometerFontSp = lerp(baseHeroOdoSp, 20.5f, collapse)
-                val labelAlpha = (1f - (collapse / 0.42f)).coerceIn(0f, 1f)
 
                 Layout(
                     modifier = Modifier
@@ -2254,35 +2398,34 @@ private fun FocusTimerStage(
                             modifier = Modifier.size(ringSize)
                         )
 
-                        // 1: Odometer, rate & elapsed/progress readout
+                        // 1: Inside-ring hero odometer readout (pinned strictly inside ring, fades out cleanly before ring shrinks tightly)
                         Column(
-                            horizontalAlignment = if (collapse < 0.5f) Alignment.CenterHorizontally else Alignment.Start,
-                            verticalArrangement = Arrangement.spacedBy(androidx.compose.ui.unit.lerp(5.dp, 2.dp, collapse))
-                        ) {
-                            if (labelAlpha > 0.04f) {
-                                Text(
-                                    text = if (isCombinedView) "통합 누적 수익" else "실시간 수익",
-                                    style = MiuixTheme.textStyles.footnote2,
-                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                    modifier = Modifier.graphicsLayer { alpha = labelAlpha }
-                                )
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(5.dp),
+                            modifier = Modifier.graphicsLayer {
+                                alpha = heroMetricsAlpha
+                                val s = 0.90f + 0.10f * heroMetricsAlpha
+                                scaleX = s
+                                scaleY = s
                             }
+                        ) {
+                            Text(
+                                text = if (isCombinedView) "통합 누적 수익" else "실시간 수익",
+                                style = MiuixTheme.textStyles.footnote2,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                            )
                             OdometerCurrencyText(
                                 amountWon = displayEarned,
                                 textStyle = MiuixTheme.textStyles.title1.copy(
-                                    fontSize = odometerFontSp.sp,
+                                    fontSize = baseHeroOdoSp.sp,
                                     fontWeight = FontWeight.SemiBold
                                 ),
                                 color = MiuixTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = if (collapse < 0.65f) {
-                                    String.format(Locale.US, "+%.2f원/초 · +%.0f원/분", displayRatePerSec, displayRatePerMin)
-                                } else {
-                                    String.format(Locale.US, "+%.2f원/초 · %s", displayRatePerSec, PayrollCalculator.formatCountdown(focusedShift.elapsedWorkMillis))
-                                },
+                                text = String.format(Locale.US, "+%.2f원/초 · +%.0f원/분", displayRatePerSec, displayRatePerMin),
                                 style = MiuixTheme.textStyles.footnote1.copy(
-                                    fontSize = lerp(12.5f, 11.5f, collapse).sp,
+                                    fontSize = 12.5f.sp,
                                     fontWeight = FontWeight.Medium,
                                     fontFeatureSettings = "tnum"
                                 ),
@@ -2290,29 +2433,53 @@ private fun FocusTimerStage(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
-
-                            if (collapse < 0.65f) {
-                                val progress = focusedShift.progressFraction
-                                val remMs = focusedShift.remainingMillis
-                                Box(modifier = Modifier.graphicsLayer { alpha = (1f - collapse / 0.65f).coerceIn(0f, 1f) }) {
-                                    if (!isCombinedView && progress != null && remMs != null) {
-                                        SquirclePillBadge(
-                                            text = "${String.format(Locale.US, "%.1f", progress * 100f)}% · 남음 ${PayrollCalculator.formatCountdown(remMs)}",
-                                            backgroundColor = MiuixTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
-                                            contentColor = MiuixTheme.colorScheme.onSecondaryContainer
-                                        )
-                                    } else {
-                                        SquirclePillBadge(
-                                            text = "실근무 ${PayrollCalculator.formatCountdown(focusedShift.elapsedWorkMillis)}",
-                                            backgroundColor = MiuixTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
-                                            contentColor = MiuixTheme.colorScheme.onSecondaryContainer
-                                        )
-                                    }
-                                }
+                            val progress = focusedShift.progressFraction
+                            val remMs = focusedShift.remainingMillis
+                            if (!isCombinedView && progress != null && remMs != null) {
+                                SquirclePillBadge(
+                                    text = "${String.format(Locale.US, "%.1f", progress * 100f)}% · 남음 ${PayrollCalculator.formatCountdown(remMs)}",
+                                    backgroundColor = MiuixTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
+                                    contentColor = MiuixTheme.colorScheme.onSecondaryContainer
+                                )
+                            } else {
+                                SquirclePillBadge(
+                                    text = "실근무 ${PayrollCalculator.formatCountdown(focusedShift.elapsedWorkMillis)}",
+                                    backgroundColor = MiuixTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
+                                    contentColor = MiuixTheme.colorScheme.onSecondaryContainer
+                                )
                             }
                         }
 
-                        // 2: Expanded controls (phone: stacked below ring; wide dual hero: beside ring with right buttons)
+                        // 2: Docked side odometer readout (strictly to the right of the ring, never overlapping ring)
+                        Column(
+                            horizontalAlignment = Alignment.Start,
+                            verticalArrangement = Arrangement.spacedBy(2.dp),
+                            modifier = Modifier.graphicsLayer {
+                                alpha = dockedMetricsAlpha
+                            }
+                        ) {
+                            OdometerCurrencyText(
+                                amountWon = displayEarned,
+                                textStyle = MiuixTheme.textStyles.title1.copy(
+                                    fontSize = 20.5f.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                ),
+                                color = MiuixTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = String.format(Locale.US, "+%.2f원/초 · %s", displayRatePerSec, PayrollCalculator.formatCountdown(focusedShift.elapsedWorkMillis)),
+                                style = MiuixTheme.textStyles.footnote1.copy(
+                                    fontSize = 11.5f.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    fontFeatureSettings = "tnum"
+                                ),
+                                color = accentColor,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+
+                        // 3: Expanded controls (phone: stacked below ring; wide dual hero: beside ring with right buttons)
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -2333,14 +2500,15 @@ private fun FocusTimerStage(
                             )
                         }
 
-                        // 3: Compact docked right action buttons
+                        // 4: Compact docked right action buttons (no outward X translation so right edge never clips)
                         Column(
                             verticalArrangement = Arrangement.spacedBy(6.dp),
                             horizontalAlignment = Alignment.End,
                             modifier = Modifier.graphicsLayer {
                                 alpha = dockedActionsAlpha
-                                val shiftX = (1f - dockedActionsAlpha) * 16f
-                                translationX = shiftX
+                                val s = 0.90f + 0.10f * dockedActionsAlpha
+                                scaleX = s
+                                scaleY = s
                             }
                         ) {
                             SquirclePillBadge(
@@ -2363,22 +2531,22 @@ private fun FocusTimerStage(
                     val ringW = ringPlaceable.width
                     val ringH = ringPlaceable.height
 
-                    val dockedActionPlaceable = measurables[3].measure(Constraints(maxWidth = maxW / 3))
+                    val dockedActionPlaceable = measurables[4].measure(Constraints(maxWidth = maxW / 3))
                     val sideGapPx = 16.dp.roundToPx()
                     val expandedControlsPlaceable = if (useWideSideSplit) {
                         val sideAvailW = (maxW - ringW - sideGapPx).coerceAtLeast(160.dp.roundToPx())
-                        measurables[2].measure(Constraints(minWidth = sideAvailW, maxWidth = sideAvailW))
+                        measurables[3].measure(Constraints(minWidth = sideAvailW, maxWidth = sideAvailW))
                     } else {
-                        measurables[2].measure(Constraints(minWidth = maxW, maxWidth = maxW))
+                        measurables[3].measure(Constraints(minWidth = maxW, maxWidth = maxW))
                     }
 
-                    val metricsMaxWAtHero = (ringW - 20.dp.roundToPx()).coerceAtLeast(116.dp.roundToPx())
-                    val metricsMaxWAtDock = (maxW - ringW - dockedActionPlaceable.width - 20.dp.roundToPx())
-                        .coerceAtLeast(100.dp.roundToPx())
-                    val metricsMaxW = lerp(metricsMaxWAtHero.toFloat(), metricsMaxWAtDock.toFloat(), collapse)
-                        .roundToInt()
+                    val heroMetricsMaxW = (ringW - 20.dp.roundToPx()).coerceAtLeast(108.dp.roundToPx())
+                    val heroMetricsPlaceable = measurables[1].measure(Constraints(maxWidth = heroMetricsMaxW))
+
+                    val dockedGapPx = 10.dp.roundToPx()
+                    val dockedMetricsMaxW = (maxW - ringW - dockedActionPlaceable.width - dockedGapPx - 8.dp.roundToPx())
                         .coerceIn(80, maxW)
-                    val metricsPlaceable = measurables[1].measure(Constraints(maxWidth = metricsMaxW))
+                    val dockedMetricsPlaceable = measurables[2].measure(Constraints(maxWidth = dockedMetricsMaxW))
 
                     val expandedGapPx = 12.dp.roundToPx()
                     val expandedTotalH = if (useWideSideSplit) {
@@ -2386,7 +2554,7 @@ private fun FocusTimerStage(
                     } else {
                         ringH + expandedGapPx + expandedControlsPlaceable.height
                     }
-                    val dockedTotalH = maxOf(ringH, metricsPlaceable.height, dockedActionPlaceable.height)
+                    val dockedTotalH = maxOf(ringH, dockedMetricsPlaceable.height, dockedActionPlaceable.height)
                     val currentH = lerp(expandedTotalH.toFloat(), dockedTotalH.toFloat(), collapse)
                         .roundToInt()
                         .coerceAtLeast(1)
@@ -2398,18 +2566,19 @@ private fun FocusTimerStage(
                         val ringY = lerp(ringYHero, ((dockedTotalH - ringH) / 2f), collapse).roundToInt()
                         ringPlaceable.placeRelative(ringX, ringY)
 
-                        val metricsXHero = if (useWideSideSplit) {
-                            (ringW - metricsPlaceable.width) / 2f
-                        } else {
-                            (maxW - metricsPlaceable.width) / 2f
+                        if (heroMetricsAlpha > 0.01f) {
+                            heroMetricsPlaceable.placeRelative(
+                                ringX + (ringW - heroMetricsPlaceable.width) / 2,
+                                ringY + (ringH - heroMetricsPlaceable.height) / 2
+                            )
                         }
-                        val metricsXDock = (ringW + 10.dp.roundToPx()).toFloat()
-                        val metricsYHero = ringYHero + (ringH - metricsPlaceable.height) / 2f
-                        val metricsYDock = (dockedTotalH - metricsPlaceable.height) / 2f
-                        metricsPlaceable.placeRelative(
-                            lerp(metricsXHero, metricsXDock, collapse).roundToInt(),
-                            lerp(metricsYHero, metricsYDock, collapse).roundToInt()
-                        )
+
+                        if (dockedMetricsAlpha > 0.01f) {
+                            dockedMetricsPlaceable.placeRelative(
+                                ringX + ringW + dockedGapPx,
+                                (dockedTotalH - dockedMetricsPlaceable.height) / 2
+                            )
+                        }
 
                         if (expandedControlsAlpha > 0.01f) {
                             if (useWideSideSplit) {
@@ -3242,4 +3411,28 @@ private fun GoalArchiveBottomSheet(
             }
         )
     }
+}
+
+private fun hasGenerousScrollHeadroom(
+    listState: androidx.compose.foundation.lazy.LazyListState,
+    requiredScrollPx: Float
+): Boolean {
+    val info = listState.layoutInfo
+    val totalCount = info.totalItemsCount
+    val visible = info.visibleItemsInfo
+    if (totalCount == 0 || visible.isEmpty() || info.viewportSize.height <= 0) return false
+    if (listState.firstVisibleItemIndex > 0) return true
+    val lastVisible = visible.last()
+    if (lastVisible.index < totalCount - 1) {
+        val avgSize = visible.sumOf { it.size }.toFloat() / visible.size
+        val hiddenItems = (totalCount - 1 - lastVisible.index)
+        val remainingEst = (lastVisible.offset + lastVisible.size - info.viewportEndOffset).coerceAtLeast(0) +
+            hiddenItems * avgSize + info.afterContentPadding
+        val totalScrollableEst = listState.firstVisibleItemScrollOffset + remainingEst
+        return totalScrollableEst >= requiredScrollPx
+    }
+    val contentEndWithPadding = lastVisible.offset + lastVisible.size + info.afterContentPadding
+    val remainingExact = (contentEndWithPadding - info.viewportEndOffset).toFloat().coerceAtLeast(0f)
+    val totalScrollableExact = listState.firstVisibleItemScrollOffset + remainingExact
+    return totalScrollableExact >= requiredScrollPx
 }

@@ -9,6 +9,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -271,8 +272,12 @@ private fun SwipeableToastCard(
             .then(surfaceModifier)
             .then(
                 if (isFront && !isExiting) {
-                    Modifier.pointerInput(Unit) {
-                        detectHorizontalDragGestures(
+                    Modifier
+                        .pointerInput(Unit) {
+                            detectTapGestures { }
+                        }
+                        .pointerInput(Unit) {
+                            detectHorizontalDragGestures(
                             onDragEnd = {
                                 val current = dragX.value
                                 val threshold = size.width * 0.22f

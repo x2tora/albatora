@@ -293,6 +293,42 @@ fun RecordsScreen(
         }
     }
 
+    val unpaidOverviewCard: @Composable () -> Unit = {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            insideMargin = PaddingValues(16.dp)
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    "정산 · 미입금 통합 요약",
+                    style = MiuixTheme.textStyles.body2.copy(fontWeight = FontWeight.Bold)
+                )
+                HorizontalDivider()
+                StatementRow(
+                    "정산일 경과 미수금",
+                    "${globalUnpaid.second.size}건 · ${PayrollCalculator.formatWon(globalUnpaid.first)}",
+                    if (globalUnpaid.first > 0L) MiuixTheme.colorScheme.error else Color(0xFF059669)
+                )
+                StatementRow(
+                    "정산일 예정 대기",
+                    "${scheduledPending.second.size}건 · ${PayrollCalculator.formatWon(scheduledPending.first)}",
+                    MiuixTheme.colorScheme.primary
+                )
+                HorizontalDivider()
+                StatementRow(
+                    "전체 미입금 합계",
+                    PayrollCalculator.formatWon(globalUnpaid.first + scheduledPending.first),
+                    MiuixTheme.colorScheme.onSurface
+                )
+                Text(
+                    "우측 항목의 상태 배지를 탭하면 즉시 입금 완료로 전환됩니다.",
+                    style = MiuixTheme.textStyles.footnote2,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                )
+            }
+        }
+    }
+
     val wideDualEnabled = LocalWideDualLayoutEnabled.current
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val isWideDual = wideDualEnabled && maxWidth >= 600.dp
@@ -321,6 +357,7 @@ fun RecordsScreen(
                         item { statementCard() }
                     } else {
                         item { unpaidBannerCard() }
+                        item { unpaidOverviewCard() }
                     }
                 }
 
@@ -365,7 +402,11 @@ fun RecordsScreen(
                                 EmptyDataBanner(
                                     icon = MiuixIcons.Ok,
                                     title = "미수금이 없습니다",
-                                    subtitle = "정산일이 지난 미수금이 없습니다",
+                                    subtitle = if (scheduledPending.second.isNotEmpty()) {
+                                        "정산일이 지난 미수금은 없으며, 정산 예정 대기 ${scheduledPending.second.size}건(${PayrollCalculator.formatWon(scheduledPending.first)})이 아래에 표시됩니다"
+                                    } else {
+                                        "정산일이 지난 미수금이 없습니다"
+                                    },
                                     accentColor = Color(0xFF16A34A)
                                 )
                             }
@@ -442,7 +483,11 @@ fun RecordsScreen(
                             EmptyDataBanner(
                                 icon = MiuixIcons.Ok,
                                 title = "미수금이 없습니다",
-                                subtitle = "정산일이 지난 미수금이 없습니다",
+                                subtitle = if (scheduledPending.second.isNotEmpty()) {
+                                    "정산일이 지난 미수금은 없으며, 정산 예정 대기 ${scheduledPending.second.size}건(${PayrollCalculator.formatWon(scheduledPending.first)})이 아래에 표시됩니다"
+                                } else {
+                                    "정산일이 지난 미수금이 없습니다"
+                                },
                                 accentColor = Color(0xFF16A34A)
                             )
                         }

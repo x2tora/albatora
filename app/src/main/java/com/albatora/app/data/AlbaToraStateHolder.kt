@@ -221,9 +221,10 @@ class AlbaToraStateHolder private constructor(context: Context) {
         }
     }
 
-    fun stampTemplateOnDate(template: ShortTermTemplate, date: LocalDate) {
+    fun stampTemplateOnDate(template: ShortTermTemplate, date: LocalDate): String {
+        val newId = UUID.randomUUID().toString()
         val rec = WorkRecord(
-            id = UUID.randomUUID().toString(),
+            id = newId,
             jobId = null,
             title = template.name,
             emoji = template.emoji,
@@ -250,6 +251,7 @@ class AlbaToraStateHolder private constructor(context: Context) {
             memo = template.memo
         )
         upsertRecord(rec)
+        return newId
     }
 
     // Live tracker actions
@@ -600,6 +602,8 @@ class AlbaToraStateHolder private constructor(context: Context) {
     }
 
     fun exportBackupJson(): String = repository.exportToJson(_state.value)
+
+    fun previewBackupJson(rawJson: String): Result<AlbaToraDataState> = repository.importFromJson(rawJson)
 
     fun importBackupJson(rawJson: String): Result<Unit> {
         val result = repository.importFromJson(rawJson)

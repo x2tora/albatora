@@ -12,12 +12,17 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -51,6 +56,7 @@ fun CalculatorScreen(
     val tabs = listOf("시급·월급", "주휴수당", "일용직·순수익", "퇴직금")
     val navBottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     val wideDualEnabled = LocalWideDualLayoutEnabled.current
+    val focusManager = LocalFocusManager.current
 
     val allSections = listOf(
         rememberHourlyMonthlySections(defaultMinWage, onCreateJobWithWage),
@@ -77,7 +83,14 @@ fun CalculatorScreen(
             )
     }
 
-    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+    BoxWithConstraints(
+        modifier = Modifier
+            .fillMaxSize()
+            .imePadding()
+            .pointerInput(Unit) {
+                detectTapGestures(onTap = { focusManager.clearFocus() })
+            }
+    ) {
         val isWideDual = wideDualEnabled && maxWidth >= 600.dp
         val singleSidePad = ((maxWidth - 600.dp) / 2f).coerceAtLeast(20.dp)
 
@@ -182,6 +195,7 @@ private fun rememberHourlyMonthlySections(
     val tax = PayrollCalculator.computeTaxAmount(monthlyGross, taxModes[taxIdx], 0.0, false)
     val monthlyNet = monthlyGross - tax
 
+    val focusManager = LocalFocusManager.current
     val inputSection: @Composable () -> Unit = {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Card(modifier = Modifier.fillMaxWidth(), insideMargin = PaddingValues(16.dp)) {
@@ -189,8 +203,8 @@ private fun rememberHourlyMonthlySections(
                     TextField(
                         value = hourlyText,
                         onValueChange = { hourlyText = it.filter(Char::isDigit) },
-                        label = "시급 (원, 2026 최저시급 ${PayrollCalculator.formatWon(defaultMinWage)})",
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        label = "시급 (원)${if (hourly > 0L) " · ${PayrollCalculator.formatWon(hourly)}" else ""}",
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -229,7 +243,7 @@ private fun rememberHourlyMonthlySections(
                             value = dailyHoursText,
                             onValueChange = { dailyHoursText = it },
                             label = "일 근무 시간",
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next),
                             singleLine = true,
                             modifier = Modifier.weight(1f)
                         )
@@ -237,7 +251,8 @@ private fun rememberHourlyMonthlySections(
                             value = weeklyDaysText,
                             onValueChange = { weeklyDaysText = it },
                             label = "주 근무 일수",
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+                            keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                             singleLine = true,
                             modifier = Modifier.weight(1f)
                         )
@@ -314,6 +329,7 @@ private fun rememberWeeklyHolidaySections(
     val whHours = if (eligible) (capped / 40.0) * 8.0 else 0.0
     val whPay = (whHours * hourly).roundToLong()
 
+    val focusManager = LocalFocusManager.current
     val inputSection: @Composable () -> Unit = {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Card(modifier = Modifier.fillMaxWidth(), insideMargin = PaddingValues(16.dp)) {
@@ -321,8 +337,8 @@ private fun rememberWeeklyHolidaySections(
                     TextField(
                         value = hourlyText,
                         onValueChange = { hourlyText = it.filter(Char::isDigit) },
-                        label = "시급 (원)",
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        label = "시급 (원)${if (hourly > 0L) " · ${PayrollCalculator.formatWon(hourly)}" else ""}",
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -330,7 +346,8 @@ private fun rememberWeeklyHolidaySections(
                         value = weeklyHoursText,
                         onValueChange = { weeklyHoursText = it },
                         label = "1주 소정 근로시간 (예: 15, 20, 40)",
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -427,6 +444,7 @@ private fun rememberDailyWorkerNetSections(): CalcTabSections {
     val expenses = (transportText.toLongOrNull() ?: 0L) + (mealText.toLongOrNull() ?: 0L)
     val net = gross - tax - fee - expenses
 
+    val focusManager = LocalFocusManager.current
     val inputSection: @Composable () -> Unit = {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Card(modifier = Modifier.fillMaxWidth(), insideMargin = PaddingValues(16.dp)) {
@@ -435,16 +453,16 @@ private fun rememberDailyWorkerNetSections(): CalcTabSections {
                         TextField(
                             value = dailyPayText,
                             onValueChange = { dailyPayText = it.filter(Char::isDigit) },
-                            label = "일당/건당 총액",
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            label = "일당/건당${if (daily > 0L) " (${PayrollCalculator.formatWon(daily)})" else ""}",
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
                             singleLine = true,
                             modifier = Modifier.weight(1f)
                         )
                         TextField(
                             value = bonusText,
                             onValueChange = { bonusText = it.filter(Char::isDigit) },
-                            label = "현장 지원금(+)",
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            label = "현장 지원금(+)${if (bonus > 0L) " · ${PayrollCalculator.formatWon(bonus)}" else ""}",
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
                             singleLine = true,
                             modifier = Modifier.weight(1f)
                         )
@@ -486,7 +504,7 @@ private fun rememberDailyWorkerNetSections(): CalcTabSections {
                             value = transportText,
                             onValueChange = { transportText = it.filter(Char::isDigit) },
                             label = "교통비(-)",
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
                             singleLine = true,
                             modifier = Modifier.weight(1f)
                         )
@@ -494,7 +512,7 @@ private fun rememberDailyWorkerNetSections(): CalcTabSections {
                             value = mealText,
                             onValueChange = { mealText = it.filter(Char::isDigit) },
                             label = "식비(-)",
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
                             singleLine = true,
                             modifier = Modifier.weight(1f)
                         )
@@ -503,8 +521,9 @@ private fun rememberDailyWorkerNetSections(): CalcTabSections {
                         TextField(
                             value = feeText,
                             onValueChange = { feeText = it },
-                            label = "수수료(-)",
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            label = if (feeType == FeeType.PERCENT) "수수료율 (%, -)" else "수수료 금액 (원, -)",
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+                            keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                             singleLine = true,
                             modifier = Modifier.weight(1.3f)
                         )
@@ -574,14 +593,15 @@ private fun rememberSeveranceSections(): CalcTabSections {
     val weeklyHours = weeklyAvgHoursText.toDoubleOrNull() ?: 0.0
     val (eligible, reason, severance) = PayrollCalculator.calculateSeverancePay(monthlyAvg, workedDays, weeklyHours)
 
+    val focusManager = LocalFocusManager.current
     val inputSection: @Composable () -> Unit = {
         Card(modifier = Modifier.fillMaxWidth(), insideMargin = PaddingValues(16.dp)) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 TextField(
                     value = monthlyAvgText,
                     onValueChange = { monthlyAvgText = it.filter(Char::isDigit) },
-                    label = "최근 3개월 월 평균 급여 (원)",
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    label = "최근 3개월 월 평균 급여 (원)${if (monthlyAvg > 0L) " · ${PayrollCalculator.formatWon(monthlyAvg)}" else ""}",
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -590,7 +610,7 @@ private fun rememberSeveranceSections(): CalcTabSections {
                         value = workedDaysText,
                         onValueChange = { workedDaysText = it.filter(Char::isDigit) },
                         label = "총 계속근로일수 (일)",
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
                         singleLine = true,
                         modifier = Modifier.weight(1f)
                     )
@@ -598,7 +618,8 @@ private fun rememberSeveranceSections(): CalcTabSections {
                         value = weeklyAvgHoursText,
                         onValueChange = { weeklyAvgHoursText = it },
                         label = "주 평균 근무시간",
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                         singleLine = true,
                         modifier = Modifier.weight(1f)
                     )

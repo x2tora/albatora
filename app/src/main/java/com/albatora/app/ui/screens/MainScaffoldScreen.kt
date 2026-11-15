@@ -250,7 +250,8 @@ fun MainScaffoldScreen(
                         onDelete = { id ->
                             viewModel.deleteJob(id, deleteRecords = false)
                             backStack.removeAt(backStack.lastIndex)
-                        }
+                        },
+                        onNotify = { toastState.show(it) }
                     )
                 }
 
@@ -272,7 +273,8 @@ fun MainScaffoldScreen(
                         onDelete = { id ->
                             viewModel.deleteRecord(id)
                             backStack.removeAt(backStack.lastIndex)
-                        }
+                        },
+                        onNotify = { toastState.show(it) }
                     )
                 }
             }
@@ -338,6 +340,7 @@ private fun MainTabsHost(
 
     LaunchedEffect(launchActionNonce) {
         if (launchActionNonce > 0) {
+            isFullscreenFocus = false
             selectedTab = launchTargetTab.coerceIn(0, 3)
             showHomeQuickMenu = false
             if (launchOpenStopwatch) {
@@ -516,6 +519,7 @@ private fun MainTabsHost(
                                 onMarkAbsent = viewModel::markAbsent,
                                 onAddSubstituteFromJob = viewModel::addSubstituteFromJob,
                                 onStampTemplateOnDate = viewModel::stampTemplateOnDate,
+                                onUndoStampRecord = viewModel::deleteRecord,
                                 onNotify = notify
                             )
                             2 -> RecordsScreen(
@@ -647,14 +651,22 @@ private fun MainTabsHost(
                                 .padding(horizontal = 16.dp, vertical = 14.dp)
                         )
                     } else {
-                        NavigationBar(
-                            showDivider = true,
-                            defaultWindowInsetsPadding = true,
-                            mode = NavigationBarDisplayMode.IconAndText,
+                        Box(
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
                                 .fillMaxWidth()
+                                .background(MiuixTheme.colorScheme.surface)
                         ) {
+                            HorizontalDivider(modifier = Modifier.align(Alignment.TopCenter))
+                            NavigationBar(
+                                showDivider = false,
+                                defaultWindowInsetsPadding = true,
+                                mode = NavigationBarDisplayMode.IconAndText,
+                                modifier = Modifier
+                                    .align(Alignment.Center)
+                                    .widthIn(max = 560.dp)
+                                    .fillMaxWidth()
+                            ) {
                             NavigationBarItem(
                                 selected = !showHomeQuickMenu && selectedTab == 0,
                                 onClick = {
@@ -757,30 +769,10 @@ private fun MainTabsHost(
                                 label = "계산기"
                             )
                         }
+                        }
                     }
                 }
             }
-
-            val toastBottomPadding by animateDpAsState(
-                targetValue = when {
-                    !showChrome -> 24.dp
-                    isLiquidGlassNav -> 104.dp
-                    else -> 94.dp
-                },
-                animationSpec = spring(dampingRatio = 0.88f, stiffness = Spring.StiffnessMediumLow),
-                label = "toast_bottom_offset"
-            )
-            StackedToastHost(
-                state = toastState,
-                backdrop = barBackdrop,
-                isLiquidGlass = isLiquidGlassNav,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .widthIn(max = 400.dp)
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .padding(start = 16.dp, end = 16.dp, bottom = toastBottomPadding)
-            )
 
             // ⑤ Morphing Quick-Add menu expanding from the center '+' button
             if (isQuickMenuMounted) {
@@ -804,6 +796,27 @@ private fun MainTabsHost(
                     }
                 )
             }
+
+            val toastBottomPadding by animateDpAsState(
+                targetValue = when {
+                    !showChrome -> 24.dp
+                    isLiquidGlassNav -> 104.dp
+                    else -> 94.dp
+                },
+                animationSpec = spring(dampingRatio = 0.88f, stiffness = Spring.StiffnessMediumLow),
+                label = "toast_bottom_offset"
+            )
+            StackedToastHost(
+                state = toastState,
+                backdrop = barBackdrop,
+                isLiquidGlass = isLiquidGlassNav,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .widthIn(max = 400.dp)
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(start = 16.dp, end = 16.dp, bottom = toastBottomPadding)
+            )
 
             AppUpdateDialog(
                 uiState = updateUiState,
@@ -898,6 +911,7 @@ private fun SettingsScreenHost(
                 title = "더보기 · 설정",
                 scrollBehavior = scrollBehavior,
                 backdrop = settingsBackdrop,
+                maxContentWidth = 620.dp,
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -929,8 +943,10 @@ private fun SettingsScreenHost(
                     onUpdateOngoingNotification = viewModel::updateOngoingNotification,
                     onUpdateAutoDnd = viewModel::updateAutoDnd,
                     onUpdateDefaultMinWage = viewModel::updateDefaultMinWage,
+                    onUpsertTemplate = viewModel::upsertTemplate,
                     onDeleteTemplate = viewModel::deleteTemplate,
                     onExportJson = viewModel::exportBackupJson,
+                    onPreviewBackupJson = viewModel::previewBackupJson,
                     onImportJson = viewModel::importBackupJson,
                     onResetAllData = viewModel::resetAllData,
                     onCheckForUpdate = { viewModel.checkForUpdate(manual = true, onFeedback = notify) },

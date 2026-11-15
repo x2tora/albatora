@@ -6,6 +6,7 @@ import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -614,6 +615,7 @@ fun MiuixFloatingScrollTopBar(
     modifier: Modifier = Modifier,
     isScrolledOverride: Boolean? = null,
     backdrop: LayerBackdrop? = null,
+    maxContentWidth: Dp = Dp.Unspecified,
     navigationIcon: @Composable () -> Unit = {},
     actions: @Composable RowScope.() -> Unit = {}
 ) {
@@ -645,19 +647,36 @@ fun MiuixFloatingScrollTopBar(
     LaunchedEffect(isScrolled, hasNav, hasActions) {
         val target = isScrolled
         val stepDelayMs = 85L
-        // Always stagger strictly left -> right (navigationIcon -> title -> actions)
-        if (hasNav) {
-            navPillVisible = target
-            delay(stepDelayMs)
+        if (target) {
+            // Enter stagger: left -> right (navigationIcon -> title -> actions)
+            if (hasNav) {
+                navPillVisible = true
+                delay(stepDelayMs)
+            } else {
+                navPillVisible = false
+            }
+            titlePillVisible = true
+            if (hasActions) {
+                delay(stepDelayMs)
+                actionsPillVisible = true
+            } else {
+                actionsPillVisible = false
+            }
         } else {
-            navPillVisible = false
-        }
-        titlePillVisible = target
-        if (hasActions) {
-            delay(stepDelayMs)
-            actionsPillVisible = target
-        } else {
-            actionsPillVisible = false
+            // Exit stagger: right -> left (actions -> title -> navigationIcon)
+            if (hasActions) {
+                actionsPillVisible = false
+                delay(stepDelayMs)
+            } else {
+                actionsPillVisible = false
+            }
+            titlePillVisible = false
+            if (hasNav) {
+                delay(stepDelayMs)
+                navPillVisible = false
+            } else {
+                navPillVisible = false
+            }
         }
     }
 
@@ -703,7 +722,10 @@ fun MiuixFloatingScrollTopBar(
         )
     }
 
-    Box(modifier = modifier.fillMaxWidth()) {
+    Box(
+        modifier = modifier.fillMaxWidth(),
+        contentAlignment = Alignment.TopCenter
+    ) {
         // Restored top progressive blur scrim behind the separated floating islands
         Box(
             modifier = Modifier
@@ -713,6 +735,7 @@ fun MiuixFloatingScrollTopBar(
 
         Row(
             modifier = Modifier
+                .then(if (maxContentWidth != Dp.Unspecified) Modifier.widthIn(max = maxContentWidth) else Modifier)
                 .fillMaxWidth()
                 .statusBarsPadding()
                 .height(58.dp)
@@ -742,13 +765,21 @@ fun MiuixFloatingScrollTopBar(
                     slideOffsetPx = slideOffsetPx,
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 9.dp)
                 ) {
-                    Text(
-                        text = title,
-                        style = MiuixTheme.textStyles.title3.copy(fontWeight = FontWeight.SemiBold),
-                        color = MiuixTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    AnimatedContent(
+                        targetState = title,
+                        transitionSpec = {
+                            fadeIn(tween(180)).togetherWith(fadeOut(tween(120)))
+                        },
+                        label = "top_bar_title_fade"
+                    ) { animTitle ->
+                        Text(
+                            text = animTitle,
+                            style = MiuixTheme.textStyles.title3.copy(fontWeight = FontWeight.SemiBold),
+                            color = MiuixTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
             }
 
@@ -785,7 +816,7 @@ private fun FloatingTopBarIsland(
     val p = progress.coerceIn(0f, 1f)
     val density = LocalDensity.current
     val isLiquidGlass = LocalLiquidGlassEnabled.current
-    val minSizePx = with(density) { 42.dp.roundToPx() }
+    val minSizePx = with(density) { 48.dp.roundToPx() }
     val pillShape = RoundedCornerShape(cornerRadius)
     val pillFill = if (isDark) {
         MiuixTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f)

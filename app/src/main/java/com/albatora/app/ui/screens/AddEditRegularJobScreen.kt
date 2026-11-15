@@ -1,5 +1,6 @@
 package com.albatora.app.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -7,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
@@ -54,6 +56,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import java.time.LocalDate
 import java.util.UUID
+import kotlinx.coroutines.launch
 
 @Composable
 fun AddEditRegularJobScreen(
@@ -62,7 +65,8 @@ fun AddEditRegularJobScreen(
     prefillHourlyWage: Long? = null,
     onBack: () -> Unit,
     onSave: (Job) -> Unit,
-    onDelete: ((String) -> Unit)? = null
+    onDelete: ((String) -> Unit)? = null,
+    onNotify: (String) -> Unit = {}
 ) {
     val isEditing = existingJob != null
     val today = remember { LocalDate.now() }
@@ -114,8 +118,121 @@ fun AddEditRegularJobScreen(
 
     var showStartDatePicker by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var showDiscardConfirm by remember { mutableStateOf(false) }
     var pendingEditJob by remember { mutableStateOf<Job?>(null) }
     var errorMsg by remember { mutableStateOf<String?>(null) }
+
+    val listState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
+    val initialSignature = remember(existingJob?.id) {
+        listOf(
+            existingJob?.name ?: "",
+            existingJob?.emoji ?: "",
+            (existingJob?.colorHex ?: JobAccentPalette.first().second).toString(),
+            (existingJob?.payType ?: PayType.HOURLY).name,
+            (existingJob?.baseAmount ?: prefillHourlyWage ?: defaultMinWage).toString(),
+            existingJob?.scheduleStartDate?.takeIf { it.isNotBlank() } ?: PayrollCalculator.formatDate(today),
+            (existingJob?.wageHistory ?: emptyList()).toString(),
+            (existingJob?.schedules ?: emptyList()).toString(),
+            (existingJob?.weeklyHoliday?.enabled ?: true).toString(),
+            (existingJob?.weeklyHoliday?.excludeOnAbsenceOrEarlyLeave ?: true).toString(),
+            (existingJob?.weeklyHoliday?.forceIncludeUnder15h ?: false).toString(),
+            (existingJob?.allowance?.nightAllowanceEnabled ?: false).toString(),
+            (existingJob?.allowance?.overtimeAllowanceEnabled ?: false).toString(),
+            (existingJob?.allowance?.holidayAllowanceEnabled ?: false).toString(),
+            (existingJob?.allowance?.holidayIncludesWeekends ?: true).toString(),
+            (existingJob?.taxMode ?: TaxMode.NONE).name,
+            (existingJob?.customTaxRatePercent ?: 3.3).toString(),
+            (existingJob?.dailyWorkerIncludeLocalTax ?: true).toString(),
+            (existingJob?.settlementMode ?: SettlementPeriodMode.FIRST_TO_END).name,
+            (existingJob?.settlementCutoffDay ?: 25).toString(),
+            (existingJob?.settlementCustomStartDay ?: 1).toString(),
+            (existingJob?.settlementCustomEndDay ?: 31).toString(),
+            (existingJob?.settlementPrevMonthCycle ?: true).toString(),
+            (existingJob?.paydayDay ?: 10).toString(),
+            (existingJob?.paydayHolidayRule ?: PaydayHolidayRule.PREV_BUSINESS_DAY).name,
+            existingJob?.memo ?: ""
+        ).joinToString("|")
+    }
+    val currentSignature = listOf(
+        name, emoji, colorHex.toString(), payType.name, baseAmountText, scheduleStartDate,
+        wageHistory.toString(), schedules.toString(), whEnabled.toString(),
+        whExcludeAbsence.toString(), whForceUnder15h.toString(), nightEnabled.toString(),
+        overtimeEnabled.toString(), holidayEnabled.toString(), holidayIncludesWeekends.toString(),
+        taxMode.name, customTaxText, dailyIncludeLocalTax.toString(), settlementMode.name,
+        settlementCutoffText, settlementCustomStartText, settlementCustomEndText,
+        settlementPrevMonthCycle.toString(), paydayDayText, paydayHolidayRule.name, memo
+    ).joinToString("|")
+    val isDirty = currentSignature != initialSignature
+
+    BackHandler(enabled = isDirty) {
+        showDiscardConfirm = true
+    }
+
+    val handleBackAttempt: () -> Unit = {
+        if (isDirty) showDiscardConfirm = true else onBack()
+    }
+
+    fun handleSubmit() {
+        val trimmed = name.trim()
+        val baseAmt = baseAmountText.toLongOrNull() ?: 0L
+        if (trimmed.isEmpty()) {
+            val msg = "근무지 이름을 입력해 주세요."
+            errorMsg = msg
+            onNotify(msg)
+            coroutineScope.launch { listState.animateScrollToItem(0) }
+            return
+        }
+        if (baseAmt <= 0L) {
+            val msg = "올바른 급여 금액을 입력해 주세요."
+            errorMsg = msg
+            onNotify(msg)
+            coroutineScope.launch { listState.animateScrollToItem(0) }
+            return
+        }
+        errorMsg = null
+        val built = Job(
+            id = existingJob?.id ?: UUID.randomUUID().toString(),
+            name = trimmed,
+            emoji = emoji,
+            kind = JobKind.REGULAR,
+            colorHex = colorHex,
+            payType = payType,
+            baseAmount = baseAmt,
+            wageHistory = wageHistory.sortedBy { it.effectiveFromDate },
+            scheduleStartDate = scheduleStartDate,
+            schedules = schedules.sortedBy { it.dayOfWeek },
+            taxMode = taxMode,
+            customTaxRatePercent = customTaxText.toDoubleOrNull() ?: 0.0,
+            dailyWorkerIncludeLocalTax = dailyIncludeLocalTax,
+            allowance = AllowanceSettings(
+                nightAllowanceEnabled = nightEnabled,
+                overtimeAllowanceEnabled = overtimeEnabled,
+                holidayAllowanceEnabled = holidayEnabled,
+                holidayIncludesWeekends = holidayIncludesWeekends
+            ),
+            weeklyHoliday = WeeklyHolidayRule(
+                enabled = whEnabled,
+                excludeOnAbsenceOrEarlyLeave = whExcludeAbsence,
+                forceIncludeUnder15h = whForceUnder15h
+            ),
+            settlementMode = settlementMode,
+            settlementCutoffDay = (settlementCutoffText.toIntOrNull() ?: 25).coerceIn(1, 28),
+            settlementCustomStartDay = (settlementCustomStartText.toIntOrNull() ?: 1).coerceIn(1, 31),
+            settlementCustomEndDay = (settlementCustomEndText.toIntOrNull() ?: 31).coerceIn(1, 31),
+            settlementPrevMonthCycle = settlementPrevMonthCycle,
+            paydayDay = (paydayDayText.toIntOrNull() ?: 10).coerceIn(1, 31),
+            paydayHolidayRule = paydayHolidayRule,
+            memo = memo.trim(),
+            isArchived = existingJob?.isArchived ?: false,
+            createdAtMillis = existingJob?.createdAtMillis ?: System.currentTimeMillis()
+        )
+        if (isEditing) {
+            pendingEditJob = built
+        } else {
+            onSave(built)
+        }
+    }
 
     val scrollBehavior = MiuixScrollBehavior(state = rememberTopAppBarState())
     val surfaceBg = MiuixTheme.colorScheme.surface
@@ -130,8 +247,9 @@ fun AddEditRegularJobScreen(
                 title = if (isEditing) "정규 알바 수정" else "정규/고정 알바 추가",
                 scrollBehavior = scrollBehavior,
                 backdrop = barBackdrop,
+                maxContentWidth = 620.dp,
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = handleBackAttempt) {
                         Icon(
                             imageVector = MiuixIcons.Back,
                             contentDescription = "뒤로가기"
@@ -149,61 +267,7 @@ fun AddEditRegularJobScreen(
                         }
                         MiuixTopBarActionDivider()
                     }
-                    IconButton(
-                        onClick = {
-                            val trimmed = name.trim()
-                            val baseAmt = baseAmountText.toLongOrNull() ?: 0L
-                            if (trimmed.isEmpty()) {
-                                errorMsg = "근무지 이름을 입력해 주세요."
-                                return@IconButton
-                            }
-                            if (baseAmt <= 0L) {
-                                errorMsg = "올바른 급여 금액을 입력해 주세요."
-                                return@IconButton
-                            }
-                            val built = Job(
-                                id = existingJob?.id ?: UUID.randomUUID().toString(),
-                                name = trimmed,
-                                emoji = emoji,
-                                kind = JobKind.REGULAR,
-                                colorHex = colorHex,
-                                payType = payType,
-                                baseAmount = baseAmt,
-                                wageHistory = wageHistory.sortedBy { it.effectiveFromDate },
-                                scheduleStartDate = scheduleStartDate,
-                                schedules = schedules.sortedBy { it.dayOfWeek },
-                                taxMode = taxMode,
-                                customTaxRatePercent = customTaxText.toDoubleOrNull() ?: 0.0,
-                                dailyWorkerIncludeLocalTax = dailyIncludeLocalTax,
-                                allowance = AllowanceSettings(
-                                    nightAllowanceEnabled = nightEnabled,
-                                    overtimeAllowanceEnabled = overtimeEnabled,
-                                    holidayAllowanceEnabled = holidayEnabled,
-                                    holidayIncludesWeekends = holidayIncludesWeekends
-                                ),
-                                weeklyHoliday = WeeklyHolidayRule(
-                                    enabled = whEnabled,
-                                    excludeOnAbsenceOrEarlyLeave = whExcludeAbsence,
-                                    forceIncludeUnder15h = whForceUnder15h
-                                ),
-                                settlementMode = settlementMode,
-                                settlementCutoffDay = (settlementCutoffText.toIntOrNull() ?: 25).coerceIn(1, 28),
-                                settlementCustomStartDay = (settlementCustomStartText.toIntOrNull() ?: 1).coerceIn(1, 31),
-                                settlementCustomEndDay = (settlementCustomEndText.toIntOrNull() ?: 31).coerceIn(1, 31),
-                                settlementPrevMonthCycle = settlementPrevMonthCycle,
-                                paydayDay = (paydayDayText.toIntOrNull() ?: 10).coerceIn(1, 31),
-                                paydayHolidayRule = paydayHolidayRule,
-                                memo = memo.trim(),
-                                isArchived = existingJob?.isArchived ?: false,
-                                createdAtMillis = existingJob?.createdAtMillis ?: System.currentTimeMillis()
-                            )
-                            if (isEditing) {
-                                pendingEditJob = built
-                            } else {
-                                onSave(built)
-                            }
-                        }
-                    ) {
+                    IconButton(onClick = ::handleSubmit) {
                         Icon(
                             imageVector = MiuixIcons.Ok,
                             contentDescription = "저장",
@@ -214,17 +278,20 @@ fun AddEditRegularJobScreen(
             )
         }
     ) { paddingValues ->
-        Box(modifier = Modifier.fillMaxSize()) {
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val sidePad = ((maxWidth - 620.dp) / 2f).coerceAtLeast(16.dp)
             LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .layerBackdrop(barBackdrop)
                 .background(surfaceBg)
+                .imePadding()
                 .overScrollVertical()
                 .nestedScroll(scrollBehavior.nestedScrollConnection),
             contentPadding = PaddingValues(
-                start = 16.dp,
-                end = 16.dp,
+                start = sidePad,
+                end = sidePad,
                 top = paddingValues.calculateTopPadding() + 12.dp,
                 bottom = paddingValues.calculateBottomPadding() + 24.dp
             ),
@@ -695,58 +762,7 @@ fun AddEditRegularJobScreen(
                 Spacer(modifier = Modifier.height(8.dp))
                 TextButton(
                     text = if (isEditing) "정규 알바 수정 완료" else "정규 알바 등록 완료",
-                    onClick = {
-                        val trimmed = name.trim()
-                        val baseAmt = baseAmountText.toLongOrNull() ?: 0L
-                        if (trimmed.isEmpty()) {
-                            errorMsg = "근무지 이름을 입력해 주세요."
-                            return@TextButton
-                        }
-                        if (baseAmt <= 0L) {
-                            errorMsg = "올바른 급여 금액을 입력해 주세요."
-                            return@TextButton
-                        }
-                        val built = Job(
-                            id = existingJob?.id ?: UUID.randomUUID().toString(),
-                            name = trimmed,
-                            kind = JobKind.REGULAR,
-                            colorHex = colorHex,
-                            payType = payType,
-                            baseAmount = baseAmt,
-                            wageHistory = wageHistory.sortedBy { it.effectiveFromDate },
-                            scheduleStartDate = scheduleStartDate,
-                            schedules = schedules.sortedBy { it.dayOfWeek },
-                            taxMode = taxMode,
-                            customTaxRatePercent = customTaxText.toDoubleOrNull() ?: 0.0,
-                            dailyWorkerIncludeLocalTax = dailyIncludeLocalTax,
-                            allowance = AllowanceSettings(
-                                nightAllowanceEnabled = nightEnabled,
-                                overtimeAllowanceEnabled = overtimeEnabled,
-                                holidayAllowanceEnabled = holidayEnabled,
-                                holidayIncludesWeekends = holidayIncludesWeekends
-                            ),
-                            weeklyHoliday = WeeklyHolidayRule(
-                                enabled = whEnabled,
-                                excludeOnAbsenceOrEarlyLeave = whExcludeAbsence,
-                                forceIncludeUnder15h = whForceUnder15h
-                            ),
-                            settlementMode = settlementMode,
-                            settlementCutoffDay = (settlementCutoffText.toIntOrNull() ?: 25).coerceIn(1, 28),
-                            settlementCustomStartDay = (settlementCustomStartText.toIntOrNull() ?: 1).coerceIn(1, 31),
-                            settlementCustomEndDay = (settlementCustomEndText.toIntOrNull() ?: 31).coerceIn(1, 31),
-                            settlementPrevMonthCycle = settlementPrevMonthCycle,
-                            paydayDay = (paydayDayText.toIntOrNull() ?: 10).coerceIn(1, 31),
-                            paydayHolidayRule = paydayHolidayRule,
-                            memo = memo.trim(),
-                            isArchived = existingJob?.isArchived ?: false,
-                            createdAtMillis = existingJob?.createdAtMillis ?: System.currentTimeMillis()
-                        )
-                        if (isEditing) {
-                            pendingEditJob = built
-                        } else {
-                            onSave(built)
-                        }
-                    },
+                    onClick = ::handleSubmit,
                     colors = ButtonDefaults.textButtonColorsPrimary(),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -842,6 +858,21 @@ fun AddEditRegularJobScreen(
                 onConfirm = {
                     pendingEditJob = null
                     onSave(editCandidate)
+                }
+            )
+        }
+
+        if (showDiscardConfirm) {
+            ConfirmActionDialog(
+                show = true,
+                title = "변경 사항이 저장되지 않았습니다",
+                summary = "입력하거나 수정한 내용이 사라집니다. 저장하지 않고 나가시겠습니까?",
+                confirmText = "나가기",
+                isDestructive = true,
+                onDismiss = { showDiscardConfirm = false },
+                onConfirm = {
+                    showDiscardConfirm = false
+                    onBack()
                 }
             )
         }

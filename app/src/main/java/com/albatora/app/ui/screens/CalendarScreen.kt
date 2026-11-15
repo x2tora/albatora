@@ -79,7 +79,8 @@ fun CalendarScreen(
     onMarkEarlyLeave: (WorkRecord) -> Unit,
     onMarkAbsent: (WorkRecord) -> Unit,
     onAddSubstituteFromJob: (Job, LocalDate, Int, Int, Int, BreakPayType) -> Unit,
-    onStampTemplateOnDate: (ShortTermTemplate, LocalDate) -> Unit,
+    onStampTemplateOnDate: (ShortTermTemplate, LocalDate) -> String = { _, _ -> "" },
+    onUndoStampRecord: (String) -> Unit = {},
     onNotify: (String) -> Unit
 ) {
     val baseMonth = remember { YearMonth.now() }
@@ -92,6 +93,9 @@ fun CalendarScreen(
         baseMonth.plusMonths((pagerState.currentPage - CALENDAR_PAGER_CENTER).toLong())
     }
     var activeStampTemplate by remember { mutableStateOf<ShortTermTemplate?>(null) }
+    var lastStampedRecordId by remember { mutableStateOf<String?>(null) }
+    var lastStampedDesc by remember { mutableStateOf("") }
+    var showMonthPickerDialog by remember { mutableStateOf(false) }
     var showSubstituteDialog by remember { mutableStateOf(false) }
     var pendingEarlyLeaveRecord by remember { mutableStateOf<WorkRecord?>(null) }
     var pendingAbsentRecord by remember { mutableStateOf<WorkRecord?>(null) }
@@ -135,18 +139,33 @@ fun CalendarScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier
                             .squircleClip(10.dp)
-                            .clickable {
-                                coroutineScope.launch {
-                                    pagerState.animateScrollToPage(CALENDAR_PAGER_CENTER)
-                                }
-                                onSelectedDateChange(LocalDate.now())
-                            }
+                            .clickable { showMonthPickerDialog = true }
                             .padding(horizontal = 10.dp, vertical = 2.dp)
                     ) {
-                        Text(
-                            text = "${displayMonth.year}년 ${displayMonth.monthValue}월",
-                            style = MiuixTheme.textStyles.title4.copy(fontWeight = FontWeight.Bold)
-                        )
+                        val todayDate = LocalDate.now()
+                        val isAtToday = displayMonth == baseMonth && selectedDate == todayDate
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = "${displayMonth.year}년 ${displayMonth.monthValue}월 ▾",
+                                style = MiuixTheme.textStyles.title4.copy(fontWeight = FontWeight.Bold)
+                            )
+                            if (!isAtToday) {
+                                SquirclePillBadge(
+                                    text = "오늘",
+                                    backgroundColor = MiuixTheme.colorScheme.primary.copy(alpha = 0.14f),
+                                    contentColor = MiuixTheme.colorScheme.primary,
+                                    onClick = {
+                                        coroutineScope.launch {
+                                            pagerState.animateScrollToPage(CALENDAR_PAGER_CENTER)
+                                        }
+                                        onSelectedDateChange(todayDate)
+                                    }
+                                )
+                            }
+                        }
                         Text(
                             text = "월 정산 예상 ${PayrollCalculator.formatWon(monthTotal)}",
                             style = MiuixTheme.textStyles.footnote1,
@@ -170,15 +189,37 @@ fun CalendarScreen(
         if (state.templates.isNotEmpty()) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        text = if (activeStampTemplate != null) {
-                            "원탭 도장 활성화: 달력 날짜를 누르면 '${activeStampTemplate!!.name}'이 즉시 등록됩니다"
-                        } else {
-                            "단기 프리셋 원탭 도장 (선택 후 날짜를 탭하세요)"
-                        },
-                        style = MiuixTheme.textStyles.footnote1,
-                        color = if (activeStampTemplate != null) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceVariantSummary
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = if (activeStampTemplate != null) {
+                                "원탭 도장 활성화: 달력 날짜를 누르면 '${activeStampTemplate!!.name}'이 즉시 등록됩니다"
+                            } else {
+                                "단기 프리셋 원탭 도장 (선택 후 날짜를 탭하세요)"
+                            },
+                            style = MiuixTheme.textStyles.footnote1,
+                            color = if (activeStampTemplate != null) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            modifier = Modifier.weight(1f)
+                        )
+                        val undoId = lastStampedRecordId
+                        if (undoId != null) {
+                            SquirclePillBadge(
+                                text = "실행 취소",
+                                backgroundColor = MiuixTheme.colorScheme.error.copy(alpha = 0.14f),
+                                contentColor = MiuixTheme.colorScheme.error,
+                                onClick = {
+                                    onUndoStampRecord(undoId)
+                                    val desc = lastStampedDesc
+                                    lastStampedRecordId = null
+                                    lastStampedDesc = ""
+                                    onNotify("${desc} 도장 등록을 취소했습니다.")
+                                }
+                            )
+                        }
+                    }
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(state.templates, key = { it.id }) { tpl ->
                             val picked = activeStampTemplate?.id == tpl.id
@@ -194,6 +235,14 @@ fun CalendarScreen(
                         }
                     }
                 }
+            }
+        } else {
+            item {
+                Text(
+                    text = "단기 프리셋 원탭 도장: 설정 > 단기 알바 프리셋 관리에서 자주 쓰는 단기 근무를 등록해 두면 달력 날짜를 탭해 1초 만에 찍을 수 있습니다.",
+                    style = MiuixTheme.textStyles.footnote1,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                )
             }
         }
 
@@ -239,6 +288,7 @@ fun CalendarScreen(
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .padding(vertical = 8.dp)
                         .zIndex(page.toFloat())
                         .graphicsLayer {
                             if (relPos < 0f && pagerWidthPx > 0f) {
@@ -336,7 +386,11 @@ fun CalendarScreen(
                                                     onSelectedDateChange(cellDate)
                                                     val stamp = activeStampTemplate
                                                     if (stamp != null) {
-                                                        onStampTemplateOnDate(stamp, cellDate)
+                                                        val newId = onStampTemplateOnDate(stamp, cellDate)
+                                                        if (newId.isNotBlank()) {
+                                                            lastStampedRecordId = newId
+                                                            lastStampedDesc = "${cellDate.monthValue}/${cellDate.dayOfMonth} ${stamp.name}"
+                                                        }
                                                         onNotify("${cellDate.monthValue}/${cellDate.dayOfMonth} '${stamp.name}' 원탭 등록 완료")
                                                     }
                                                 }
@@ -603,6 +657,31 @@ fun CalendarScreen(
         }
     }
 
+    if (showMonthPickerDialog) {
+        YearMonthJumpDialog(
+            currentMonth = displayMonth,
+            onDismiss = { showMonthPickerDialog = false },
+            onSelectMonth = { pickedMonth ->
+                val monthOffset = (pickedMonth.year - baseMonth.year) * 12 + (pickedMonth.monthValue - baseMonth.monthValue)
+                val targetPage = (CALENDAR_PAGER_CENTER + monthOffset).coerceIn(0, CALENDAR_PAGER_COUNT - 1)
+                coroutineScope.launch {
+                    pagerState.animateScrollToPage(targetPage)
+                }
+                val clampedDay = selectedDate.dayOfMonth.coerceAtMost(pickedMonth.lengthOfMonth())
+                onSelectedDateChange(pickedMonth.atDay(clampedDay))
+                showMonthPickerDialog = false
+            },
+            onJumpToday = {
+                val todayDate = LocalDate.now()
+                coroutineScope.launch {
+                    pagerState.animateScrollToPage(CALENDAR_PAGER_CENTER)
+                }
+                onSelectedDateChange(todayDate)
+                showMonthPickerDialog = false
+            }
+        )
+    }
+
     if (showSubstituteDialog && state.jobs.isNotEmpty()) {
         SubstituteQuickDialog(
             jobs = state.jobs,
@@ -732,7 +811,91 @@ private fun CalendarDayShiftCard(
                         },
                         onClick = onTogglePayment
                     )
+                } else if (item.record != null && item.record.id.startsWith("cal_") && !item.isVirtualFuture && item.status != ShiftStatus.ABSENT) {
+                    SquirclePillBadge(
+                        text = "자동 스케줄",
+                        backgroundColor = MiuixTheme.colorScheme.secondaryContainer,
+                        contentColor = MiuixTheme.colorScheme.onSecondaryContainer
+                    )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun YearMonthJumpDialog(
+    currentMonth: YearMonth,
+    onDismiss: () -> Unit,
+    onSelectMonth: (YearMonth) -> Unit,
+    onJumpToday: () -> Unit
+) {
+    var year by remember(currentMonth) { mutableIntStateOf(currentMonth.year) }
+
+    OverlayDialog(
+        show = true,
+        title = "연·월 빠른 이동",
+        onDismissRequest = onDismiss
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = { year = (year - 1).coerceAtLeast(2000) }) {
+                    Icon(MiuixIcons.ChevronBackward, contentDescription = "이전 연도")
+                }
+                Text(
+                    text = "${year}년",
+                    style = MiuixTheme.textStyles.title3.copy(fontWeight = FontWeight.Bold)
+                )
+                IconButton(onClick = { year = (year + 1).coerceAtMost(2100) }) {
+                    Icon(MiuixIcons.ChevronForward, contentDescription = "다음 연도")
+                }
+            }
+
+            for (row in 0 until 3) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    for (col in 1..4) {
+                        val m = row * 4 + col
+                        val candidate = YearMonth.of(year, m)
+                        val selected = candidate == currentMonth
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .squircleBackground(
+                                    if (selected) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.secondaryContainer,
+                                    10.dp
+                                )
+                                .squircleClip(10.dp)
+                                .clickable { onSelectMonth(candidate) }
+                                .padding(vertical = 10.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "${m}월",
+                                style = MiuixTheme.textStyles.body2.copy(
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
+                                ),
+                                color = if (selected) MiuixTheme.colorScheme.onPrimary else MiuixTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                    }
+                }
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                TextButton(text = "닫기", onClick = onDismiss, modifier = Modifier.weight(1f))
+                TextButton(
+                    text = "오늘로 이동",
+                    onClick = onJumpToday,
+                    colors = ButtonDefaults.textButtonColorsPrimary(),
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
     }

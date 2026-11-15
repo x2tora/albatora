@@ -10,6 +10,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -270,7 +271,21 @@ fun Modifier.liquidGlassSurface(
 ): Modifier {
     val isDark = LocalIsDarkTheme.current
     if (backdrop == null || !isRuntimeShaderSupported() || Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-        return this.clip(shape).background(fallbackColor.copy(alpha = 0.94f))
+        val resolvedFallback = if (fallbackColor.alpha >= 0.99f) fallbackColor.copy(alpha = 0.94f) else fallbackColor
+        return this
+            .clip(shape)
+            .background(resolvedFallback)
+            .then(
+                if (resolvedFallback.alpha < 0.5f) {
+                    Modifier.border(
+                        width = 0.75.dp,
+                        color = if (isDark) Color.White.copy(alpha = 0.20f) else Color.Black.copy(alpha = 0.10f),
+                        shape = shape
+                    )
+                } else {
+                    Modifier
+                }
+            )
     }
 
     val grainBrush = rememberGrainBrush()
@@ -501,11 +516,16 @@ private fun LiquidGlassNavBarContent(
                 val minLeft = baseOffsetPx
                 val maxLeft = itemWidthPx * (slotCount - 1) + baseOffsetPx
                 val slopPx = with(density) { SliderDragStartSlop.toPx() }
+                val edgeGuardPx = with(density) { 16.dp.toPx() }
 
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false)
                     val pointerId = down.id
                     val startX = down.position.x
+                    val startY = down.position.y
+                    if (startX < edgeGuardPx || startX > size.width - edgeGuardPx) {
+                        return@awaitEachGesture
+                    }
                     var started = false
 
                     while (true) {
@@ -537,7 +557,9 @@ private fun LiquidGlassNavBarContent(
                         }
 
                         val dx = change.position.x - startX
+                        val dy = change.position.y - startY
                         if (!started) {
+                            if (abs(dy) > slopPx && abs(dy) > abs(dx)) break
                             if (abs(dx) < slopPx) continue
                             started = true
                             draggingState.value = true
