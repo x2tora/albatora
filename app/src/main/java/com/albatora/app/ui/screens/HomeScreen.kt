@@ -125,9 +125,6 @@ fun HomeScreen(
     onDeleteWishlistGoal: (String) -> Unit,
     onArchiveWishlistGoal: (String, Long) -> Unit = { _, _ -> },
     onDeleteArchivedGoal: (String) -> Unit = {},
-    onOpenCalendar: () -> Unit = {},
-    onOpenCalculator: () -> Unit = {},
-    onOpenWidgetStudio: () -> Unit = {},
     topBarInset: Dp = 0.dp,
     scrollToTopTrigger: Int = 0,
     onLiveHeaderCollapseChange: (Float) -> Unit = {},
@@ -479,31 +476,11 @@ fun HomeScreen(
             }
         }
 
-        val quickActionHubSection: androidx.compose.foundation.lazy.LazyListScope.() -> Unit = {
-            item(key = "quick_action_hub") {
-                SmallTitle(text = "자주 사용하는 기능")
-                HomeActionHubGrid(
-                    unpaidCount = unpaidPair.second.size,
-                    onStopwatch = { showStopwatchSheet = true },
-                    onQuickShortTerm = onQuickAddShortTerm,
-                    onAddRegularJob = onAddRegularJob,
-                    onOpenCalendar = onOpenCalendar,
-                    onOpenUnpaid = onOpenUnpaidRecords,
-                    onOpenCalculator = onOpenCalculator,
-                    onOpenWidgetStudio = onOpenWidgetStudio,
-                    onAddWishlist = {
-                        editingGoal = null
-                        showGoalSheet = true
-                    }
-                )
-            }
-        }
-
         val overviewAndUnpaidSection: androidx.compose.foundation.lazy.LazyListScope.() -> Unit = {
             if (!completelyEmpty) {
                 item(key = "monthly_overview") {
                     val livePlusMonth = monthSummary.totalNetPay + liveDashboard.totalEarnedWon.toLong()
-                    SmallTitle(text = "${currentMonth.monthValue}월 누적 수익 현황")
+                    SmallTitle(text = "${currentMonth.monthValue}월 수익")
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         insideMargin = PaddingValues(20.dp)
@@ -516,7 +493,7 @@ fun HomeScreen(
                             ) {
                                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                     Text(
-                                        text = "실수령 예상 누적 (실시간 포함)",
+                                        text = "예상 실수령액",
                                         style = MiuixTheme.textStyles.footnote1,
                                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                                     )
@@ -593,60 +570,6 @@ fun HomeScreen(
                     }
                 }
             }
-
-            if (unpaidPair.first > 0L) {
-                item(key = "unpaid_alert") {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.defaultColors(
-                            color = MiuixTheme.colorScheme.errorContainer.copy(alpha = if (isDark) 0.45f else 0.72f)
-                        ),
-                        onClick = onOpenUnpaidRecords,
-                        insideMargin = PaddingValues(16.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                modifier = Modifier.weight(1f),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                MiuixGlassIcon(
-                                    icon = MiuixIcons.Alarm,
-                                    contentDescription = null,
-                                    accentColor = MiuixTheme.colorScheme.error,
-                                    size = 36.dp,
-                                    iconSize = 18.dp,
-                                    cornerRadius = 11.dp
-                                )
-                                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                    Text(
-                                        text = "입금 대기 중인 미수금 ${unpaidPair.second.size}건",
-                                        style = MiuixTheme.textStyles.body2.copy(fontWeight = FontWeight.SemiBold),
-                                        color = MiuixTheme.colorScheme.onErrorContainer
-                                    )
-                                    Text(
-                                        text = "탭하여 미수금 내역 확인 및 입금 완료 처리",
-                                        style = MiuixTheme.textStyles.footnote2,
-                                        color = MiuixTheme.colorScheme.onErrorContainer.copy(alpha = 0.8f)
-                                    )
-                                }
-                            }
-                            Text(
-                                text = PayrollCalculator.formatWon(unpaidPair.first),
-                                style = MiuixTheme.textStyles.title4.copy(
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontFeatureSettings = "tnum"
-                                ),
-                                color = MiuixTheme.colorScheme.error
-                            )
-                        }
-                    }
-                }
-            }
         }
 
         val wishlistAndJobsSection: androidx.compose.foundation.lazy.LazyListScope.() -> Unit = {
@@ -656,7 +579,7 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    SmallTitle(text = "목표 금액 (위시리스트) 달성률")
+                    SmallTitle(text = "목표 달성")
                     Row(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -707,11 +630,11 @@ fun HomeScreen(
                                 verticalArrangement = Arrangement.spacedBy(2.dp)
                             ) {
                                 Text(
-                                    "갖고 싶은 목표 금액을 설정해 보세요",
+                                    "목표 금액 추가하기",
                                     style = MiuixTheme.textStyles.body2.copy(fontWeight = FontWeight.Medium)
                                 )
                                 Text(
-                                    "실시간 수익이 오를 때마다 목표 달성률이 함께 채워집니다",
+                                    "수익이 쌓일 때마다 달성률이 채워집니다",
                                     style = MiuixTheme.textStyles.footnote2,
                                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                                 )
@@ -814,11 +737,11 @@ fun HomeScreen(
                 }
             }
 
-            if (paydays.isNotEmpty()) {
+            if (paydays.size > 1) {
                 item(key = "paydays_section") {
-                    SmallTitle(text = "다가오는 월급날 D-Day")
+                    SmallTitle(text = "예정된 월급날")
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        paydays.forEach { info ->
+                        paydays.drop(1).forEach { info ->
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
                                 onClick = { onEditRegularJob(info.jobId) },
@@ -925,7 +848,7 @@ fun HomeScreen(
                                                 text = job.name,
                                                 style = MiuixTheme.textStyles.body1.copy(fontWeight = FontWeight.Medium)
                                             )
-                                            val daysLabel = if (job.schedules.isEmpty()) "스케줄 없음 (스톱워치 전용)"
+                                            val daysLabel = if (job.schedules.isEmpty()) "자유 출근"
                                             else job.schedules.joinToString(",") { dayOfWeekKorean(it.dayOfWeek) }
                                             Text(
                                                 text = "${job.payType.label} ${PayrollCalculator.formatWon(currentWage)} · $daysLabel",
@@ -987,7 +910,6 @@ fun HomeScreen(
                                 )
                             }
                         }
-                        quickActionHubSection()
                         wishlistAndJobsSection()
                     }
                 }
@@ -1040,7 +962,6 @@ fun HomeScreen(
                     verticalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
                     focusSection()
-                    quickActionHubSection()
                     overviewAndUnpaidSection()
                     wishlistAndJobsSection()
                 }
@@ -1546,94 +1467,6 @@ private fun WeeklyHolidayAndPaydayCard(
     }
 }
 
-private data class HomeHubTileSpec(
-    val title: String,
-    val subtitle: String,
-    val icon: ImageVector,
-    val color: Color,
-    val onClick: () -> Unit
-)
-
-@Composable
-private fun HomeActionHubGrid(
-    unpaidCount: Int,
-    onStopwatch: () -> Unit,
-    onQuickShortTerm: () -> Unit,
-    onAddRegularJob: () -> Unit,
-    onOpenCalendar: () -> Unit,
-    onOpenUnpaid: () -> Unit,
-    onOpenCalculator: () -> Unit,
-    onOpenWidgetStudio: () -> Unit,
-    onAddWishlist: () -> Unit
-) {
-    val tiles = listOf(
-        HomeHubTileSpec("즉시 출근", "실시간 타이머", MiuixIcons.Stopwatch, MiuixTheme.colorScheme.primary, onStopwatch),
-        HomeHubTileSpec("단기·대타 등록", "10초 퀵 입력", MiuixIcons.Timer, Color(0xFF0EA5E9), onQuickShortTerm),
-        HomeHubTileSpec("정규 알바 추가", "시급·주차 설정", MiuixIcons.Store, Color(0xFF10B981), onAddRegularJob),
-        HomeHubTileSpec("근무 달력", "연장·조퇴·대타", MiuixIcons.Months, Color(0xFF6366F1), onOpenCalendar),
-        HomeHubTileSpec(
-            "미수금·정산",
-            if (unpaidCount > 0) "대기 ${unpaidCount}건" else "급여 명세서",
-            MiuixIcons.BankCards,
-            if (unpaidCount > 0) MiuixTheme.colorScheme.error else Color(0xFFF59E0B),
-            onOpenUnpaid
-        ),
-        HomeHubTileSpec("급여 계산기", "주휴·일용직·퇴직금", MiuixIcons.Tune, Color(0xFFEC4899), onOpenCalculator),
-        HomeHubTileSpec("위젯 꾸미기", "OneUI 4종 설정", MiuixIcons.Layers, Color(0xFF14B8A6), onOpenWidgetStudio),
-        HomeHubTileSpec("목표 추가", "위시리스트 게이지", MiuixIcons.FavoritesFill, Color(0xFF8B5CF6), onAddWishlist)
-    )
-
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        tiles.chunked(2).forEach { rowTiles ->
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                rowTiles.forEach { spec ->
-                    Card(
-                        modifier = Modifier.weight(1f),
-                        cornerRadius = 16.dp,
-                        insideMargin = PaddingValues(14.dp),
-                        onClick = spec.onClick
-                    ) {
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            MiuixGlassIcon(
-                                icon = spec.icon,
-                                contentDescription = spec.title,
-                                accentColor = spec.color,
-                                size = 42.dp,
-                                iconSize = 20.dp,
-                                cornerRadius = 12.dp
-                            )
-                            Column(
-                                modifier = Modifier.weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(2.dp)
-                            ) {
-                                Text(
-                                    text = spec.title,
-                                    style = MiuixTheme.textStyles.body2.copy(fontWeight = FontWeight.SemiBold),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Text(
-                                    text = spec.subtitle,
-                                    style = MiuixTheme.textStyles.footnote2,
-                                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
 @Composable
 private fun StandbyFocusCard(
     jobs: List<Job>,
@@ -1664,14 +1497,14 @@ private fun StandbyFocusCard(
                     )
                     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                         Text(
-                            text = "현재 예정된 자동 근무 없음",
+                            text = "대기 중",
                             style = MiuixTheme.textStyles.body1.copy(fontWeight = FontWeight.SemiBold)
                         )
                         Text(
                             text = if (jobs.isEmpty() && templates.isEmpty()) {
-                                "아래 버튼으로 첫 근무를 등록하거나 스톱워치를 시작해 보세요"
+                                "첫 근무지를 등록하거나 스톱워치를 시작하세요"
                             } else {
-                                "아래 근무지를 누르면 바로 실시간 출근이 시작됩니다"
+                                "근무지를 탭하면 즉시 출근합니다"
                             },
                             style = MiuixTheme.textStyles.footnote2,
                             color = MiuixTheme.colorScheme.onSurfaceVariantSummary
@@ -1785,7 +1618,7 @@ private fun StandbyFocusCard(
             }
 
             TextButton(
-                text = "새 근무 직접 스톱워치 시작",
+                text = "스톱워치 출근",
                 onClick = onStartStopwatch,
                 colors = ButtonDefaults.textButtonColorsPrimary(),
                 modifier = Modifier.fillMaxWidth()

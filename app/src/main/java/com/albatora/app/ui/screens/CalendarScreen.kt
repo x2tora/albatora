@@ -196,9 +196,9 @@ fun CalendarScreen(
                     ) {
                         Text(
                             text = if (activeStampTemplate != null) {
-                                "원탭 도장 활성화: 달력 날짜를 누르면 '${activeStampTemplate!!.name}'이 즉시 등록됩니다"
+                                "날짜를 탭하면 '${activeStampTemplate!!.name}' 바로 등록"
                             } else {
-                                "단기 프리셋 원탭 도장 (선택 후 날짜를 탭하세요)"
+                                "원탭 도장"
                             },
                             style = MiuixTheme.textStyles.footnote1,
                             color = if (activeStampTemplate != null) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.onSurfaceVariantSummary,
@@ -235,14 +235,6 @@ fun CalendarScreen(
                         }
                     }
                 }
-            }
-        } else {
-            item {
-                Text(
-                    text = "단기 프리셋 원탭 도장: 설정 > 단기 알바 프리셋 관리에서 자주 쓰는 단기 근무를 등록해 두면 달력 날짜를 탭해 1초 만에 찍을 수 있습니다.",
-                    style = MiuixTheme.textStyles.footnote1,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                )
             }
         }
 
@@ -456,7 +448,7 @@ fun CalendarScreen(
             val actionableItems = selectedItems.filter { it.record != null && it.status != ShiftStatus.ABSENT }
             var selectedTargetId by remember(selectedDate) { mutableStateOf<String?>(null) }
             val primaryItem = actionableItems.find { it.record?.id == selectedTargetId } ?: actionableItems.firstOrNull()
-            SmallTitle(text = "${selectedDate.monthValue}월 ${selectedDate.dayOfMonth}일 (${dayOfWeekKorean(selectedDate.dayOfWeek.value)}) 원탭 퀵 액션")
+            SmallTitle(text = "${selectedDate.monthValue}월 ${selectedDate.dayOfMonth}일 (${dayOfWeekKorean(selectedDate.dayOfWeek.value)})")
             if (actionableItems.size > 1) {
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),

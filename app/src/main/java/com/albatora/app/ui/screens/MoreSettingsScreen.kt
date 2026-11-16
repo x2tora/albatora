@@ -181,16 +181,16 @@ fun MoreSettingsScreen(
                 val colorStyle = state.settings.resolvedColorStyle()
                 OverlayDropdownPreference(
                     title = "테마 컬러 스타일",
-                    summary = "${colorStyle.label} · ${colorStyle.description}",
+                    summary = colorStyle.label,
                     items = colorStyles.map { it.label },
                     selectedIndex = colorStyles.indexOf(colorStyle),
                     onSelectedIndexChange = { index ->
                         val chosen = colorStyles[index]
                         onUpdateThemeColorStyle(chosen)
-                        onNotify("테마 컬러가 '${chosen.label}'으로 적용되었습니다.")
+                        onNotify("테마 컬러가 '${chosen.label}'으로 적용되었습니다")
                     },
                     startAction = {
-                        PreferenceStartIcon(MiuixIcons.Favorites, Color(0xFF7C5CFF))
+                        PreferenceStartIcon(MiuixIcons.Favorites, MiuixTheme.colorScheme.primary)
                     }
                 )
                 AnimatedVisibility(
@@ -222,41 +222,41 @@ fun MoreSettingsScreen(
                 val navStyles = NavBarStyle.entries
                 OverlayDropdownPreference(
                     title = "인터페이스 스타일",
-                    summary = "${state.settings.navBarStyle.label} · ${state.settings.navBarStyle.description}",
+                    summary = state.settings.navBarStyle.label,
                     items = navStyles.map { it.label },
                     selectedIndex = navStyles.indexOf(state.settings.navBarStyle),
                     onSelectedIndexChange = { index ->
                         val chosen = navStyles[index]
                         onUpdateNavBarStyle(chosen)
-                        onNotify("인터페이스 스타일이 '${chosen.label}'으로 적용되었습니다.")
+                        onNotify("인터페이스 스타일이 '${chosen.label}'으로 적용되었습니다")
                     },
                     startAction = {
-                        PreferenceStartIcon(MiuixIcons.Tune, Color(0xFF14B8A6))
+                        PreferenceStartIcon(MiuixIcons.Tune, MiuixTheme.colorScheme.primary)
                     }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 SwitchPreference(
                     title = "대화면 듀얼 칼럼 보기",
-                    summary = "태블릿·폴더블 등 넓은 화면에서 좌우 2단 분할 레이아웃 사용 (기본: 중앙 단일 보기)",
+                    summary = "태블릿·폴더블에서 좌우 2단 분할 표시",
                     checked = state.settings.wideDualLayoutEnabled,
                     onCheckedChange = { enabled ->
                         onUpdateWideDualLayout(enabled)
                         onNotify(
-                            if (enabled) "넓은 화면에서 듀얼 칼럼 레이아웃이 활성화되었습니다."
-                            else "대화면에서도 모바일과 동일한 중앙 단일 보기로 표시됩니다."
+                            if (enabled) "넓은 화면에서 듀얼 칼럼 레이아웃이 활성화되었습니다"
+                            else "대화면에서도 중앙 단일 보기로 표시됩니다"
                         )
                     },
                     startAction = {
-                        PreferenceStartIcon(MiuixIcons.ScreenMirroring, Color(0xFF3482FF))
+                        PreferenceStartIcon(MiuixIcons.ScreenMirroring, MiuixTheme.colorScheme.primary)
                     }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 ArrowPreference(
                     title = "바탕화면 위젯 꾸미기",
-                    summary = "${state.settings.widgetConfig.themeStyle.label} · 투명도 ${state.settings.widgetConfig.opacity.label} (위젯 4종)",
+                    summary = "${state.settings.widgetConfig.themeStyle.label} · 투명도 ${state.settings.widgetConfig.opacity.label}",
                     onClick = onOpenWidgetStudio,
                     startAction = {
-                        PreferenceStartIcon(MiuixIcons.Layers, Color(0xFF0EA5E9))
+                        PreferenceStartIcon(MiuixIcons.Layers, MiuixTheme.colorScheme.primary)
                     }
                 )
             }
@@ -267,45 +267,36 @@ fun MoreSettingsScreen(
             Card(modifier = Modifier.fillMaxWidth()) {
                 SwitchPreference(
                     title = "상단바 실시간 수익 알림",
-                    summary = "근무 중 실시간 누적 금액과 [휴게] / [퇴근] 빠른 버튼 표시",
                     checked = state.settings.ongoingNotificationEnabled,
                     onCheckedChange = onUpdateOngoingNotification,
                     startAction = {
-                        PreferenceStartIcon(MiuixIcons.Alarm, Color(0xFFFF6B4A))
+                        PreferenceStartIcon(MiuixIcons.Alarm, MiuixTheme.colorScheme.primary)
                     }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 SwitchPreference(
-                    title = "알바 중 자동 방해금지(무음)",
-                    summary = when {
-                        !hasDndAccess -> "방해금지 권한을 허용하면 근무 시작 시 자동 무음 전환됩니다"
-                        state.settings.autoDndEnabled -> "근무 중 방해금지 자동 켜기 · 휴게/퇴근 시 원래 상태로 복원"
-                        else -> "근무 중 알림 방해를 자동으로 차단하고 퇴근 시 해제합니다"
-                    },
+                    title = "알바 중 자동 방해금지",
+                    summary = if (!hasDndAccess) "권한 허용 필요" else null,
                     checked = state.settings.autoDndEnabled && hasDndAccess,
                     onCheckedChange = { enabled ->
                         if (enabled && !AutoDndController.hasPolicyAccess(context)) {
                             showDndPermissionDialog = true
                         } else {
                             onUpdateAutoDnd(enabled)
-                            onNotify(if (enabled) "알바 중 자동 방해금지가 켜졌습니다." else "알바 중 자동 방해금지가 꺼졌습니다.")
+                            onNotify(if (enabled) "알바 중 자동 방해금지가 켜졌습니다" else "알바 중 자동 방해금지가 꺼졌습니다")
                         }
                     },
                     startAction = {
-                        PreferenceStartIcon(MiuixIcons.Timer, Color(0xFF6366F1))
+                        PreferenceStartIcon(MiuixIcons.Timer, MiuixTheme.colorScheme.primary)
                     }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 ArrowPreference(
-                    title = "백그라운드 항상 실행 (배터리 최적화 제외)",
-                    summary = if (hasBatteryExemption) {
-                        "허용됨 · 상단바 알림이 꺼져 있어도 백그라운드 동작 유지"
-                    } else {
-                        "미허용 · 탭하여 배터리 최적화 제외(제한 없음) 권한 허용"
-                    },
+                    title = "백그라운드 실행 예외",
+                    summary = if (hasBatteryExemption) "허용됨" else "미허용 · 배터리 최적화 제외 필요",
                     onClick = {
                         if (hasBatteryExemption) {
-                            onNotify("이미 백그라운드 항상 실행이 허용되어 있습니다.")
+                            onNotify("이미 백그라운드 항상 실행이 허용되어 있습니다")
                         } else {
                             BatteryOptimizationHelper.requestIgnoreBatteryOptimizations(context)
                         }
@@ -320,16 +311,16 @@ fun MoreSettingsScreen(
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 ArrowPreference(
                     title = "기본 최저시급 설정",
-                    summary = "현재 기본값: ${PayrollCalculator.formatWon(state.settings.defaultMinWage)} (2026 기준)",
+                    summary = PayrollCalculator.formatWon(state.settings.defaultMinWage),
                     onClick = { showMinWageDialog = true },
                     startAction = {
-                        PreferenceStartIcon(MiuixIcons.BankCards, Color(0xFF10B981))
+                        PreferenceStartIcon(MiuixIcons.BankCards, MiuixTheme.colorScheme.primary)
                     }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 ArrowPreference(
-                    title = "단기 알바 프리셋(템플릿) 관리",
-                    summary = "저장된 프리셋 ${state.templates.size}개",
+                    title = "단기 알바 프리셋 관리",
+                    summary = "${state.templates.size}개",
                     onClick = { showTemplatesDialog = true },
                     startAction = {
                         PreferenceStartIcon(MiuixIcons.Notes, MiuixTheme.colorScheme.primary)
@@ -339,43 +330,40 @@ fun MoreSettingsScreen(
         }
 
         item {
-            SmallTitle(text = "로컬 데이터 JSON 백업 및 복원")
+            SmallTitle(text = "백업 및 데이터")
             Card(modifier = Modifier.fillMaxWidth()) {
                 ArrowPreference(
-                    title = "JSON 파일로 내보내기 (백업)",
-                    summary = "모든 알바, 근무 기록, 프리셋, 설정을 JSON 파일로 저장",
+                    title = "JSON 백업 내보내기",
                     onClick = {
                         val today = PayrollCalculator.formatDate(LocalDate.now()).replace("-", "")
                         exportFileLauncher.launch("albatora-backup-$today.json")
                     },
                     startAction = {
-                        PreferenceStartIcon(MiuixIcons.Backup, Color(0xFF3482FF))
+                        PreferenceStartIcon(MiuixIcons.Backup, MiuixTheme.colorScheme.primary)
                     }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 ArrowPreference(
-                    title = "JSON 파일에서 가져오기 (복원)",
-                    summary = "저장해 둔 JSON 백업 파일을 불러와 데이터를 복원합니다",
+                    title = "JSON 백업 가져오기",
                     onClick = {
                         importFileLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
                     },
                     startAction = {
-                        PreferenceStartIcon(MiuixIcons.Import, Color(0xFF10B981))
+                        PreferenceStartIcon(MiuixIcons.Import, MiuixTheme.colorScheme.primary)
                     }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 ArrowPreference(
-                    title = "클립보드 백업 텍스트 복사 / 붙여넣기 복원",
-                    summary = "파일 없이 JSON 텍스트로 바로 백업하거나 복원합니다",
+                    title = "클립보드 백업 · 복원",
                     onClick = { showPasteRestoreDialog = true },
                     startAction = {
-                        PreferenceStartIcon(MiuixIcons.Copy, Color(0xFF06B6D4))
+                        PreferenceStartIcon(MiuixIcons.Copy, MiuixTheme.colorScheme.primary)
                     }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 ArrowPreference(
                     title = "모든 데이터 초기화",
-                    summary = "등록된 모든 알바와 기록을 비웁니다 (테마/기본 설정 유지)",
+                    summary = "테마·기본 설정은 유지됩니다",
                     onClick = { showResetConfirm = true },
                     startAction = {
                         PreferenceStartIcon(MiuixIcons.Reset, MiuixTheme.colorScheme.error)
@@ -390,9 +378,9 @@ fun MoreSettingsScreen(
                 ArrowPreference(
                     title = "앱 업데이트 확인",
                     summary = when {
-                        updateUiState.isChecking -> "GitHub 릴리즈에서 최신 버전을 확인하는 중..."
-                        !updateUiState.lastStatusNote.isNullOrBlank() -> "현재 v${BuildConfig.VERSION_NAME} · ${updateUiState.lastStatusNote}"
-                        else -> "현재 v${BuildConfig.VERSION_NAME} · 앱 실행 시 자동 확인 (탭하여 지금 확인)"
+                        updateUiState.isChecking -> "확인 중"
+                        !updateUiState.lastStatusNote.isNullOrBlank() -> "v${BuildConfig.VERSION_NAME} · ${updateUiState.lastStatusNote}"
+                        else -> "v${BuildConfig.VERSION_NAME}"
                     },
                     onClick = onCheckForUpdate,
                     startAction = {
@@ -401,8 +389,8 @@ fun MoreSettingsScreen(
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 BasicComponent(
-                    title = "알바토라 (AlbaTora) v${BuildConfig.VERSION_NAME}",
-                    summary = "실시간 하이브리드 수익 트래커 · 정규/단기 일용직 올인원 급여 관리",
+                    title = "AlbaTora",
+                    summary = "v${BuildConfig.VERSION_NAME}",
                     startAction = {
                         PreferenceStartIcon(MiuixIcons.Info, MiuixTheme.colorScheme.primary)
                     }

@@ -47,6 +47,7 @@ import androidx.compose.ui.zIndex
 import com.albatora.app.ui.theme.LocalAppBackdrop
 import com.albatora.app.ui.theme.LocalIsDarkTheme
 import com.albatora.app.ui.theme.LocalLiquidGlassEnabled
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Icon
@@ -67,7 +68,8 @@ data class ToastEntry(
     val id: Long,
     val message: String,
     val durationMs: Long = 3400L,
-    val isExiting: Boolean = false
+    val isExiting: Boolean = false,
+    val exitDelayMs: Long = 0L
 )
 
 @Stable
@@ -78,6 +80,7 @@ class StackedToastState {
     fun show(message: String, durationMs: Long = 3400L) {
         val trimmed = message.trim()
         if (trimmed.isEmpty()) return
+        entries.removeAll { it.isExiting }
         val id = ++nextId
         entries.add(0, ToastEntry(id = id, message = trimmed, durationMs = durationMs))
         if (entries.size > 5) {
@@ -88,7 +91,18 @@ class StackedToastState {
     fun requestDismiss(id: Long) {
         val idx = entries.indexOfFirst { it.id == id }
         if (idx >= 0 && !entries[idx].isExiting) {
-            entries[idx] = entries[idx].copy(isExiting = true)
+            entries[idx] = entries[idx].copy(isExiting = true, exitDelayMs = 0L)
+        }
+    }
+
+    fun requestDismissAllCascade(staggerMs: Long = 50L, skipId: Long? = null) {
+        var step = 0
+        for (i in entries.indices) {
+            val entry = entries[i]
+            if (entry.id != skipId && !entry.isExiting) {
+                entries[i] = entry.copy(isExiting = true, exitDelayMs = step * staggerMs)
+                step++
+            }
         }
     }
 
@@ -124,7 +138,7 @@ fun StackedToastHost(
     LaunchedEffect(frontEntry?.id, frontEntry?.isExiting) {
         if (frontEntry != null && !frontEntry.isExiting) {
             delay(frontEntry.durationMs)
-            state.requestDismiss(frontEntry.id)
+            state.requestDismissAllCascade(staggerMs = 55L)
         }
     }
 
@@ -168,9 +182,11 @@ fun StackedToastHost(
                     message = item.message,
                     isFront = depth == 0,
                     isExiting = item.isExiting,
+                    exitDelayMs = item.exitDelayMs,
                     deckAlpha = animatedAlpha,
                     backdrop = backdrop,
                     isLiquidGlass = isLiquidGlass,
+                    onSwipeStartDismissStack = { state.requestDismissAllCascade(staggerMs = 45L, skipId = item.id) },
                     onRemove = { state.dismiss(item.id) },
                     modifier = Modifier
                         .zIndex((visibleEntries.size - depth).toFloat())
@@ -190,15 +206,18 @@ private fun SwipeableToastCard(
     message: String,
     isFront: Boolean,
     isExiting: Boolean,
+    exitDelayMs: Long,
     deckAlpha: Float,
     backdrop: LayerBackdrop?,
     isLiquidGlass: Boolean,
+    onSwipeStartDismissStack: () -> Unit,
     onRemove: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val isDark = LocalIsDarkTheme.current
     val scope = rememberCoroutineScope()
     val dragX = remember { Animatable(0f) }
+    val exitShiftY = remember { Animatable(0f) }
     val fadeAnim = remember { Animatable(0f) }
     var cardWidthPx by remember { mutableIntStateOf(0) }
 
@@ -208,7 +227,11 @@ private fun SwipeableToastCard(
 
     LaunchedEffect(isExiting) {
         if (isExiting) {
-            fadeAnim.animateTo(0f, animationSpec = tween(durationMillis = 220))
+            if (exitDelayMs > 0L) delay(exitDelayMs)
+            coroutineScope {
+                launch { fadeAnim.animateTo(0f, animationSpec = tween(durationMillis = 200)) }
+                launch { exitShiftY.animateTo(22f, animationSpec = tween(durationMillis = 200)) }
+            }
             onRemove()
         }
     }
@@ -259,7 +282,7 @@ private fun SwipeableToastCard(
         modifier = modifier
             .fillMaxWidth()
             .onSizeChanged { cardWidthPx = it.width }
-            .offset { IntOffset(dragX.value.roundToInt(), 0) }
+            .offset { IntOffset(dragX.value.roundToInt(), exitShiftY.value.roundToInt()) }
             .alpha(combinedAlpha)
             .dropShadow(
                 shape = shape,
@@ -283,6 +306,7 @@ private fun SwipeableToastCard(
                                 val threshold = size.width * 0.22f
                                 if (abs(current) > threshold) {
                                     val direction = if (current == 0f) 1f else sign(current)
+                                    onSwipeStartDismissStack()
                                     scope.launch {
                                         dragX.animateTo(
                                             targetValue = direction * size.width * 0.9f,

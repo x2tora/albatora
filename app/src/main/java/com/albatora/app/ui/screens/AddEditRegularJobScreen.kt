@@ -245,7 +245,7 @@ fun AddEditRegularJobScreen(
     Scaffold(
         topBar = {
             MiuixFloatingScrollTopBar(
-                title = if (isEditing) "정규 알바 수정" else "정규/고정 알바 추가",
+                title = if (isEditing) "정규 알바 수정" else "정규 알바 추가",
                 scrollBehavior = scrollBehavior,
                 backdrop = barBackdrop,
                 maxContentWidth = 620.dp,
@@ -415,7 +415,7 @@ fun AddEditRegularJobScreen(
 
             // Wage history
             item {
-                SmallTitle(text = "시급/급여 변경 이력 (과거 기록 보존)")
+                SmallTitle(text = "급여 변경 이력")
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     insideMargin = PaddingValues(16.dp)
@@ -469,7 +469,7 @@ fun AddEditRegularJobScreen(
 
             // Weekly schedules and break rules
             item {
-                SmallTitle(text = "정규 근무 요일 · 시간 및 휴게시간")
+                SmallTitle(text = "근무 요일 · 시간")
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     insideMargin = PaddingValues(16.dp)
@@ -557,11 +557,10 @@ fun AddEditRegularJobScreen(
 
             // Weekly holiday and allowance boosts
             item {
-                SmallTitle(text = "주휴수당 및 1.5배 가산수당")
+                SmallTitle(text = "주휴 · 가산수당")
                 Card(modifier = Modifier.fillMaxWidth()) {
                     SwitchPreference(
                         title = "주휴수당 자동 계산 (주 15시간 이상, 40시간 캡)",
-                        summary = "1주 소정근로 15시간 이상 시 최대 40시간 기준으로 주휴수당 자동 가산",
                         checked = whEnabled,
                         onCheckedChange = { whEnabled = it }
                     )
@@ -573,15 +572,13 @@ fun AddEditRegularJobScreen(
                         Column {
                             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                             SwitchPreference(
-                                title = "결근·조퇴 시 해당 주 주휴수당 자동 제외",
-                                summary = "지정 근무일에 결근 또는 조퇴가 발생하면 해당 주 주휴수당을 제외합니다",
+                                title = "결근·조퇴 시 해당 주 주휴수당 제외",
                                 checked = whExcludeAbsence,
                                 onCheckedChange = { whExcludeAbsence = it }
                             )
                             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                             SwitchPreference(
-                                title = "주 15시간 미만도 주휴수당 강제 포함",
-                                summary = "매장별 별도 약정 시 주 15시간 미만 주에도 비례 주휴수당 포함",
+                                title = "주 15시간 미만도 주휴수당 포함",
                                 checked = whForceUnder15h,
                                 onCheckedChange = { whForceUnder15h = it }
                             )
@@ -590,21 +587,18 @@ fun AddEditRegularJobScreen(
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                     SwitchPreference(
                         title = "야간수당 1.5배 (22:00 ~ 06:00)",
-                        summary = "켜두면 야간 시간대 진입 시 실시간 부스트 배지 및 속도 가속",
                         checked = nightEnabled,
                         onCheckedChange = { nightEnabled = it }
                     )
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                     SwitchPreference(
                         title = "연장수당 1.5배 (일 8시간 초과·연장근무)",
-                        summary = "일 8시간 초과 또는 +1시간 연장 시 1.5배 가산 적용",
                         checked = overtimeEnabled,
                         onCheckedChange = { overtimeEnabled = it }
                     )
                     HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                     SwitchPreference(
                         title = "휴일수당 1.5배 (공휴일·휴일)",
-                        summary = "법정 공휴일/지정 휴일 근무 시 1.5배 가산",
                         checked = holidayEnabled,
                         onCheckedChange = { holidayEnabled = it }
                     )
@@ -616,8 +610,7 @@ fun AddEditRegularJobScreen(
                         Column {
                             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                             SwitchPreference(
-                                title = "토요일·일요일 주말도 휴일수당 적용",
-                                summary = "공휴일 외 주말 근무에도 휴일수당 부스트를 적용하려면 켜세요",
+                                title = "토·일 주말도 휴일수당 적용",
                                 checked = holidayIncludesWeekends,
                                 onCheckedChange = { holidayIncludesWeekends = it }
                             )
@@ -628,7 +621,7 @@ fun AddEditRegularJobScreen(
 
             // Tax, settlement, and payday
             item {
-                SmallTitle(text = "세금 공제 · 정산 기간 · 월급날 보정")
+                SmallTitle(text = "세금 · 정산 · 월급날")
                 Card(modifier = Modifier.fillMaxWidth()) {
                     val taxOptions = TaxMode.entries
                     OverlayDropdownPreference(

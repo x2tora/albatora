@@ -167,50 +167,6 @@ fun RecordsScreen(
         }
     }
 
-    val metricsGridCard: @Composable () -> Unit = {
-        val bonusTotal = summary.totalAllowancePay + summary.totalWeeklyHolidayPay + summary.totalSiteBonus
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                RecordsMetricTile(
-                    icon = MiuixIcons.BankCards,
-                    accentColor = MiuixTheme.colorScheme.primary,
-                    label = "예상 실수령",
-                    value = PayrollCalculator.formatWon(summary.totalNetPay),
-                    modifier = Modifier.weight(1f)
-                )
-                RecordsMetricTile(
-                    icon = MiuixIcons.Stopwatch,
-                    accentColor = Color(0xFF0EA5E9),
-                    label = "총 근무시간",
-                    value = "${PayrollCalculator.formatDurationKorean(summary.totalWorkMinutes)} (${summary.shiftCount}건)",
-                    modifier = Modifier.weight(1f)
-                )
-            }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                RecordsMetricTile(
-                    icon = MiuixIcons.FavoritesFill,
-                    accentColor = Color(0xFF16A34A),
-                    label = "주휴·가산수당",
-                    value = "+${PayrollCalculator.formatWon(bonusTotal)}",
-                    modifier = Modifier.weight(1f)
-                )
-                RecordsMetricTile(
-                    icon = MiuixIcons.Alarm,
-                    accentColor = if (summary.unpaidAmount > 0L) MiuixTheme.colorScheme.error else Color(0xFF64748B),
-                    label = "기간 미수금",
-                    value = if (summary.unpaidAmount > 0L) PayrollCalculator.formatWon(summary.unpaidAmount) else "없음",
-                    modifier = Modifier.weight(1f)
-                )
-            }
-        }
-    }
-
     val statementCard: @Composable () -> Unit = {
         Card(
             modifier = Modifier
@@ -220,13 +176,16 @@ fun RecordsScreen(
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    text = "최종 실수령 예상액 (순수익)",
+                    text = "예상 실수령액",
                     style = MiuixTheme.textStyles.footnote1,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                 )
                 Text(
                     text = PayrollCalculator.formatWon(summary.totalNetPay),
-                    style = MiuixTheme.textStyles.title2.copy(fontWeight = FontWeight.Bold),
+                    style = MiuixTheme.textStyles.title2.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontFeatureSettings = "tnum"
+                    ),
                     color = MiuixTheme.colorScheme.primary
                 )
                 HorizontalDivider()
@@ -256,12 +215,12 @@ fun RecordsScreen(
 
                 Spacer(modifier = Modifier.height(6.dp))
                 TextButton(
-                    text = "정산 내역서 (급여명세서) 텍스트 복사",
+                    text = "급여명세서 복사",
                     onClick = {
                         val title = selectedJob?.name ?: "전체 근무지 합산"
                         val text = PayrollCalculator.buildPayslipText(title, summary)
                         clipboardManager.setText(AnnotatedString(text))
-                        onNotify("급여 정산 명세서를 클립보드에 복사했습니다.")
+                        onNotify("급여명세서를 클립보드에 복사했습니다")
                     },
                     colors = ButtonDefaults.textButtonColorsPrimary(),
                     modifier = Modifier.fillMaxWidth()
@@ -278,7 +237,7 @@ fun RecordsScreen(
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
-                    "아직 받지 못한 전체 미수금",
+                    "전체 미수금",
                     style = MiuixTheme.textStyles.footnote1.copy(fontWeight = FontWeight.SemiBold),
                     color = MiuixTheme.colorScheme.onErrorContainer
                 )
@@ -291,7 +250,7 @@ fun RecordsScreen(
                     color = MiuixTheme.colorScheme.error
                 )
                 Text(
-                    "총 ${globalUnpaid.second.size}건 · 각 항목의 상태 배지를 눌러 입금 완료 처리할 수 있습니다",
+                    "총 ${globalUnpaid.second.size}건 · 배지를 탭해 입금 완료 처리",
                     style = MiuixTheme.textStyles.footnote2,
                     color = MiuixTheme.colorScheme.onErrorContainer.copy(alpha = 0.85f)
                 )
@@ -306,7 +265,7 @@ fun RecordsScreen(
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    "정산 · 미입금 통합 요약",
+                    "미입금 요약",
                     style = MiuixTheme.textStyles.body2.copy(fontWeight = FontWeight.Bold)
                 )
                 HorizontalDivider()
@@ -325,11 +284,6 @@ fun RecordsScreen(
                     "전체 미입금 합계",
                     PayrollCalculator.formatWon(globalUnpaid.first + scheduledPending.first),
                     MiuixTheme.colorScheme.onSurface
-                )
-                Text(
-                    "우측 항목의 상태 배지를 탭하면 즉시 입금 완료로 전환됩니다.",
-                    style = MiuixTheme.textStyles.footnote2,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                 )
             }
         }
@@ -359,7 +313,6 @@ fun RecordsScreen(
                     item { filterTabsCard() }
                     if (!onlyUnpaid) {
                         item { navigatorCard() }
-                        item { metricsGridCard() }
                         item { statementCard() }
                     } else {
                         item { unpaidBannerCard() }
@@ -382,8 +335,8 @@ fun RecordsScreen(
                                 EmptyDataBanner(
                                     icon = MiuixIcons.Notes,
                                     title = "선택한 기간에 근무 기록이 없어요",
-                                    subtitle = "달력에서 날짜를 누르거나 단기 퀵 등록으로 근무를 추가해 보세요.",
-                                    actionLabel = "단기/일용직 10초 퀵 등록",
+                                    subtitle = "달력이나 하단 + 버튼에서 근무를 추가할 수 있습니다",
+                                    actionLabel = "단기 근무 등록",
                                     onAction = onAddShortTerm
                                 )
                             }
@@ -455,15 +408,14 @@ fun RecordsScreen(
                 item { filterTabsCard() }
                 if (!onlyUnpaid) {
                     item { navigatorCard() }
-                    item { metricsGridCard() }
                     item { statementCard() }
                     if (summary.items.isEmpty()) {
                         item {
                             EmptyDataBanner(
                                 icon = MiuixIcons.Notes,
                                 title = "선택한 기간에 근무 기록이 없어요",
-                                subtitle = "달력에서 날짜를 누르거나 단기 퀵 등록으로 근무를 추가해 보세요.",
-                                actionLabel = "단기/일용직 10초 퀵 등록",
+                                subtitle = "달력이나 하단 + 버튼에서 근무를 추가할 수 있습니다",
+                                actionLabel = "단기 근무 등록",
                                 onAction = onAddShortTerm
                             )
                         }
@@ -521,52 +473,6 @@ fun RecordsScreen(
                         }
                     }
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun RecordsMetricTile(
-    icon: ImageVector,
-    accentColor: Color,
-    label: String,
-    value: String,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier,
-        insideMargin = PaddingValues(13.dp)
-    ) {
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            MiuixGlassIcon(
-                icon = icon,
-                contentDescription = null,
-                accentColor = accentColor,
-                size = 36.dp,
-                iconSize = 18.dp,
-                cornerRadius = 11.dp
-            )
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(
-                    text = label,
-                    style = MiuixTheme.textStyles.footnote2,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                    maxLines = 1
-                )
-                Text(
-                    text = value,
-                    style = MiuixTheme.textStyles.body2.copy(
-                        fontWeight = FontWeight.Bold,
-                        fontFeatureSettings = "tnum"
-                    ),
-                    color = MiuixTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
             }
         }
     }

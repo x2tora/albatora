@@ -309,7 +309,7 @@ fun QuickAddShortTermScreen(
     Scaffold(
         topBar = {
             MiuixFloatingScrollTopBar(
-                title = if (isEditing) "근무 내역 수정" else "단기/일용직 10초 퀵 등록",
+                title = if (isEditing) "근무 내역 수정" else "단기 근무 등록",
                 scrollBehavior = scrollBehavior,
                 backdrop = barBackdrop,
                 maxContentWidth = 620.dp,
@@ -389,7 +389,7 @@ fun QuickAddShortTermScreen(
             // Saved templates bar
             if (templates.isNotEmpty() && !isEditing) {
                 item {
-                    SmallTitle(text = "원탭 단기 프리셋 불러오기")
+                    SmallTitle(text = "단기 프리셋")
                     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(templates, key = { it.id }) { tpl ->
                             SquirclePillBadge(
@@ -429,7 +429,7 @@ fun QuickAddShortTermScreen(
 
             // Core 10-second fields
             item {
-                SmallTitle(text = "일자리 · 날짜 · 급여 형태")
+                SmallTitle(text = "근무 정보")
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     insideMargin = PaddingValues(16.dp)
@@ -577,7 +577,7 @@ fun QuickAddShortTermScreen(
 
             // Expenses and fees
             item {
-                SmallTitle(text = "순수익 정산 (교통비·식비·지원금·수수료)")
+                SmallTitle(text = "부대비용 · 수수료")
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     insideMargin = PaddingValues(16.dp)
@@ -635,7 +635,7 @@ fun QuickAddShortTermScreen(
 
             // Tax and allowance boosts
             item {
-                SmallTitle(text = "세금 공제 · 수당 가산 옵션")
+                SmallTitle(text = "세금 · 가산수당")
                 Card(modifier = Modifier.fillMaxWidth()) {
                     val taxOptions = TaxMode.entries
                     OverlayDropdownPreference(

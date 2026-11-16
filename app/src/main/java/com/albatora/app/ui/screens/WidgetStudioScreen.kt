@@ -308,7 +308,7 @@ fun WidgetStudioScreen(
 
             // 3. Appearance Controls
             item {
-                SmallTitle(text = "외관 및 투명도 (OneUI 스타일)")
+                SmallTitle(text = "외관 및 투명도")
                 val styles = WidgetThemeStyle.entries
                 val opacities = WidgetOpacity.entries
                 Card(modifier = Modifier.fillMaxWidth()) {
@@ -336,7 +336,7 @@ fun WidgetStudioScreen(
                     HorizontalDivider()
                     OverlayDropdownPreference(
                         title = "카드 배경 불투명도",
-                        summary = "현재 ${cfg.opacity.label}",
+                        summary = cfg.opacity.label,
                         items = opacities.map { it.label },
                         selectedIndex = opacities.indexOf(cfg.opacity).coerceAtLeast(0),
                         onSelectedIndexChange = { idx ->
@@ -347,7 +347,7 @@ fun WidgetStudioScreen(
                             MiuixGlassIcon(
                                 icon = MiuixIcons.Tune,
                                 contentDescription = null,
-                                accentColor = Color(0xFF0EA5E9),
+                                accentColor = MiuixTheme.colorScheme.primary,
                                 modifier = Modifier.padding(end = 6.dp),
                                 size = 38.dp,
                                 iconSize = 18.dp,
@@ -358,7 +358,6 @@ fun WidgetStudioScreen(
                     HorizontalDivider()
                     SwitchPreference(
                         title = "앱 테마 포인트 색상 따라가기",
-                        summary = if (cfg.useAppAccent) "앱 테마 설정과 동일한 색상을 위젯에 사용" else "위젯 전용 커스텀 포인트 색상 사용",
                         checked = cfg.useAppAccent,
                         onCheckedChange = { follow ->
                             onUpdateWidgetConfig { it.copy(useAppAccent = follow) }
@@ -438,8 +437,7 @@ fun WidgetStudioScreen(
 
                 Card(modifier = Modifier.fillMaxWidth()) {
                     SwitchPreference(
-                        title = "체감 물가 환산 함께 표시",
-                        summary = "실시간 타이머 위젯 하단에 커피·식사 환산 개수 표시",
+                        title = "체감 물가 환산 표시",
                         checked = cfg.showTangibleConversion,
                         onCheckedChange = { enabled ->
                             onUpdateWidgetConfig { it.copy(showTangibleConversion = enabled) }
@@ -447,8 +445,7 @@ fun WidgetStudioScreen(
                     )
                     HorizontalDivider()
                     SwitchPreference(
-                        title = "하단 빠른 실행 버튼 표시",
-                        summary = "휴게·퇴근·바로 출근 버튼을 위젯 안에서 바로 조작",
+                        title = "하단 빠른 실행 버튼",
                         checked = cfg.showQuickActions,
                         onCheckedChange = { enabled ->
                             onUpdateWidgetConfig { it.copy(showQuickActions = enabled) }
@@ -456,8 +453,7 @@ fun WidgetStudioScreen(
                     )
                     HorizontalDivider()
                     SwitchPreference(
-                        title = "주간 스케줄에서 지난 요일 숨기기",
-                        summary = "오늘 이후 남은 이번 주 일정만 깔끔하게 표시",
+                        title = "주간 위젯 지난 요일 숨기기",
                         checked = cfg.weeklyHidePastDays,
                         onCheckedChange = { hide ->
                             onUpdateWidgetConfig { it.copy(weeklyHidePastDays = hide) }
@@ -465,8 +461,7 @@ fun WidgetStudioScreen(
                     )
                     HorizontalDivider()
                     SwitchPreference(
-                        title = "월간 위젯 미수금·월급날 배지 표시",
-                        summary = "입금 대기 미수금 금액 또는 다음 월급 D-Day 배지 노출",
+                        title = "월간 위젯 미수금·월급날 배지",
                         checked = cfg.showMonthlyUnpaidBadge,
                         onCheckedChange = { showBadge ->
                             onUpdateWidgetConfig { it.copy(showMonthlyUnpaidBadge = showBadge) }

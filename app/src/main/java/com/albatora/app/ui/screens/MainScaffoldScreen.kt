@@ -466,12 +466,9 @@ private fun MainTabsHost(
                                 onDeleteWishlistGoal = viewModel::deleteWishlistGoal,
                                 onArchiveWishlistGoal = { id, amt ->
                                     viewModel.archiveWishlistGoal(id, amt)
-                                    notify("목표 달성을 아카이브에 보관했습니다!")
+                                    notify("목표 달성을 아카이브에 보관했습니다")
                                 },
                                 onDeleteArchivedGoal = viewModel::deleteArchivedGoal,
-                                onOpenCalendar = { selectedTab = 1 },
-                                onOpenCalculator = { selectedTab = 3 },
-                                onOpenWidgetStudio = onOpenWidgetStudio,
                                 topBarInset = resolvedTopBarInset,
                                 scrollToTopTrigger = scrollHomeToTopTrigger,
                                 onHomeScrollChange = { isHomeScrolled = it }
@@ -1083,7 +1080,7 @@ private fun ExpandableQuickAddMenuOverlay(
                     icon = MiuixIcons.Store,
                     iconTint = MiuixTheme.colorScheme.primary,
                     title = "고정 근무(매장) 추가",
-                    subtitle = "반복 스케줄 · 주휴수당 · 세금 프리셋",
+                    subtitle = "반복 스케줄 · 주휴 · 세금",
                     revealProgress = smoothStep(0.28f, 0.78f, clamped),
                     enabled = interactive,
                     onClick = onAddRegularJob
@@ -1091,9 +1088,9 @@ private fun ExpandableQuickAddMenuOverlay(
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
                 QuickAddMorphActionRow(
                     icon = MiuixIcons.Timer,
-                    iconTint = Color(0xFF00A86B),
+                    iconTint = MiuixTheme.colorScheme.primary,
                     title = "단기 알바 · 일당 추가",
-                    subtitle = "하루 행사, 대타, 일당 근무 빠르게 기록",
+                    subtitle = "일당 · 대타 · 단기 기록",
                     revealProgress = smoothStep(0.36f, 0.86f, clamped),
                     enabled = interactive,
                     onClick = onQuickAddShortTerm
@@ -1101,9 +1098,9 @@ private fun ExpandableQuickAddMenuOverlay(
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
                 QuickAddMorphActionRow(
                     icon = MiuixIcons.Stopwatch,
-                    iconTint = Color(0xFFE07A18),
+                    iconTint = MiuixTheme.colorScheme.primary,
                     title = "즉석 스톱워치 출근",
-                    subtitle = "매장 등록 없이 지금 바로 시급 카운트 시작",
+                    subtitle = "지금 바로 시급 카운트",
                     revealProgress = smoothStep(0.44f, 0.94f, clamped),
                     enabled = interactive,
                     onClick = onStartStopwatch
