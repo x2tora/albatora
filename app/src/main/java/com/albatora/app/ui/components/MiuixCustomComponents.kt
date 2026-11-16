@@ -704,8 +704,8 @@ fun MiuixFloatingScrollTopBar(
     }
 
     val islandSpring = spring<Float>(
-        dampingRatio = 0.80f,
-        stiffness = Spring.StiffnessMediumLow
+        dampingRatio = 0.74f,
+        stiffness = 280f
     )
     val navProgress by animateFloatAsState(
         targetValue = if (navPillVisible) 1f else 0f,

@@ -385,16 +385,16 @@ private fun MainTabsHost(
             quickMenuMorphProgress.animateTo(
                 targetValue = 1f,
                 animationSpec = spring(
-                    dampingRatio = 0.80f,
-                    stiffness = Spring.StiffnessMediumLow
+                    dampingRatio = 0.72f,
+                    stiffness = 290f
                 )
             )
         } else {
             quickMenuMorphProgress.animateTo(
                 targetValue = 0f,
                 animationSpec = spring(
-                    dampingRatio = 0.92f,
-                    stiffness = Spring.StiffnessMedium
+                    dampingRatio = 0.84f,
+                    stiffness = 320f
                 )
             )
             isQuickMenuMounted = false
@@ -544,13 +544,13 @@ private fun MainTabsHost(
             AnimatedVisibility(
                 visible = showChrome,
                 enter = slideInVertically(
-                    animationSpec = spring(dampingRatio = 0.88f, stiffness = Spring.StiffnessMediumLow),
+                    animationSpec = AlbaMotion.OffsetSpring,
                     initialOffsetY = { -it }
-                ) + fadeIn(tween(240)),
+                ) + fadeIn(tween(260)),
                 exit = slideOutVertically(
-                    animationSpec = spring(dampingRatio = 0.95f, stiffness = Spring.StiffnessMedium),
+                    animationSpec = AlbaMotion.ExitOffsetSpring,
                     targetOffsetY = { -it }
-                ) + fadeOut(tween(180)),
+                ) + fadeOut(tween(200)),
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .onSizeChanged {
@@ -597,13 +597,13 @@ private fun MainTabsHost(
             AnimatedVisibility(
                 visible = showChrome,
                 enter = slideInVertically(
-                    animationSpec = spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow),
+                    animationSpec = AlbaMotion.OffsetSpring,
                     initialOffsetY = { it }
-                ) + fadeIn(tween(240)),
+                ) + fadeIn(tween(260)),
                 exit = slideOutVertically(
-                    animationSpec = spring(dampingRatio = 0.94f, stiffness = Spring.StiffnessMedium),
+                    animationSpec = AlbaMotion.ExitOffsetSpring,
                     targetOffsetY = { it }
-                ) + fadeOut(tween(180)),
+                ) + fadeOut(tween(200)),
                 modifier = Modifier.align(Alignment.BottomCenter)
             ) {
                 Box(modifier = Modifier.fillMaxWidth()) {
