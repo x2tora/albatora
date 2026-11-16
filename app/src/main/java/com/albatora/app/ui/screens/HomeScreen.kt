@@ -3062,10 +3062,11 @@ private fun WishlistGoalEditSheet(
                 style = MiuixTheme.textStyles.footnote2,
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary
             )
+            val parsedGoalAmt = targetText.toLongOrNull() ?: 0L
             TextField(
                 value = targetText,
                 onValueChange = { targetText = it.filter(Char::isDigit) },
-                label = "목표 금액 (원)",
+                label = "목표 금액${if (parsedGoalAmt > 0L) " · ${PayrollCalculator.formatWon(parsedGoalAmt)}" else " (원)"}",
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()

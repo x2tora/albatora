@@ -261,12 +261,6 @@ fun WidgetStudioScreen(
                             }
                         }
                     }
-
-                    Text(
-                        text = "OneUI 8·9 표준 26dp 곡률과 다이나믹 투명도를 기준으로 모든 홈 화면 위젯에 즉시 반영됩니다.",
-                        style = MiuixTheme.textStyles.footnote2,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                    )
                 }
             }
 

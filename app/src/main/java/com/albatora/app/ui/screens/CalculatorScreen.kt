@@ -277,14 +277,16 @@ private fun rememberHourlyMonthlySections(
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.secondaryContainer),
                 insideMargin = PaddingValues(16.dp)
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text("예상 월 실수령액 (평균 4.345주)", style = MiuixTheme.textStyles.footnote1)
                     Text(
                         PayrollCalculator.formatWon(monthlyNet),
-                        style = MiuixTheme.textStyles.title2.copy(fontWeight = FontWeight.Bold),
+                        style = MiuixTheme.textStyles.title2.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontFeatureSettings = "tnum"
+                        ),
                         color = MiuixTheme.colorScheme.primary
                     )
                     HorizontalDivider()
@@ -389,7 +391,6 @@ private fun rememberWeeklyHolidaySections(
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.secondaryContainer),
                 insideMargin = PaddingValues(16.dp)
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -399,9 +400,13 @@ private fun rememberWeeklyHolidaySections(
                     )
                     Text(
                         PayrollCalculator.formatWon(whPay),
-                        style = MiuixTheme.textStyles.title2.copy(fontWeight = FontWeight.Bold),
+                        style = MiuixTheme.textStyles.title2.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontFeatureSettings = "tnum"
+                        ),
                         color = MiuixTheme.colorScheme.primary
                     )
+                    HorizontalDivider()
                     CalcLine("적용 주휴시간", "${String.format(Locale.US, "%.2f", whHours)}시간 (상한 8시간)")
                     CalcLine("실질 시급 환산", PayrollCalculator.formatWon(if (hours > 0) ((hours * hourly + whPay) / hours).roundToLong() else 0L))
                 }
@@ -547,14 +552,16 @@ private fun rememberDailyWorkerNetSections(): CalcTabSections {
     val resultSection: @Composable () -> Unit = {
         Card(
             modifier = Modifier.fillMaxWidth(),
-            colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.secondaryContainer),
             insideMargin = PaddingValues(16.dp)
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("일용직 최종 순수익", style = MiuixTheme.textStyles.footnote1)
                 Text(
                     PayrollCalculator.formatWon(net),
-                    style = MiuixTheme.textStyles.title2.copy(fontWeight = FontWeight.Bold),
+                    style = MiuixTheme.textStyles.title2.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontFeatureSettings = "tnum"
+                    ),
                     color = MiuixTheme.colorScheme.primary
                 )
                 HorizontalDivider()
@@ -624,10 +631,6 @@ private fun rememberSeveranceSections(): CalcTabSections {
     }
 
     val resultSection: @Composable () -> Unit = {
-        val resultContainerColor by animateColorAsState(
-            targetValue = if (eligible) MiuixTheme.colorScheme.secondaryContainer else MiuixTheme.colorScheme.errorContainer,
-            label = "severance_container"
-        )
         val resultAccentColor by animateColorAsState(
             targetValue = if (eligible) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.error,
             label = "severance_accent"
@@ -636,14 +639,16 @@ private fun rememberSeveranceSections(): CalcTabSections {
             modifier = Modifier
                 .fillMaxWidth()
                 .animateContentSize(animationSpec = AlbaMotion.LayoutSizeSpring),
-            colors = CardDefaults.defaultColors(color = resultContainerColor),
             insideMargin = PaddingValues(16.dp)
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text("예상 법정 퇴직금 (세전)", style = MiuixTheme.textStyles.footnote1)
                 Text(
                     PayrollCalculator.formatWon(severance),
-                    style = MiuixTheme.textStyles.title2.copy(fontWeight = FontWeight.Bold),
+                    style = MiuixTheme.textStyles.title2.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontFeatureSettings = "tnum"
+                    ),
                     color = resultAccentColor
                 )
                 Text(
@@ -669,6 +674,13 @@ private fun CalcLine(
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
         Text(label, style = MiuixTheme.textStyles.body2, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
-        Text(value, style = MiuixTheme.textStyles.body2.copy(fontWeight = FontWeight.SemiBold), color = valueColor)
+        Text(
+            value,
+            style = MiuixTheme.textStyles.body2.copy(
+                fontWeight = FontWeight.SemiBold,
+                fontFeatureSettings = "tnum"
+            ),
+            color = valueColor
+        )
     }
 }

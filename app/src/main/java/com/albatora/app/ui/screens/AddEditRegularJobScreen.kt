@@ -369,13 +369,15 @@ fun AddEditRegularJobScreen(
                             onTabSelected = { payType = payTypes[it] }
                         )
 
+                        val parsedBaseAmt = baseAmountText.toLongOrNull() ?: 0L
+                        val previewSuffix = if (parsedBaseAmt > 0L) " · ${PayrollCalculator.formatWon(parsedBaseAmt)}" else ""
                         TextField(
                             value = baseAmountText,
                             onValueChange = { baseAmountText = it.filter(Char::isDigit) },
                             label = when (payType) {
-                                PayType.HOURLY -> "기본 시급 (2026 최저시급 ${PayrollCalculator.formatWon(defaultMinWage)})"
-                                PayType.DAILY -> "기본 일급 (원)"
-                                PayType.PER_TASK -> "기본 건당 금액 (원)"
+                                PayType.HOURLY -> "기본 시급$previewSuffix"
+                                PayType.DAILY -> "기본 일급$previewSuffix"
+                                PayType.PER_TASK -> "기본 건당 금액$previewSuffix"
                             },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -421,11 +423,13 @@ fun AddEditRegularJobScreen(
                     insideMargin = PaddingValues(16.dp)
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text(
-                            text = "적용 시작일을 지정해 시급 인상 이력을 추가하면, 인상 전 날짜의 급여는 기존 시급으로 정확히 보존됩니다.",
-                            style = MiuixTheme.textStyles.footnote1,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                        )
+                        if (wageHistory.isEmpty()) {
+                            Text(
+                                text = "인상 적용일 이후 근무부터 변경된 급여로 계산됩니다",
+                                style = MiuixTheme.textStyles.footnote1,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                            )
+                        }
                         wageHistory.sortedBy { it.effectiveFromDate }.forEachIndexed { idx, rev ->
                             Row(
                                 modifier = Modifier
@@ -475,11 +479,6 @@ fun AddEditRegularJobScreen(
                     insideMargin = PaddingValues(16.dp)
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text(
-                            text = "요일을 누르면 해당 요일의 근무·휴게 시간을 설정할 수 있습니다. (휴게: 4시간당 30분 / 8시간당 1시간 자동 추천)",
-                            style = MiuixTheme.textStyles.footnote1,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                        )
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -508,7 +507,7 @@ fun AddEditRegularJobScreen(
 
                         if (schedules.isEmpty()) {
                             Text(
-                                text = "아직 등록된 요일 스케줄이 없습니다. 위 요일을 탭해 추가하거나 즉시 출근(스톱워치)만으로도 사용할 수 있습니다.",
+                                text = "요일을 탭해 근무 시간을 추가하세요 (미설정 시 자유 출근)",
                                 style = MiuixTheme.textStyles.footnote1,
                                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                             )
@@ -822,32 +821,18 @@ fun AddEditRegularJobScreen(
         }
 
         if (showDeleteConfirm && existingJob != null && onDelete != null) {
-            OverlayDialog(
+            ConfirmActionDialog(
                 show = true,
                 title = "알바 삭제",
                 summary = "'${existingJob.name}' 근무지를 삭제할까요?",
-                onDismissRequest = { showDeleteConfirm = false }
-            ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    TextButton(
-                        text = "취소",
-                        onClick = { showDeleteConfirm = false },
-                        modifier = Modifier.weight(1f)
-                    )
-                    TextButton(
-                        text = "삭제",
-                        onClick = {
-                            showDeleteConfirm = false
-                            onDelete(existingJob.id)
-                        },
-                        colors = ButtonDefaults.textButtonColors(
-                            color = MiuixTheme.colorScheme.error,
-                            textColor = Color.White
-                        ),
-                        modifier = Modifier.weight(1f)
-                    )
+                confirmText = "삭제",
+                isDestructive = true,
+                onDismiss = { showDeleteConfirm = false },
+                onConfirm = {
+                    showDeleteConfirm = false
+                    onDelete(existingJob.id)
                 }
-            }
+            )
         }
 
         val editCandidate = pendingEditJob

@@ -552,7 +552,7 @@ private fun RecordDetailCard(
                         }
                         if (item.isVirtualSchedule) {
                             SquirclePillBadge(
-                                text = "자동정규",
+                                text = "자동 스케줄",
                                 backgroundColor = Color(rec.colorHex).copy(alpha = 0.14f),
                                 contentColor = Color(rec.colorHex)
                             )

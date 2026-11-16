@@ -516,10 +516,11 @@ fun QuickAddShortTermScreen(
                             }
                         )
 
+                        val parsedUnitAmt = unitAmountText.toLongOrNull() ?: 0L
                         TextField(
                             value = unitAmountText,
                             onValueChange = { unitAmountText = it.filter(Char::isDigit) },
-                            label = "${payType.label} 금액 (원)",
+                            label = "${payType.label} 금액${if (parsedUnitAmt > 0L) " · ${PayrollCalculator.formatWon(parsedUnitAmt)}" else " (원)"}",
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
@@ -705,8 +706,7 @@ fun QuickAddShortTermScreen(
                     if (!isEditing) {
                         HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                         SwitchPreference(
-                            title = "자주 가는 단기 알바 프리셋(템플릿)으로 저장",
-                            summary = "달력에서 날짜만 찍어 원탭 등록할 수 있습니다",
+                            title = "단기 프리셋으로 함께 저장",
                             checked = saveAsTemplate,
                             onCheckedChange = { saveAsTemplate = it }
                         )
@@ -718,25 +718,26 @@ fun QuickAddShortTermScreen(
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.defaultColors(
-                        color = MiuixTheme.colorScheme.secondaryContainer
-                    ),
                     insideMargin = PaddingValues(16.dp)
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(
-                            text = "실시간 예상 순수익 미리보기",
-                            style = MiuixTheme.textStyles.footnote1.copy(fontWeight = FontWeight.SemiBold),
-                            color = MiuixTheme.colorScheme.onSecondaryContainer
+                            text = "예상 순수익",
+                            style = MiuixTheme.textStyles.footnote1,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                         )
                         Text(
                             text = PayrollCalculator.formatWon(preview.netPay),
-                            style = MiuixTheme.textStyles.title2.copy(fontWeight = FontWeight.Bold),
+                            style = MiuixTheme.textStyles.title2.copy(
+                                fontWeight = FontWeight.Bold,
+                                fontFeatureSettings = "tnum"
+                            ),
                             color = MiuixTheme.colorScheme.primary
                         )
+                        HorizontalDivider()
                         Text(
                             text = "세전 ${PayrollCalculator.formatWon(preview.grossPay)} · 세금 -${PayrollCalculator.formatWon(preview.taxAmount)} · 수수료 -${PayrollCalculator.formatWon(preview.agencyFee)} · 지출 -${PayrollCalculator.formatWon(preview.transportExpense + preview.mealExpense)}",
-                            style = MiuixTheme.textStyles.footnote2,
+                            style = MiuixTheme.textStyles.footnote2.copy(fontFeatureSettings = "tnum"),
                             color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                         )
                     }
@@ -788,32 +789,18 @@ fun QuickAddShortTermScreen(
         }
 
         if (showDeleteConfirm && existingRecord != null && onDelete != null) {
-            OverlayDialog(
+            ConfirmActionDialog(
                 show = true,
                 title = "근무 기록 삭제",
                 summary = "'${existingRecord.title}' (${existingRecord.date}) 기록을 삭제할까요?",
-                onDismissRequest = { showDeleteConfirm = false }
-            ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    TextButton(
-                        text = "취소",
-                        onClick = { showDeleteConfirm = false },
-                        modifier = Modifier.weight(1f)
-                    )
-                    TextButton(
-                        text = "삭제",
-                        onClick = {
-                            showDeleteConfirm = false
-                            onDelete(existingRecord.id)
-                        },
-                        colors = ButtonDefaults.textButtonColors(
-                            color = MiuixTheme.colorScheme.error,
-                            textColor = Color.White
-                        ),
-                        modifier = Modifier.weight(1f)
-                    )
+                confirmText = "삭제",
+                isDestructive = true,
+                onDismiss = { showDeleteConfirm = false },
+                onConfirm = {
+                    showDeleteConfirm = false
+                    onDelete(existingRecord.id)
                 }
-            }
+            )
         }
 
         val editPair = pendingEditSave

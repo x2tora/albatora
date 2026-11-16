@@ -437,10 +437,11 @@ fun MoreSettingsScreen(
         onDismissRequest = { showMinWageDialog = false }
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            val parsedWage = wageText.toLongOrNull() ?: 0L
             TextField(
                 value = wageText,
                 onValueChange = { wageText = it.filter(Char::isDigit) },
-                label = "시급 (원)",
+                label = "시급${if (parsedWage > 0L) " · ${PayrollCalculator.formatWon(parsedWage)}" else " (원)"}",
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth()
@@ -502,7 +503,7 @@ fun MoreSettingsScreen(
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             if (state.templates.isEmpty()) {
                 Text(
-                    "저장된 프리셋이 없습니다. 아래 버튼이나 [단기/일용직 10초 퀵 등록]에서 프리셋을 만들어 보세요.",
+                    "저장된 프리셋이 없습니다. 아래 '+ 새 프리셋'으로 추가해 보세요",
                     style = MiuixTheme.textStyles.body2,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                 )
@@ -556,10 +557,11 @@ fun MoreSettingsScreen(
                                 }
                             }
                         )
+                        val parsedTplAmt = newTplAmount.toLongOrNull() ?: 0L
                         TextField(
                             value = newTplAmount,
                             onValueChange = { newTplAmount = it.filter(Char::isDigit) },
-                            label = "금액 (원)",
+                            label = "금액${if (parsedTplAmt > 0L) " · ${PayrollCalculator.formatWon(parsedTplAmt)}" else " (원)"}",
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             singleLine = true,
                             modifier = Modifier.weight(1f)
@@ -578,7 +580,7 @@ fun MoreSettingsScreen(
                                 ShortTermTemplate(
                                     id = UUID.randomUUID().toString(),
                                     name = clean,
-                                    emoji = "⚡",
+                                    emoji = "timer",
                                     colorHex = JobAccentPalette.random().second,
                                     startMinute = 9 * 60,
                                     endMinute = 18 * 60,

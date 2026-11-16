@@ -12,8 +12,8 @@ android {
         applicationId = "com.albatora.app"
         minSdk = 24
         targetSdk = 36
-        versionCode = 48
-        versionName = "1.7.0"
+        versionCode = 49
+        versionName = "1.8.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

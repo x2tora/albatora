@@ -168,7 +168,7 @@ fun CalendarScreen(
                         }
                         Text(
                             text = "월 정산 예상 ${PayrollCalculator.formatWon(monthTotal)}",
-                            style = MiuixTheme.textStyles.footnote1,
+                            style = MiuixTheme.textStyles.footnote1.copy(fontFeatureSettings = "tnum"),
                             color = MiuixTheme.colorScheme.primary
                         )
                     }
@@ -776,7 +776,7 @@ private fun CalendarDayShiftCard(
                     }
                     Text(
                         text = "${PayrollCalculator.formatMinutes(item.startMinute)} ~ ${PayrollCalculator.formatMinutes(item.endMinute)}",
-                        style = MiuixTheme.textStyles.footnote2,
+                        style = MiuixTheme.textStyles.footnote2.copy(fontFeatureSettings = "tnum"),
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                     )
                 }
@@ -784,7 +784,10 @@ private fun CalendarDayShiftCard(
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text(
                     text = if (item.status == ShiftStatus.ABSENT) "0원" else PayrollCalculator.formatWon(item.estimatedNetPay),
-                    style = MiuixTheme.textStyles.body1.copy(fontWeight = FontWeight.Bold),
+                    style = MiuixTheme.textStyles.body1.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontFeatureSettings = "tnum"
+                    ),
                     color = if (item.status == ShiftStatus.ABSENT) MiuixTheme.colorScheme.outline else MiuixTheme.colorScheme.onSurface
                 )
                 val pStatus = item.paymentStatus
