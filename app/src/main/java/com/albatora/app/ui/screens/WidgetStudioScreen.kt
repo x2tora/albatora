@@ -136,7 +136,7 @@ fun WidgetStudioScreen(
                 navigationIcon = {
                     IconButton(
                         onClick = onBack,
-                        modifier = Modifier.size(44.dp)
+                        modifier = Modifier.size(48.dp)
                     ) {
                         Icon(MiuixIcons.Back, contentDescription = "뒤로가기")
                     }

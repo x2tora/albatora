@@ -252,7 +252,7 @@ fun AddEditRegularJobScreen(
                 navigationIcon = {
                     IconButton(
                         onClick = handleBackAttempt,
-                        modifier = Modifier.size(44.dp)
+                        modifier = Modifier.size(48.dp)
                     ) {
                         Icon(
                             imageVector = MiuixIcons.Back,
@@ -264,7 +264,7 @@ fun AddEditRegularJobScreen(
                     if (isEditing && onDelete != null) {
                         IconButton(
                             onClick = { showDeleteConfirm = true },
-                            modifier = Modifier.size(44.dp)
+                            modifier = Modifier.size(48.dp)
                         ) {
                             Icon(
                                 imageVector = MiuixIcons.Delete,
@@ -276,7 +276,7 @@ fun AddEditRegularJobScreen(
                     }
                     IconButton(
                         onClick = ::handleSubmit,
-                        modifier = Modifier.size(44.dp)
+                        modifier = Modifier.size(48.dp)
                     ) {
                         Icon(
                             imageVector = MiuixIcons.Ok,

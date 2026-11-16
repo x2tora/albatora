@@ -568,7 +568,7 @@ private fun MainTabsHost(
                     actions = {
                         IconButton(
                             onClick = onOpenSettings,
-                            modifier = Modifier.size(44.dp)
+                            modifier = Modifier.size(48.dp)
                         ) {
                             Icon(
                                 imageVector = MiuixIcons.Regular.Settings,

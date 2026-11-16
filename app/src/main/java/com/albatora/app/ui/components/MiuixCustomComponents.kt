@@ -16,6 +16,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
@@ -39,6 +40,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -768,21 +770,21 @@ fun MiuixFloatingScrollTopBar(
                 .then(if (maxContentWidth != Dp.Unspecified) Modifier.widthIn(max = maxContentWidth) else Modifier)
                 .fillMaxWidth()
                 .statusBarsPadding()
-                .height(56.dp)
+                .height(60.dp)
                 .padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Row(
                 modifier = Modifier.weight(1f),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 FloatingTopBarIsland(
                     progress = navProgress,
                     isDark = isDark,
                     backdrop = backdrop,
-                    cornerRadius = 16.dp,
+                    cornerRadius = 13.dp,
                     slideOffsetPx = slideOffsetPx,
                     onHasContentChange = { hasNav = it },
                     content = navigationIcon
@@ -791,9 +793,9 @@ fun MiuixFloatingScrollTopBar(
                     progress = titleProgress,
                     isDark = isDark,
                     backdrop = backdrop,
-                    cornerRadius = 16.dp,
+                    cornerRadius = 13.dp,
                     slideOffsetPx = slideOffsetPx,
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
                 ) {
                     AnimatedContent(
                         targetState = title,
@@ -822,9 +824,8 @@ fun MiuixFloatingScrollTopBar(
                 progress = actionsProgress,
                 isDark = isDark,
                 backdrop = backdrop,
-                cornerRadius = 16.dp,
+                cornerRadius = 13.dp,
                 slideOffsetPx = slideOffsetPx,
-                contentPadding = PaddingValues(horizontal = 2.dp),
                 onHasContentChange = { hasActions = it }
             ) {
                 Row(
@@ -837,7 +838,8 @@ fun MiuixFloatingScrollTopBar(
 }
 
 private class MiuixSquircleShape(
-    private val cornerRadius: Dp
+    private val cornerRadius: Dp,
+    private val extension: Float = SquircleDefaults.ExtensionMin
 ) : Shape {
     override fun createOutline(
         size: Size,
@@ -850,7 +852,7 @@ private class MiuixSquircleShape(
                 size.width,
                 size.height,
                 radiusPx,
-                SquircleDefaults.Extension,
+                extension,
                 true
             )
         }
@@ -873,8 +875,8 @@ private fun FloatingTopBarIsland(
     val p = progress.coerceIn(0f, 1f)
     val density = LocalDensity.current
     val isLiquidGlass = LocalLiquidGlassEnabled.current
-    val minSizePx = with(density) { 44.dp.roundToPx() }
-    val pillShape = remember(cornerRadius) { MiuixSquircleShape(cornerRadius) }
+    val minSizePx = with(density) { 48.dp.roundToPx() }
+    val pillShape = remember(cornerRadius) { MiuixSquircleShape(cornerRadius, SquircleDefaults.ExtensionMin) }
     val pillFill = if (isDark) {
         MiuixTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f)
     } else {
@@ -906,9 +908,9 @@ private fun FloatingTopBarIsland(
                         shape = pillShape,
                         cornerRadius = cornerRadius,
                         blurRadius = 2.5.dp,
-                        refractionHeight = 10.dp,
-                        refractionAmount = 7.dp,
-                        chromaticAberration = 2.4.dp,
+                        refractionHeight = 8.dp,
+                        refractionAmount = 5.dp,
+                        chromaticAberration = 2.0.dp,
                         surfaceTint = if (isDark) {
                             Color(0xFF141822).copy(alpha = 0.40f)
                         } else {
@@ -933,8 +935,8 @@ private fun FloatingTopBarIsland(
                     Modifier
                         .clip(pillShape)
                         .then(blurMod)
-                        .squircleBackground(color = pillFill, cornerRadius = cornerRadius)
-                        .squircleBorder(width = 1.dp, color = pillBorder, cornerRadius = cornerRadius)
+                        .squircleBackground(color = pillFill, cornerRadius = cornerRadius, extension = SquircleDefaults.ExtensionMin)
+                        .squircleBorder(width = 1.dp, color = pillBorder, cornerRadius = cornerRadius, extension = SquircleDefaults.ExtensionMin)
                 }
                 Box(
                     modifier = Modifier
@@ -946,17 +948,15 @@ private fun FloatingTopBarIsland(
                             scaleY = scale
                         }
                         .shadow(
-                            elevation = (10f * p).dp,
+                            elevation = (8f * p).dp,
                             shape = pillShape,
-                            ambientColor = Color.Black.copy(alpha = if (isDark) 0.42f else 0.14f),
-                            spotColor = Color.Black.copy(alpha = if (isDark) 0.42f else 0.16f)
+                            ambientColor = Color.Black.copy(alpha = if (isDark) 0.40f else 0.12f),
+                            spotColor = Color.Black.copy(alpha = if (isDark) 0.40f else 0.14f)
                         )
                         .then(bgSurfaceMod)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            onClick = {}
-                        )
+                        .pointerInput(Unit) {
+                            detectTapGestures { }
+                        }
                 )
             }
         }

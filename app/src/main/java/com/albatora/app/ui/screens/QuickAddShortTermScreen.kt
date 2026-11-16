@@ -316,7 +316,7 @@ fun QuickAddShortTermScreen(
                 navigationIcon = {
                     IconButton(
                         onClick = handleBackAttempt,
-                        modifier = Modifier.size(44.dp)
+                        modifier = Modifier.size(48.dp)
                     ) {
                         Icon(MiuixIcons.Back, contentDescription = "뒤로가기")
                     }
@@ -325,7 +325,7 @@ fun QuickAddShortTermScreen(
                     if (isEditing && onDelete != null) {
                         IconButton(
                             onClick = { showDeleteConfirm = true },
-                            modifier = Modifier.size(44.dp)
+                            modifier = Modifier.size(48.dp)
                         ) {
                             Icon(
                                 MiuixIcons.Delete,
@@ -337,7 +337,7 @@ fun QuickAddShortTermScreen(
                     }
                     IconButton(
                         onClick = ::handleSubmit,
-                        modifier = Modifier.size(44.dp)
+                        modifier = Modifier.size(48.dp)
                     ) {
                         Icon(
                             MiuixIcons.Ok,
