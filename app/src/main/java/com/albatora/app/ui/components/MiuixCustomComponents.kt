@@ -31,7 +31,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
@@ -44,7 +47,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.albatora.app.ui.theme.AlbaMotion
 import androidx.compose.ui.unit.sp
@@ -64,6 +69,8 @@ import top.yukonga.miuix.kmp.blur.progressiveTextureBlur
 import top.yukonga.miuix.kmp.blur.textureBlur
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.shader.isRuntimeShaderSupported
+import top.yukonga.miuix.kmp.squircle.SquircleDefaults
+import top.yukonga.miuix.kmp.squircle.addSquircleRect
 import top.yukonga.miuix.kmp.squircle.squircleBackground
 import top.yukonga.miuix.kmp.squircle.squircleBorder
 import top.yukonga.miuix.kmp.squircle.squircleClip
@@ -705,7 +712,7 @@ fun MiuixFloatingScrollTopBar(
 
     val islandSpring = spring<Float>(
         dampingRatio = 0.74f,
-        stiffness = 280f
+        stiffness = 175f
     )
     val navProgress by animateFloatAsState(
         targetValue = if (navPillVisible) 1f else 0f,
@@ -761,8 +768,8 @@ fun MiuixFloatingScrollTopBar(
                 .then(if (maxContentWidth != Dp.Unspecified) Modifier.widthIn(max = maxContentWidth) else Modifier)
                 .fillMaxWidth()
                 .statusBarsPadding()
-                .height(58.dp)
-                .padding(horizontal = 10.dp),
+                .height(56.dp)
+                .padding(horizontal = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -775,7 +782,7 @@ fun MiuixFloatingScrollTopBar(
                     progress = navProgress,
                     isDark = isDark,
                     backdrop = backdrop,
-                    cornerRadius = 21.dp,
+                    cornerRadius = 16.dp,
                     slideOffsetPx = slideOffsetPx,
                     onHasContentChange = { hasNav = it },
                     content = navigationIcon
@@ -784,18 +791,18 @@ fun MiuixFloatingScrollTopBar(
                     progress = titleProgress,
                     isDark = isDark,
                     backdrop = backdrop,
-                    cornerRadius = 21.dp,
+                    cornerRadius = 16.dp,
                     slideOffsetPx = slideOffsetPx,
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 9.dp)
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)
                 ) {
                     AnimatedContent(
                         targetState = title,
                         transitionSpec = {
                             (slideInVertically(animationSpec = AlbaMotion.OffsetSpring) { it / 6 } +
-                                fadeIn(tween(200)))
+                                fadeIn(tween(280)))
                                 .togetherWith(
                                     slideOutVertically(animationSpec = AlbaMotion.ExitOffsetSpring) { -it / 6 } +
-                                        fadeOut(tween(130))
+                                        fadeOut(tween(190))
                                 )
                         },
                         label = "top_bar_title_fade"
@@ -815,17 +822,39 @@ fun MiuixFloatingScrollTopBar(
                 progress = actionsProgress,
                 isDark = isDark,
                 backdrop = backdrop,
-                cornerRadius = 21.dp,
+                cornerRadius = 16.dp,
                 slideOffsetPx = slideOffsetPx,
+                contentPadding = PaddingValues(horizontal = 2.dp),
                 onHasContentChange = { hasActions = it }
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
                     content = actions
                 )
             }
         }
+    }
+}
+
+private class MiuixSquircleShape(
+    private val cornerRadius: Dp
+) : Shape {
+    override fun createOutline(
+        size: Size,
+        layoutDirection: LayoutDirection,
+        density: Density
+    ): Outline {
+        val radiusPx = with(density) { cornerRadius.toPx() }
+        val path = Path().apply {
+            addSquircleRect(
+                size.width,
+                size.height,
+                radiusPx,
+                SquircleDefaults.Extension,
+                true
+            )
+        }
+        return Outline.Generic(path)
     }
 }
 
@@ -844,8 +873,8 @@ private fun FloatingTopBarIsland(
     val p = progress.coerceIn(0f, 1f)
     val density = LocalDensity.current
     val isLiquidGlass = LocalLiquidGlassEnabled.current
-    val minSizePx = with(density) { 48.dp.roundToPx() }
-    val pillShape = RoundedCornerShape(cornerRadius)
+    val minSizePx = with(density) { 44.dp.roundToPx() }
+    val pillShape = remember(cornerRadius) { MiuixSquircleShape(cornerRadius) }
     val pillFill = if (isDark) {
         MiuixTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f)
     } else {
@@ -863,7 +892,9 @@ private fun FloatingTopBarIsland(
         },
         content = {
             Box(
-                modifier = Modifier.padding(contentPadding),
+                modifier = Modifier
+                    .clip(pillShape)
+                    .padding(contentPadding),
                 contentAlignment = Alignment.Center
             ) {
                 content()
@@ -921,6 +952,11 @@ private fun FloatingTopBarIsland(
                             spotColor = Color.Black.copy(alpha = if (isDark) 0.42f else 0.16f)
                         )
                         .then(bgSurfaceMod)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = {}
+                        )
                 )
             }
         }

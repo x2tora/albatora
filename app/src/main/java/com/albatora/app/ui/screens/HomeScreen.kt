@@ -1081,22 +1081,22 @@ fun HomeScreen(
         // Smooth animated Fullscreen focus mode overlay with interactive pull-down-to-collapse gesture
         AnimatedVisibility(
             visible = isFullscreenFocus && liveDashboard.activeShifts.isNotEmpty(),
-            enter = fadeIn(tween(280, easing = FastOutSlowInEasing)) +
+            enter = fadeIn(tween(360, easing = FastOutSlowInEasing)) +
                 scaleIn(
                     initialScale = 0.88f,
                     transformOrigin = TransformOrigin(0.5f, 0.22f),
                     animationSpec = spring(
-                        dampingRatio = 0.76f,
-                        stiffness = 270f
+                        dampingRatio = 0.75f,
+                        stiffness = 170f
                     )
                 ),
-            exit = fadeOut(tween(220, easing = FastOutSlowInEasing)) +
+            exit = fadeOut(tween(260, easing = FastOutSlowInEasing)) +
                 scaleOut(
                     targetScale = 0.88f,
                     transformOrigin = TransformOrigin(0.5f, 0.22f),
                     animationSpec = spring(
                         dampingRatio = 0.84f,
-                        stiffness = 300f
+                        stiffness = 195f
                     )
                 )
         ) {

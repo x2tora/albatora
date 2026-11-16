@@ -134,7 +134,10 @@ fun WidgetStudioScreen(
                 backdrop = barBackdrop,
                 maxContentWidth = 620.dp,
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier.size(44.dp)
+                    ) {
                         Icon(MiuixIcons.Back, contentDescription = "뒤로가기")
                     }
                 },

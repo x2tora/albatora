@@ -314,13 +314,19 @@ fun QuickAddShortTermScreen(
                 backdrop = barBackdrop,
                 maxContentWidth = 620.dp,
                 navigationIcon = {
-                    IconButton(onClick = handleBackAttempt) {
+                    IconButton(
+                        onClick = handleBackAttempt,
+                        modifier = Modifier.size(44.dp)
+                    ) {
                         Icon(MiuixIcons.Back, contentDescription = "뒤로가기")
                     }
                 },
                 actions = {
                     if (isEditing && onDelete != null) {
-                        IconButton(onClick = { showDeleteConfirm = true }) {
+                        IconButton(
+                            onClick = { showDeleteConfirm = true },
+                            modifier = Modifier.size(44.dp)
+                        ) {
                             Icon(
                                 MiuixIcons.Delete,
                                 contentDescription = "삭제",
@@ -329,7 +335,10 @@ fun QuickAddShortTermScreen(
                         }
                         MiuixTopBarActionDivider()
                     }
-                    IconButton(onClick = ::handleSubmit) {
+                    IconButton(
+                        onClick = ::handleSubmit,
+                        modifier = Modifier.size(44.dp)
+                    ) {
                         Icon(
                             MiuixIcons.Ok,
                             contentDescription = "저장",

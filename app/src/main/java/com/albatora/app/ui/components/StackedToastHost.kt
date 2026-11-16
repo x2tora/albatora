@@ -145,22 +145,22 @@ fun StackedToastHost(
                 val animatedScale by animateFloatAsState(
                     targetValue = targetScale,
                     animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessMediumLow
+                        dampingRatio = 0.72f,
+                        stiffness = 190f
                     ),
                     label = "toastDeckScale"
                 )
                 val animatedOffsetY by animateDpAsState(
                     targetValue = targetOffsetY,
                     animationSpec = spring(
-                        dampingRatio = Spring.DampingRatioMediumBouncy,
-                        stiffness = Spring.StiffnessMediumLow
+                        dampingRatio = 0.72f,
+                        stiffness = 190f
                     ),
                     label = "toastDeckOffsetY"
                 )
                 val animatedAlpha by animateFloatAsState(
                     targetValue = targetAlpha,
-                    animationSpec = tween(durationMillis = 220),
+                    animationSpec = tween(durationMillis = 280),
                     label = "toastDeckAlpha"
                 )
 
@@ -295,8 +295,8 @@ private fun SwipeableToastCard(
                                         dragX.animateTo(
                                             targetValue = 0f,
                                             animationSpec = spring(
-                                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                                stiffness = Spring.StiffnessMediumLow
+                                                dampingRatio = 0.72f,
+                                                stiffness = 190f
                                             )
                                         )
                                     }
@@ -307,8 +307,8 @@ private fun SwipeableToastCard(
                                     dragX.animateTo(
                                         targetValue = 0f,
                                         animationSpec = spring(
-                                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                                            stiffness = Spring.StiffnessMediumLow
+                                            dampingRatio = 0.72f,
+                                            stiffness = 190f
                                         )
                                     )
                                 }

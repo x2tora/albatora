@@ -386,7 +386,7 @@ private fun MainTabsHost(
                 targetValue = 1f,
                 animationSpec = spring(
                     dampingRatio = 0.72f,
-                    stiffness = 290f
+                    stiffness = 185f
                 )
             )
         } else {
@@ -394,7 +394,7 @@ private fun MainTabsHost(
                 targetValue = 0f,
                 animationSpec = spring(
                     dampingRatio = 0.84f,
-                    stiffness = 320f
+                    stiffness = 210f
                 )
             )
             isQuickMenuMounted = false
@@ -546,11 +546,11 @@ private fun MainTabsHost(
                 enter = slideInVertically(
                     animationSpec = AlbaMotion.OffsetSpring,
                     initialOffsetY = { -it }
-                ) + fadeIn(tween(260)),
+                ) + fadeIn(tween(320)),
                 exit = slideOutVertically(
                     animationSpec = AlbaMotion.ExitOffsetSpring,
                     targetOffsetY = { -it }
-                ) + fadeOut(tween(200)),
+                ) + fadeOut(tween(240)),
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .onSizeChanged {
@@ -566,7 +566,10 @@ private fun MainTabsHost(
                     isScrolledOverride = if (selectedTab == 0) isHomeScrolled else null,
                     backdrop = barBackdrop,
                     actions = {
-                        IconButton(onClick = onOpenSettings) {
+                        IconButton(
+                            onClick = onOpenSettings,
+                            modifier = Modifier.size(44.dp)
+                        ) {
                             Icon(
                                 imageVector = MiuixIcons.Regular.Settings,
                                 contentDescription = "더보기 및 설정",
@@ -599,11 +602,11 @@ private fun MainTabsHost(
                 enter = slideInVertically(
                     animationSpec = AlbaMotion.OffsetSpring,
                     initialOffsetY = { it }
-                ) + fadeIn(tween(260)),
+                ) + fadeIn(tween(320)),
                 exit = slideOutVertically(
                     animationSpec = AlbaMotion.ExitOffsetSpring,
                     targetOffsetY = { it }
-                ) + fadeOut(tween(200)),
+                ) + fadeOut(tween(240)),
                 modifier = Modifier.align(Alignment.BottomCenter)
             ) {
                 Box(modifier = Modifier.fillMaxWidth()) {
@@ -897,7 +900,10 @@ private fun SettingsScreenHost(
                 backdrop = settingsBackdrop,
                 maxContentWidth = 620.dp,
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier.size(44.dp)
+                    ) {
                         Icon(
                             imageVector = MiuixIcons.Back,
                             contentDescription = "뒤로가기"

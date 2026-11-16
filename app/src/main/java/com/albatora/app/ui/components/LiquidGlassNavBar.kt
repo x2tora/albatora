@@ -357,8 +357,8 @@ fun FloatingLiquidGlassNavBar(
     val barScale by animateFloatAsState(
         targetValue = if (barPressed) DockPressedScale else 1f,
         animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
+            dampingRatio = 0.70f,
+            stiffness = 220f
         ),
         label = "dockPressScale"
     )
@@ -473,8 +473,8 @@ private fun LiquidGlassNavBarContent(
     val pressProgress by animateFloatAsState(
         targetValue = if (pressed) 1f else 0f,
         animationSpec = spring(
-            dampingRatio = Spring.DampingRatioMediumBouncy,
-            stiffness = Spring.StiffnessMedium
+            dampingRatio = 0.70f,
+            stiffness = 220f
         ),
         label = "sliderPress"
     )
@@ -624,16 +624,16 @@ private fun LiquidGlassNavBarContent(
                         val addIconRotation by animateFloatAsState(
                             targetValue = if (centerActive) 45f else 0f,
                             animationSpec = spring(
-                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                stiffness = Spring.StiffnessMediumLow
+                                dampingRatio = 0.70f,
+                                stiffness = 190f
                             ),
                             label = "centerAddRotation"
                         )
                         val addPillScale by animateFloatAsState(
                             targetValue = if (centerActive) 1.07f else 1f,
                             animationSpec = spring(
-                                dampingRatio = Spring.DampingRatioMediumBouncy,
-                                stiffness = Spring.StiffnessMedium
+                                dampingRatio = 0.70f,
+                                stiffness = 210f
                             ),
                             label = "centerAddScale"
                         )
@@ -681,7 +681,7 @@ private fun LiquidGlassNavBarContent(
                             } else {
                                 MiuixTheme.colorScheme.onSurfaceVariantSummary
                             },
-                            animationSpec = tween(180),
+                            animationSpec = tween(260),
                             label = "navTint_$slotIdx"
                         )
                         Column(

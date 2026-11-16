@@ -26,60 +26,60 @@ import androidx.compose.ui.unit.IntSize
 object AlbaMotion {
     val FluidSpring = spring<Float>(
         dampingRatio = 0.74f,
-        stiffness = 260f
+        stiffness = 165f
     )
 
     val InteractiveSpring = spring<Float>(
         dampingRatio = 0.70f,
-        stiffness = 320f
+        stiffness = 210f
     )
 
     val SettleSpring = spring<Float>(
         dampingRatio = 0.82f,
-        stiffness = 280f
+        stiffness = 185f
     )
 
     val OffsetSpring = spring<IntOffset>(
-        dampingRatio = 0.76f,
-        stiffness = 260f
+        dampingRatio = 0.75f,
+        stiffness = 165f
     )
 
     val ExitOffsetSpring = spring<IntOffset>(
         dampingRatio = 0.84f,
-        stiffness = 280f
+        stiffness = 185f
     )
 
     val LayoutSizeSpring = spring<IntSize>(
         dampingRatio = 0.76f,
-        stiffness = 250f
+        stiffness = 160f
     )
 
     val ExitLayoutSizeSpring = spring<IntSize>(
         dampingRatio = 0.84f,
-        stiffness = 270f
+        stiffness = 180f
     )
 
     val OdometerSpring = spring<IntOffset>(
         dampingRatio = 0.74f,
-        stiffness = 310f
+        stiffness = 200f
     )
 
     fun expandEnter(): EnterTransition =
-        expandVertically(animationSpec = LayoutSizeSpring) + fadeIn(tween(260))
+        expandVertically(animationSpec = LayoutSizeSpring) + fadeIn(tween(320))
 
     fun shrinkExit(): ExitTransition =
-        shrinkVertically(animationSpec = ExitLayoutSizeSpring) + fadeOut(tween(200))
+        shrinkVertically(animationSpec = ExitLayoutSizeSpring) + fadeOut(tween(240))
 
     fun tabTransition(forward: Boolean, slideDivisor: Int = 12): ContentTransform {
         val enterOffset: (Int) -> Int = { full -> if (forward) full / slideDivisor else -full / slideDivisor }
         val exitOffset: (Int) -> Int = { full -> if (forward) -full / slideDivisor else full / slideDivisor }
         return (
             slideInHorizontally(animationSpec = OffsetSpring, initialOffsetX = enterOffset) +
-                fadeIn(tween(260)) +
+                fadeIn(tween(320)) +
                 scaleIn(initialScale = 0.98f, animationSpec = FluidSpring)
             ).togetherWith(
             slideOutHorizontally(animationSpec = ExitOffsetSpring, targetOffsetX = exitOffset) +
-                fadeOut(tween(190)) +
+                fadeOut(tween(230)) +
                 scaleOut(targetScale = 0.98f, animationSpec = SettleSpring)
         )
     }
