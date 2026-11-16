@@ -341,7 +341,7 @@ fun WidgetStudioScreen(
                             MiuixGlassIcon(
                                 icon = MiuixIcons.Tune,
                                 contentDescription = null,
-                                accentColor = MiuixTheme.colorScheme.primary,
+                                accentColor = Color(0xFF0EA5E9),
                                 modifier = Modifier.padding(end = 6.dp),
                                 size = 38.dp,
                                 iconSize = 18.dp,

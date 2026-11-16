@@ -1090,7 +1090,7 @@ private fun ExpandableQuickAddMenuOverlay(
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
                 QuickAddMorphActionRow(
                     icon = MiuixIcons.Timer,
-                    iconTint = MiuixTheme.colorScheme.primary,
+                    iconTint = Color(0xFF10B981),
                     title = "단기 알바 · 일당 추가",
                     subtitle = "일당 · 대타 · 단기 기록",
                     revealProgress = smoothStep(0.36f, 0.86f, clamped),
@@ -1100,7 +1100,7 @@ private fun ExpandableQuickAddMenuOverlay(
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 12.dp))
                 QuickAddMorphActionRow(
                     icon = MiuixIcons.Stopwatch,
-                    iconTint = MiuixTheme.colorScheme.primary,
+                    iconTint = Color(0xFFF97316),
                     title = "즉석 스톱워치 출근",
                     subtitle = "지금 바로 시급 카운트",
                     revealProgress = smoothStep(0.44f, 0.94f, clamped),

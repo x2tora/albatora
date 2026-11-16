@@ -190,7 +190,7 @@ fun MoreSettingsScreen(
                         onNotify("테마 컬러가 '${chosen.label}'으로 적용되었습니다")
                     },
                     startAction = {
-                        PreferenceStartIcon(MiuixIcons.Favorites, MiuixTheme.colorScheme.primary)
+                        PreferenceStartIcon(MiuixIcons.Favorites, Color(0xFF7C5CFF))
                     }
                 )
                 AnimatedVisibility(
@@ -231,7 +231,7 @@ fun MoreSettingsScreen(
                         onNotify("인터페이스 스타일이 '${chosen.label}'으로 적용되었습니다")
                     },
                     startAction = {
-                        PreferenceStartIcon(MiuixIcons.Tune, MiuixTheme.colorScheme.primary)
+                        PreferenceStartIcon(MiuixIcons.Tune, Color(0xFF14B8A6))
                     }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
@@ -247,7 +247,7 @@ fun MoreSettingsScreen(
                         )
                     },
                     startAction = {
-                        PreferenceStartIcon(MiuixIcons.ScreenMirroring, MiuixTheme.colorScheme.primary)
+                        PreferenceStartIcon(MiuixIcons.ScreenMirroring, Color(0xFF3B82F6))
                     }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
@@ -256,7 +256,7 @@ fun MoreSettingsScreen(
                     summary = "${state.settings.widgetConfig.themeStyle.label} · 투명도 ${state.settings.widgetConfig.opacity.label}",
                     onClick = onOpenWidgetStudio,
                     startAction = {
-                        PreferenceStartIcon(MiuixIcons.Layers, MiuixTheme.colorScheme.primary)
+                        PreferenceStartIcon(MiuixIcons.Layers, Color(0xFF0EA5E9))
                     }
                 )
             }
@@ -270,7 +270,7 @@ fun MoreSettingsScreen(
                     checked = state.settings.ongoingNotificationEnabled,
                     onCheckedChange = onUpdateOngoingNotification,
                     startAction = {
-                        PreferenceStartIcon(MiuixIcons.Alarm, MiuixTheme.colorScheme.primary)
+                        PreferenceStartIcon(MiuixIcons.Alarm, Color(0xFFF97316))
                     }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
@@ -287,7 +287,7 @@ fun MoreSettingsScreen(
                         }
                     },
                     startAction = {
-                        PreferenceStartIcon(MiuixIcons.Timer, MiuixTheme.colorScheme.primary)
+                        PreferenceStartIcon(MiuixIcons.Timer, Color(0xFF6366F1))
                     }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
@@ -314,7 +314,7 @@ fun MoreSettingsScreen(
                     summary = PayrollCalculator.formatWon(state.settings.defaultMinWage),
                     onClick = { showMinWageDialog = true },
                     startAction = {
-                        PreferenceStartIcon(MiuixIcons.BankCards, MiuixTheme.colorScheme.primary)
+                        PreferenceStartIcon(MiuixIcons.BankCards, Color(0xFF10B981))
                     }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
@@ -323,7 +323,7 @@ fun MoreSettingsScreen(
                     summary = "${state.templates.size}개",
                     onClick = { showTemplatesDialog = true },
                     startAction = {
-                        PreferenceStartIcon(MiuixIcons.Notes, MiuixTheme.colorScheme.primary)
+                        PreferenceStartIcon(MiuixIcons.Notes, Color(0xFF8B5CF6))
                     }
                 )
             }
@@ -339,7 +339,7 @@ fun MoreSettingsScreen(
                         exportFileLauncher.launch("albatora-backup-$today.json")
                     },
                     startAction = {
-                        PreferenceStartIcon(MiuixIcons.Backup, MiuixTheme.colorScheme.primary)
+                        PreferenceStartIcon(MiuixIcons.Backup, Color(0xFF3482FF))
                     }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
@@ -349,7 +349,7 @@ fun MoreSettingsScreen(
                         importFileLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
                     },
                     startAction = {
-                        PreferenceStartIcon(MiuixIcons.Import, MiuixTheme.colorScheme.primary)
+                        PreferenceStartIcon(MiuixIcons.Import, Color(0xFF10B981))
                     }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
@@ -357,7 +357,7 @@ fun MoreSettingsScreen(
                     title = "클립보드 백업 · 복원",
                     onClick = { showPasteRestoreDialog = true },
                     startAction = {
-                        PreferenceStartIcon(MiuixIcons.Copy, MiuixTheme.colorScheme.primary)
+                        PreferenceStartIcon(MiuixIcons.Copy, Color(0xFF06B6D4))
                     }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
@@ -384,7 +384,7 @@ fun MoreSettingsScreen(
                     },
                     onClick = onCheckForUpdate,
                     startAction = {
-                        PreferenceStartIcon(MiuixIcons.Store, MiuixTheme.colorScheme.primary)
+                        PreferenceStartIcon(MiuixIcons.Store, Color(0xFF3B82F6))
                     }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
@@ -392,7 +392,7 @@ fun MoreSettingsScreen(
                     title = "AlbaTora",
                     summary = "v${BuildConfig.VERSION_NAME}",
                     startAction = {
-                        PreferenceStartIcon(MiuixIcons.Info, MiuixTheme.colorScheme.primary)
+                        PreferenceStartIcon(MiuixIcons.Info, Color(0xFF64748B))
                     }
                 )
             }
