@@ -15,6 +15,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -32,10 +33,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Outline
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
@@ -49,9 +47,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.albatora.app.ui.theme.AlbaMotion
 import androidx.compose.ui.unit.sp
@@ -71,8 +67,6 @@ import top.yukonga.miuix.kmp.blur.progressiveTextureBlur
 import top.yukonga.miuix.kmp.blur.textureBlur
 import top.yukonga.miuix.kmp.overlay.OverlayDialog
 import top.yukonga.miuix.kmp.shader.isRuntimeShaderSupported
-import top.yukonga.miuix.kmp.squircle.SquircleDefaults
-import top.yukonga.miuix.kmp.squircle.addSquircleRect
 import top.yukonga.miuix.kmp.squircle.squircleBackground
 import top.yukonga.miuix.kmp.squircle.squircleBorder
 import top.yukonga.miuix.kmp.squircle.squircleClip
@@ -784,7 +778,7 @@ fun MiuixFloatingScrollTopBar(
                     progress = navProgress,
                     isDark = isDark,
                     backdrop = backdrop,
-                    cornerRadius = 13.dp,
+                    cornerRadius = 16.dp,
                     slideOffsetPx = slideOffsetPx,
                     onHasContentChange = { hasNav = it },
                     content = navigationIcon
@@ -793,7 +787,7 @@ fun MiuixFloatingScrollTopBar(
                     progress = titleProgress,
                     isDark = isDark,
                     backdrop = backdrop,
-                    cornerRadius = 13.dp,
+                    cornerRadius = 16.dp,
                     slideOffsetPx = slideOffsetPx,
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
                 ) {
@@ -824,7 +818,7 @@ fun MiuixFloatingScrollTopBar(
                 progress = actionsProgress,
                 isDark = isDark,
                 backdrop = backdrop,
-                cornerRadius = 13.dp,
+                cornerRadius = 16.dp,
                 slideOffsetPx = slideOffsetPx,
                 onHasContentChange = { hasActions = it }
             ) {
@@ -834,29 +828,6 @@ fun MiuixFloatingScrollTopBar(
                 )
             }
         }
-    }
-}
-
-private class MiuixSquircleShape(
-    private val cornerRadius: Dp,
-    private val extension: Float = SquircleDefaults.ExtensionMin
-) : Shape {
-    override fun createOutline(
-        size: Size,
-        layoutDirection: LayoutDirection,
-        density: Density
-    ): Outline {
-        val radiusPx = with(density) { cornerRadius.toPx() }
-        val path = Path().apply {
-            addSquircleRect(
-                size.width,
-                size.height,
-                radiusPx,
-                extension,
-                true
-            )
-        }
-        return Outline.Generic(path)
     }
 }
 
@@ -876,7 +847,7 @@ private fun FloatingTopBarIsland(
     val density = LocalDensity.current
     val isLiquidGlass = LocalLiquidGlassEnabled.current
     val minSizePx = with(density) { 48.dp.roundToPx() }
-    val pillShape = remember(cornerRadius) { MiuixSquircleShape(cornerRadius, SquircleDefaults.ExtensionMin) }
+    val pillShape = remember(cornerRadius) { RoundedCornerShape(cornerRadius) }
     val pillFill = if (isDark) {
         MiuixTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.94f)
     } else {
@@ -935,8 +906,8 @@ private fun FloatingTopBarIsland(
                     Modifier
                         .clip(pillShape)
                         .then(blurMod)
-                        .squircleBackground(color = pillFill, cornerRadius = cornerRadius, extension = SquircleDefaults.ExtensionMin)
-                        .squircleBorder(width = 1.dp, color = pillBorder, cornerRadius = cornerRadius, extension = SquircleDefaults.ExtensionMin)
+                        .background(pillFill, pillShape)
+                        .border(1.dp, pillBorder, pillShape)
                 }
                 Box(
                     modifier = Modifier
