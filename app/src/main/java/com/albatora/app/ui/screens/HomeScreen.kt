@@ -68,6 +68,7 @@ import com.albatora.app.domain.*
 import com.albatora.app.model.*
 import com.albatora.app.ui.components.*
 import com.albatora.app.ui.theme.AlbaIconCatalog
+import com.albatora.app.ui.theme.AlbaMotion
 import com.albatora.app.ui.theme.LocalIsDarkTheme
 import com.albatora.app.ui.theme.LocalWideDualLayoutEnabled
 import top.yukonga.miuix.kmp.basic.*
@@ -735,7 +736,7 @@ fun HomeScreen(
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .animateContentSize(),
+                                    .animateContentSize(animationSpec = AlbaMotion.LayoutSizeSpring),
                                 onClick = {
                                     editingGoal = goal
                                     showGoalSheet = true
@@ -2208,8 +2209,8 @@ private fun FocusTimerStage(
                     ) {
                         AnimatedVisibility(
                             visible = showBoost && collapse < 0.7f,
-                            enter = fadeIn(tween(200)) + scaleIn(initialScale = 0.85f),
-                            exit = fadeOut(tween(150)) + scaleOut(targetScale = 0.85f)
+                            enter = fadeIn(tween(200)) + scaleIn(initialScale = 0.88f, animationSpec = AlbaMotion.InteractiveSpring),
+                            exit = fadeOut(tween(150)) + scaleOut(targetScale = 0.88f, animationSpec = AlbaMotion.SettleSpring)
                         ) {
                             val multStr = if (boostMult == 1.5) "1.5" else String.format(Locale.US, "%.1f", boostMult)
                             SquirclePillBadge(
@@ -2221,8 +2222,8 @@ private fun FocusTimerStage(
                         AnimatedContent(
                             targetState = Pair(isFullscreen, pullExpandRatio >= 1f),
                             transitionSpec = {
-                                (fadeIn(tween(180)) + scaleIn(initialScale = 0.92f))
-                                    .togetherWith(fadeOut(tween(150)) + scaleOut(targetScale = 0.92f))
+                                (fadeIn(tween(180)) + scaleIn(initialScale = 0.92f, animationSpec = AlbaMotion.InteractiveSpring))
+                                    .togetherWith(fadeOut(tween(140)) + scaleOut(targetScale = 0.92f, animationSpec = AlbaMotion.SettleSpring))
                             },
                             label = "fullscreen_toggle_label"
                         ) { (full, pullReady) ->

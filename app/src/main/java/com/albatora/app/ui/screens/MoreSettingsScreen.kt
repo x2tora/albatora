@@ -38,6 +38,7 @@ import com.albatora.app.ui.components.ConfirmActionDialog
 import com.albatora.app.ui.components.MiuixColorPickerDialog
 import com.albatora.app.ui.components.MiuixGlassIcon
 import com.albatora.app.ui.components.SquirclePillBadge
+import com.albatora.app.ui.theme.AlbaMotion
 import com.albatora.app.ui.components.formatRgbHex
 import com.albatora.app.ui.theme.JobAccentPalette
 import top.yukonga.miuix.kmp.basic.*
@@ -194,8 +195,8 @@ fun MoreSettingsScreen(
                 )
                 AnimatedVisibility(
                     visible = colorStyle == ThemeColorStyle.CUSTOM,
-                    enter = expandVertically() + fadeIn(),
-                    exit = shrinkVertically() + fadeOut()
+                    enter = AlbaMotion.expandEnter(),
+                    exit = AlbaMotion.shrinkExit()
                 ) {
                     val previewHex = state.settings.customKeyColorHex ?: 0xFF3482FF
                     Column {
@@ -539,7 +540,11 @@ fun MoreSettingsScreen(
                 }
             }
 
-            AnimatedVisibility(visible = showAddTemplateForm) {
+            AnimatedVisibility(
+                visible = showAddTemplateForm,
+                enter = AlbaMotion.expandEnter(),
+                exit = AlbaMotion.shrinkExit()
+            ) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     HorizontalDivider()
                     TextField(

@@ -34,6 +34,7 @@ import com.albatora.app.ui.components.MiuixTopBarActionDivider
 import com.albatora.app.ui.components.MiuixTimePickerDialog
 import com.albatora.app.ui.components.SquirclePillBadge
 import com.albatora.app.ui.theme.AlbaIconCatalog
+import com.albatora.app.ui.theme.AlbaMotion
 import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.blur.layerBackdrop
 import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
@@ -363,8 +364,8 @@ fun QuickAddShortTermScreen(
                 errorMsg?.let { stickyErrorMsg = it }
                 AnimatedVisibility(
                     visible = errorMsg != null,
-                    enter = expandVertically() + fadeIn(),
-                    exit = shrinkVertically() + fadeOut()
+                    enter = AlbaMotion.expandEnter(),
+                    exit = AlbaMotion.shrinkExit()
                 ) {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -528,8 +529,8 @@ fun QuickAddShortTermScreen(
                         }
                         AnimatedVisibility(
                             visible = !autoRecBreak,
-                            enter = expandVertically() + fadeIn(),
-                            exit = shrinkVertically() + fadeOut()
+                            enter = AlbaMotion.expandEnter(),
+                            exit = AlbaMotion.shrinkExit()
                         ) {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 TextField(
@@ -637,8 +638,8 @@ fun QuickAddShortTermScreen(
                     )
                     AnimatedVisibility(
                         visible = taxMode == TaxMode.DAILY_WORKER,
-                        enter = expandVertically() + fadeIn(),
-                        exit = shrinkVertically() + fadeOut()
+                        enter = AlbaMotion.expandEnter(),
+                        exit = AlbaMotion.shrinkExit()
                     ) {
                         Column {
                             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
@@ -652,8 +653,8 @@ fun QuickAddShortTermScreen(
                     }
                     AnimatedVisibility(
                         visible = taxMode == TaxMode.CUSTOM,
-                        enter = expandVertically() + fadeIn(),
-                        exit = shrinkVertically() + fadeOut()
+                        enter = AlbaMotion.expandEnter(),
+                        exit = AlbaMotion.shrinkExit()
                     ) {
                         TextField(
                             value = customTaxText,
@@ -668,8 +669,8 @@ fun QuickAddShortTermScreen(
                     }
                     AnimatedVisibility(
                         visible = payType == PayType.HOURLY,
-                        enter = expandVertically() + fadeIn(),
-                        exit = shrinkVertically() + fadeOut()
+                        enter = AlbaMotion.expandEnter(),
+                        exit = AlbaMotion.shrinkExit()
                     ) {
                         Column {
                             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))

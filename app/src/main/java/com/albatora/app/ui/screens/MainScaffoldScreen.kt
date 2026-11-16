@@ -68,6 +68,7 @@ import com.albatora.app.ui.components.StackedToastHost
 import com.albatora.app.ui.components.StackedToastState
 import com.albatora.app.ui.components.rememberStackedToastState
 import com.albatora.app.ui.theme.AlbaIconCatalog
+import com.albatora.app.ui.theme.AlbaMotion
 import com.albatora.app.ui.theme.LocalAppBackdrop
 import com.albatora.app.ui.theme.LocalIsDarkTheme
 import com.albatora.app.ui.theme.LocalLiquidGlassEnabled
@@ -418,24 +419,7 @@ private fun MainTabsHost(
                     AnimatedContent(
                         targetState = selectedTab,
                         transitionSpec = {
-                            val forward = targetState >= initialState
-                            val enterOffset: (Int) -> Int = { full -> if (forward) full / 10 else -full / 10 }
-                            val exitOffset: (Int) -> Int = { full -> if (forward) -full / 10 else full / 10 }
-                            (slideInHorizontally(
-                                animationSpec = tween(260, easing = FastOutSlowInEasing),
-                                initialOffsetX = enterOffset
-                            ) + fadeIn(tween(240, easing = FastOutSlowInEasing)) + scaleIn(
-                                initialScale = 0.985f,
-                                animationSpec = tween(260, easing = FastOutSlowInEasing)
-                            )).togetherWith(
-                                slideOutHorizontally(
-                                    animationSpec = tween(220, easing = FastOutSlowInEasing),
-                                    targetOffsetX = exitOffset
-                                ) + fadeOut(tween(180)) + scaleOut(
-                                    targetScale = 0.985f,
-                                    animationSpec = tween(220, easing = FastOutSlowInEasing)
-                                )
-                            )
+                            AlbaMotion.tabTransition(forward = targetState >= initialState, slideDivisor = 10)
                         },
                         label = "main_tab_transition"
                     ) { tab ->

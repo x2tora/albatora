@@ -13,8 +13,11 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -43,6 +46,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.albatora.app.ui.theme.AlbaMotion
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import com.albatora.app.ui.theme.AlbaIconCatalog
@@ -273,8 +277,12 @@ fun OdometerCurrencyText(
                     targetState = ch,
                     modifier = Modifier.clipToBounds(),
                     transitionSpec = {
-                        (slideInVertically(initialOffsetY = { it / 2 }) + fadeIn())
-                            .togetherWith(slideOutVertically(targetOffsetY = { -it / 2 }) + fadeOut())
+                        (slideInVertically(animationSpec = AlbaMotion.OdometerSpring, initialOffsetY = { it / 2 }) +
+                            fadeIn(tween(150)))
+                            .togetherWith(
+                                slideOutVertically(animationSpec = AlbaMotion.OdometerSpring, targetOffsetY = { -it / 2 }) +
+                                    fadeOut(tween(120))
+                            )
                             .using(SizeTransform(clip = true))
                     },
                     label = "odometer_digit_$posFromRight"
@@ -313,11 +321,26 @@ fun SquirclePillBadge(
     contentPadding: PaddingValues = PaddingValues(horizontal = 10.dp, vertical = 5.dp),
     onClick: (() -> Unit)? = null
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
+    val pressScale by animateFloatAsState(
+        targetValue = if (onClick != null && isPressed) 0.94f else 1f,
+        animationSpec = AlbaMotion.InteractiveSpring,
+        label = "pill_press_scale"
+    )
     val base = modifier
+        .graphicsLayer {
+            scaleX = pressScale
+            scaleY = pressScale
+        }
         .squircleBackground(backgroundColor, cornerRadius = 10.dp)
         .squircleClip(10.dp)
     val finalModifier = if (onClick != null) {
-        base.clickable(onClick = onClick)
+        base.clickable(
+            interactionSource = interactionSource,
+            indication = LocalIndication.current,
+            onClick = onClick
+        )
     } else {
         base
     }
@@ -768,7 +791,12 @@ fun MiuixFloatingScrollTopBar(
                     AnimatedContent(
                         targetState = title,
                         transitionSpec = {
-                            fadeIn(tween(180)).togetherWith(fadeOut(tween(120)))
+                            (slideInVertically(animationSpec = AlbaMotion.OffsetSpring) { it / 6 } +
+                                fadeIn(tween(200)))
+                                .togetherWith(
+                                    slideOutVertically(animationSpec = AlbaMotion.ExitOffsetSpring) { -it / 6 } +
+                                        fadeOut(tween(130))
+                                )
                         },
                         label = "top_bar_title_fade"
                     ) { animTitle ->

@@ -37,6 +37,7 @@ import com.albatora.app.ui.components.MiuixTopBarActionDivider
 import com.albatora.app.ui.components.MiuixTimePickerDialog
 import com.albatora.app.ui.components.SquirclePillBadge
 import com.albatora.app.ui.components.dayOfWeekKorean
+import com.albatora.app.ui.theme.AlbaMotion
 import com.albatora.app.ui.theme.JobAccentPalette
 import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.blur.layerBackdrop
@@ -302,8 +303,8 @@ fun AddEditRegularJobScreen(
                 errorMsg?.let { stickyErrorMsg = it }
                 AnimatedVisibility(
                     visible = errorMsg != null,
-                    enter = expandVertically() + fadeIn(),
-                    exit = shrinkVertically() + fadeOut()
+                    enter = AlbaMotion.expandEnter(),
+                    exit = AlbaMotion.shrinkExit()
                 ) {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -557,8 +558,8 @@ fun AddEditRegularJobScreen(
                     )
                     AnimatedVisibility(
                         visible = whEnabled,
-                        enter = expandVertically() + fadeIn(),
-                        exit = shrinkVertically() + fadeOut()
+                        enter = AlbaMotion.expandEnter(),
+                        exit = AlbaMotion.shrinkExit()
                     ) {
                         Column {
                             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
@@ -600,8 +601,8 @@ fun AddEditRegularJobScreen(
                     )
                     AnimatedVisibility(
                         visible = holidayEnabled,
-                        enter = expandVertically() + fadeIn(),
-                        exit = shrinkVertically() + fadeOut()
+                        enter = AlbaMotion.expandEnter(),
+                        exit = AlbaMotion.shrinkExit()
                     ) {
                         Column {
                             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
@@ -630,8 +631,8 @@ fun AddEditRegularJobScreen(
                     )
                     AnimatedVisibility(
                         visible = taxMode == TaxMode.CUSTOM,
-                        enter = expandVertically() + fadeIn(),
-                        exit = shrinkVertically() + fadeOut()
+                        enter = AlbaMotion.expandEnter(),
+                        exit = AlbaMotion.shrinkExit()
                     ) {
                         TextField(
                             value = customTaxText,
@@ -646,8 +647,8 @@ fun AddEditRegularJobScreen(
                     }
                     AnimatedVisibility(
                         visible = taxMode == TaxMode.DAILY_WORKER,
-                        enter = expandVertically() + fadeIn(),
-                        exit = shrinkVertically() + fadeOut()
+                        enter = AlbaMotion.expandEnter(),
+                        exit = AlbaMotion.shrinkExit()
                     ) {
                         Column {
                             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
@@ -670,8 +671,8 @@ fun AddEditRegularJobScreen(
                     )
                     AnimatedVisibility(
                         visible = settlementMode == SettlementPeriodMode.PREV_N_PLUS_1_TO_N,
-                        enter = expandVertically() + fadeIn(),
-                        exit = shrinkVertically() + fadeOut()
+                        enter = AlbaMotion.expandEnter(),
+                        exit = AlbaMotion.shrinkExit()
                     ) {
                         TextField(
                             value = settlementCutoffText,
@@ -686,8 +687,8 @@ fun AddEditRegularJobScreen(
                     }
                     AnimatedVisibility(
                         visible = settlementMode == SettlementPeriodMode.CUSTOM_RANGE,
-                        enter = expandVertically() + fadeIn(),
-                        exit = shrinkVertically() + fadeOut()
+                        enter = AlbaMotion.expandEnter(),
+                        exit = AlbaMotion.shrinkExit()
                     ) {
                         Row(
                             modifier = Modifier

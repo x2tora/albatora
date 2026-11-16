@@ -8,6 +8,8 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.*
@@ -30,6 +32,7 @@ import com.albatora.app.ui.components.MiuixEntityBadge
 import com.albatora.app.ui.components.MiuixGlassIcon
 import com.albatora.app.ui.components.SquirclePillBadge
 import com.albatora.app.ui.theme.AlbaIconCatalog
+import com.albatora.app.ui.theme.AlbaMotion
 import com.albatora.app.ui.theme.LocalWideDualLayoutEnabled
 import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.icon.MiuixIcons
@@ -114,7 +117,10 @@ fun RecordsScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         AnimatedContent(
                             targetState = "${anchorMonth}_${selectedJobId}_${periodRange.first}_${periodRange.second}",
-                            transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(140)) },
+                            transitionSpec = {
+                                (fadeIn(tween(200)) + scaleIn(initialScale = 0.97f, animationSpec = AlbaMotion.FluidSpring))
+                                    .togetherWith(fadeOut(tween(140)) + scaleOut(targetScale = 0.97f, animationSpec = AlbaMotion.SettleSpring))
+                            },
                             label = "records_period_title"
                         ) { _ ->
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -209,7 +215,7 @@ fun RecordsScreen(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .animateContentSize(),
+                .animateContentSize(animationSpec = AlbaMotion.LayoutSizeSpring),
             insideMargin = PaddingValues(16.dp)
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -601,7 +607,7 @@ private fun RecordDetailCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .animateContentSize(),
+            .animateContentSize(animationSpec = AlbaMotion.LayoutSizeSpring),
         onClick = onEdit,
         insideMargin = PaddingValues(14.dp)
     ) {

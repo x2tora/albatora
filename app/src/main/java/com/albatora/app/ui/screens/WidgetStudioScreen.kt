@@ -43,6 +43,7 @@ import com.albatora.app.ui.components.MiuixBottomEdgeBlur
 import com.albatora.app.ui.components.MiuixFloatingScrollTopBar
 import com.albatora.app.ui.components.MiuixGlassIcon
 import com.albatora.app.ui.components.SquirclePillBadge
+import com.albatora.app.ui.theme.AlbaMotion
 import com.albatora.app.ui.components.StackedToastHost
 import com.albatora.app.ui.components.StackedToastState
 import com.albatora.app.ui.components.formatRgbHex
@@ -204,14 +205,14 @@ fun WidgetStudioScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(18.dp)
-                                .animateContentSize(),
+                                .animateContentSize(animationSpec = AlbaMotion.LayoutSizeSpring),
                             contentAlignment = Alignment.Center
                         ) {
                             AnimatedContent(
                                 targetState = previewTab,
                                 transitionSpec = {
-                                    (fadeIn(tween(200)) + scaleIn(initialScale = 0.96f, animationSpec = tween(220)))
-                                        .togetherWith(fadeOut(tween(150)))
+                                    (fadeIn(tween(200)) + scaleIn(initialScale = 0.96f, animationSpec = AlbaMotion.FluidSpring))
+                                        .togetherWith(fadeOut(tween(140)))
                                 },
                                 label = "widget_preview_tab"
                             ) { tab ->
@@ -374,8 +375,8 @@ fun WidgetStudioScreen(
 
                     AnimatedVisibility(
                         visible = !cfg.useAppAccent,
-                        enter = expandVertically() + fadeIn(),
-                        exit = shrinkVertically() + fadeOut()
+                        enter = AlbaMotion.expandEnter(),
+                        exit = AlbaMotion.shrinkExit()
                     ) {
                         Column {
                             HorizontalDivider()

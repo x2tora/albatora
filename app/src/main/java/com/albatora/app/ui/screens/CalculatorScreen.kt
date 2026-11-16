@@ -30,6 +30,7 @@ import com.albatora.app.domain.PayrollCalculator
 import com.albatora.app.model.FeeType
 import com.albatora.app.model.TaxMode
 import com.albatora.app.ui.components.SquirclePillBadge
+import com.albatora.app.ui.theme.AlbaMotion
 import com.albatora.app.ui.theme.LocalWideDualLayoutEnabled
 import top.yukonga.miuix.kmp.basic.*
 import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
@@ -74,13 +75,7 @@ fun CalculatorScreen(
     }
 
     val tabTransitionSpec: androidx.compose.animation.AnimatedContentTransitionScope<Int>.() -> androidx.compose.animation.ContentTransform = {
-        val forward = targetState >= initialState
-        (slideInHorizontally(animationSpec = tween(220)) { w -> if (forward) w / 8 else -w / 8 } +
-            fadeIn(tween(200)))
-            .togetherWith(
-                slideOutHorizontally(animationSpec = tween(180)) { w -> if (forward) -w / 8 else w / 8 } +
-                    fadeOut(tween(150))
-            )
+        AlbaMotion.tabTransition(forward = targetState >= initialState, slideDivisor = 9)
     }
 
     BoxWithConstraints(
@@ -640,7 +635,7 @@ private fun rememberSeveranceSections(): CalcTabSections {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .animateContentSize(),
+                .animateContentSize(animationSpec = AlbaMotion.LayoutSizeSpring),
             colors = CardDefaults.defaultColors(color = resultContainerColor),
             insideMargin = PaddingValues(16.dp)
         ) {
