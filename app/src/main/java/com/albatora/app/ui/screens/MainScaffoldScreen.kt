@@ -50,6 +50,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
@@ -562,6 +563,7 @@ private fun MainTabsHost(
                     scrollBehavior = activeScrollBehavior,
                     isScrolledOverride = if (selectedTab == 0) isHomeScrolled else null,
                     backdrop = barBackdrop,
+                    maxContentWidth = if (state.settings.wideDualLayoutEnabled) Dp.Unspecified else 620.dp,
                     actions = {
                         IconButton(
                             onClick = onOpenSettings,
