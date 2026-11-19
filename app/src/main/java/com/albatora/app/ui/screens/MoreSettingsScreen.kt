@@ -34,6 +34,7 @@ import com.albatora.app.domain.PayrollCalculator
 import com.albatora.app.model.*
 import com.albatora.app.service.AutoDndController
 import com.albatora.app.service.BatteryOptimizationHelper
+import com.albatora.app.service.LiveUpdateNotificationHelper
 import com.albatora.app.ui.components.AppUpdateUiState
 import com.albatora.app.ui.components.ConfirmActionDialog
 import com.albatora.app.ui.components.MiuixColorPickerDialog
@@ -297,6 +298,25 @@ fun MoreSettingsScreen(
                         PreferenceStartIcon(MiuixIcons.Alarm, Color(0xFFF97316))
                     }
                 )
+                if (android.os.Build.VERSION.SDK_INT >= 36) {
+                    val canPromoted = LiveUpdateNotificationHelper.canPostPromoted(context)
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                    ArrowPreference(
+                        title = "Live Updates 상태바 칩",
+                        summary = if (canPromoted) {
+                            "상태바 칩 · Now Bar 승격 허용됨"
+                        } else {
+                            "시스템 설정에서 실시간 정보 승격 허용 필요"
+                        },
+                        onClick = { LiveUpdateNotificationHelper.openPromotionSettings(context) },
+                        startAction = {
+                            PreferenceStartIcon(
+                                MiuixIcons.Stopwatch,
+                                if (canPromoted) Color(0xFF10B981) else Color(0xFFF59E0B)
+                            )
+                        }
+                    )
+                }
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 SwitchPreference(
                     title = "알바 중 자동 방해금지",

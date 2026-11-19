@@ -76,22 +76,6 @@ class LiveTrackerForegroundService : Service() {
     private fun buildNotification(): Notification {
         val st = AlbaToraStateHolder.getInstance(applicationContext).state.value
         val snapshot = PayrollCalculator.evaluateLiveDashboard(st, System.currentTimeMillis())
-        val firstShift = snapshot.activeShifts.firstOrNull()
-        val isPaused = snapshot.activeShifts.all { it.isPaused }
-
-        val title = when {
-            snapshot.activeShifts.size > 1 ->
-                "알바토라 · ${snapshot.activeShifts.size}개 동시 근무 중"
-            firstShift != null && isPaused ->
-                "일시정지(휴게) · ${firstShift.title}"
-            firstShift != null ->
-                "근무 진행 중 · ${firstShift.title}"
-            else -> "알바토라 실시간 근무 중"
-        }
-
-        val rateFormatted = String.format(Locale.US, "+%.2f원/초", snapshot.totalPerSecondRateWon)
-        val boostTag = if (snapshot.anyBoostActive) " · ${snapshot.maxBoostMultiplier}배 가산" else ""
-        val content = "지금까지 ${PayrollCalculator.formatWonDecimal(snapshot.totalEarnedWon)} ($rateFormatted$boostTag)"
 
         val openAppIntent = PendingIntent.getActivity(
             this,
@@ -120,32 +104,32 @@ class LiveTrackerForegroundService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val breakLabel = if (isPaused) "휴게 종료" else "휴게"
-
-        return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_stat_albatora)
-            .setContentTitle(title)
-            .setContentText(content)
-            .setContentIntent(openAppIntent)
-            .setOngoing(true)
-            .setOnlyAlertOnce(true)
-            .setSilent(true)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .addAction(0, breakLabel, breakIntent)
-            .addAction(0, "퇴근", clockOutIntent)
-            .build()
+        return LiveUpdateNotificationHelper.build(
+            context = this,
+            channelId = CHANNEL_ID,
+            snapshot = snapshot,
+            openAppIntent = openAppIntent,
+            breakIntent = breakIntent,
+            clockOutIntent = clockOutIntent
+        )
     }
 
     private fun ensureChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            if (nm.getNotificationChannel(LEGACY_CHANNEL_ID) != null) {
+                nm.deleteNotificationChannel(LEGACY_CHANNEL_ID)
+            }
             if (nm.getNotificationChannel(CHANNEL_ID) == null) {
                 val channel = NotificationChannel(
                     CHANNEL_ID,
                     "실시간 수익 트래커",
-                    NotificationManager.IMPORTANCE_LOW
+                    NotificationManager.IMPORTANCE_DEFAULT
                 ).apply {
-                    description = "근무 중 실시간 누적 급여와 휴게/퇴근 빠른 제어 알림을 표시합니다."
+                    description = "근무 중 실시간 누적 급여와 Live Updates 상태바 칩을 표시합니다."
+                    setSound(null, null)
+                    enableVibration(false)
+                    enableLights(false)
                     setShowBadge(false)
                 }
                 nm.createNotificationChannel(channel)
@@ -166,7 +150,8 @@ class LiveTrackerForegroundService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     companion object {
-        const val CHANNEL_ID = "albatora_live_tracker"
+        private const val LEGACY_CHANNEL_ID = "albatora_live_tracker"
+        const val CHANNEL_ID = "albatora_live_tracker_v2"
         const val NOTIFICATION_ID = 20261
 
         fun startOrUpdate(context: Context) {
