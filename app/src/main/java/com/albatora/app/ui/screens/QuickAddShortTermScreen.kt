@@ -60,6 +60,7 @@ fun QuickAddShortTermScreen(
     initialDateIso: String?,
     templates: List<ShortTermTemplate>,
     defaultMinWage: Long,
+    userPersona: UserPersona = UserPersona.MULTI_JOB,
     onBack: () -> Unit,
     onSave: (WorkRecord, ShortTermTemplate?) -> Unit,
     onDelete: ((String) -> Unit)? = null,
@@ -78,7 +79,12 @@ fun QuickAddShortTermScreen(
     }
     var startMin by remember { mutableIntStateOf(existingRecord?.startMinute ?: 9 * 60) }
     var endMin by remember { mutableIntStateOf(existingRecord?.endMinute ?: 18 * 60) }
-    var payType by remember { mutableStateOf(existingRecord?.payType ?: PayType.DAILY) }
+    var payType by remember {
+        mutableStateOf(
+            existingRecord?.payType
+                ?: if (userPersona == UserPersona.REGULAR_FOCUSED) PayType.HOURLY else PayType.DAILY
+        )
+    }
     var unitAmountText by remember {
         mutableStateOf(
             existingRecord?.unitAmount?.toString()

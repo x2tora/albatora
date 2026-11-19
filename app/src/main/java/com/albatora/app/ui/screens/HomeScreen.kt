@@ -410,6 +410,7 @@ fun HomeScreen(
                 item(key = "empty_focus_welcome") {
                     EmptyOnboardingFocusCard(
                         defaultMinWage = state.settings.defaultMinWage,
+                        userPersona = state.settings.userPersona,
                         onAddRegularJob = onAddRegularJob,
                         onQuickAddShortTerm = onQuickAddShortTerm,
                         onOpenStopwatch = { showStopwatchSheet = true },
@@ -461,7 +462,9 @@ fun HomeScreen(
                     )
                 }
             }
+        }
 
+        val weeklyHolidaySection: androidx.compose.foundation.lazy.LazyListScope.() -> Unit = {
             if (!completelyEmpty) {
                 item(key = "weekly_holiday_progress") {
                     WeeklyHolidayAndPaydayCard(
@@ -889,7 +892,17 @@ fun HomeScreen(
                         verticalArrangement = Arrangement.spacedBy(18.dp)
                     ) {
                         focusSection()
-                        overviewAndUnpaidSection()
+                        when (state.settings.userPersona) {
+                            UserPersona.REGULAR_FOCUSED -> {
+                                weeklyHolidaySection()
+                                overviewAndUnpaidSection()
+                            }
+                            UserPersona.MULTI_JOB,
+                            UserPersona.SHORT_TERM_FREELANCE -> {
+                                overviewAndUnpaidSection()
+                                weeklyHolidaySection()
+                            }
+                        }
                     }
                     LazyColumn(
                         state = wideRightListState,
@@ -962,8 +975,23 @@ fun HomeScreen(
                     verticalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
                     focusSection()
-                    overviewAndUnpaidSection()
-                    wishlistAndJobsSection()
+                    when (state.settings.userPersona) {
+                        UserPersona.REGULAR_FOCUSED -> {
+                            weeklyHolidaySection()
+                            overviewAndUnpaidSection()
+                            wishlistAndJobsSection()
+                        }
+                        UserPersona.MULTI_JOB -> {
+                            overviewAndUnpaidSection()
+                            weeklyHolidaySection()
+                            wishlistAndJobsSection()
+                        }
+                        UserPersona.SHORT_TERM_FREELANCE -> {
+                            overviewAndUnpaidSection()
+                            wishlistAndJobsSection()
+                            weeklyHolidaySection()
+                        }
+                    }
                 }
 
                 if (hasActiveShifts && !isFullscreenFocus) {
@@ -1228,11 +1256,21 @@ fun HomeScreen(
 @Composable
 private fun EmptyOnboardingFocusCard(
     defaultMinWage: Long,
+    userPersona: UserPersona,
     onAddRegularJob: () -> Unit,
     onQuickAddShortTerm: () -> Unit,
     onOpenStopwatch: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val isShortTermPrimary = userPersona == UserPersona.SHORT_TERM_FREELANCE
+    val subtitleText = when (userPersona) {
+        UserPersona.REGULAR_FOCUSED ->
+            "2026년 최저시급 ${PayrollCalculator.formatWon(defaultMinWage)} 기준 · 정규 알바를 등록하면 출근 타이머, 주휴수당, 월급날 카운트다운이 자동으로 계산됩니다."
+        UserPersona.SHORT_TERM_FREELANCE ->
+            "단기 일당 · 교통/식대 · 일용직/3.3% 원천징수를 10초 만에 기록하거나 스톱워치로 바로 출근하세요."
+        UserPersona.MULTI_JOB ->
+            "2026년 최저시급 ${PayrollCalculator.formatWon(defaultMinWage)} 기준 · 고정 알바와 단기 근무를 한곳에서 관리하고 미수금까지 놓치지 마세요."
+    }
     Box(
         modifier = modifier
             .fillMaxWidth()
@@ -1264,7 +1302,7 @@ private fun EmptyOnboardingFocusCard(
                     textAlign = TextAlign.Center
                 )
                 Text(
-                    text = "2026년 최저시급 ${PayrollCalculator.formatWon(defaultMinWage)}이 기본 설정되어 있습니다.\n알바를 등록하면 출근 시간마다 타이머가 자동으로 작동합니다.",
+                    text = subtitleText,
                     style = MiuixTheme.textStyles.body2,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     textAlign = TextAlign.Center
@@ -1275,17 +1313,31 @@ private fun EmptyOnboardingFocusCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                TextButton(
-                    text = "정규 알바 추가",
-                    onClick = onAddRegularJob,
-                    colors = ButtonDefaults.textButtonColorsPrimary(),
-                    modifier = Modifier.weight(1f)
-                )
-                TextButton(
-                    text = "단기 10초 등록",
-                    onClick = onQuickAddShortTerm,
-                    modifier = Modifier.weight(1f)
-                )
+                if (isShortTermPrimary) {
+                    TextButton(
+                        text = "단기 10초 등록",
+                        onClick = onQuickAddShortTerm,
+                        colors = ButtonDefaults.textButtonColorsPrimary(),
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(
+                        text = "정규 알바 추가",
+                        onClick = onAddRegularJob,
+                        modifier = Modifier.weight(1f)
+                    )
+                } else {
+                    TextButton(
+                        text = "정규 알바 추가",
+                        onClick = onAddRegularJob,
+                        colors = ButtonDefaults.textButtonColorsPrimary(),
+                        modifier = Modifier.weight(1f)
+                    )
+                    TextButton(
+                        text = "단기 10초 등록",
+                        onClick = onQuickAddShortTerm,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
             }
             Text(
                 text = "등록 없이 바로 스톱워치 출근",

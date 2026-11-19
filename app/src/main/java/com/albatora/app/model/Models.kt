@@ -199,6 +199,7 @@ data class WorkRecord(
     val transportExpense: Long = 0L,
     val mealExpense: Long = 0L,
     val siteBonus: Long = 0L,
+    val extraDeduction: Long = 0L,
     val agencyFeeValue: Double = 0.0,
     val agencyFeeType: FeeType = FeeType.PERCENT,
     val taxMode: TaxMode = TaxMode.NONE,
@@ -228,6 +229,7 @@ data class ShortTermTemplate(
     val transportExpense: Long = 0L,
     val mealExpense: Long = 0L,
     val siteBonus: Long = 0L,
+    val extraDeduction: Long = 0L,
     val agencyFeeValue: Double = 0.0,
     val agencyFeeType: FeeType = FeeType.PERCENT,
     val taxMode: TaxMode = TaxMode.DAILY_WORKER,
@@ -282,6 +284,7 @@ data class ActiveStopwatchSession(
     val transportExpense: Long = 0L,
     val mealExpense: Long = 0L,
     val siteBonus: Long = 0L,
+    val extraDeduction: Long = 0L,
     val agencyFeeValue: Double = 0.0,
     val agencyFeeType: FeeType = FeeType.PERCENT
 )
@@ -297,7 +300,32 @@ data class ScheduledShiftRuntime(
 )
 
 @Serializable
+enum class UserPersona(
+    val label: String,
+    val subtitle: String,
+    val badge: String
+) {
+    REGULAR_FOCUSED(
+        label = "고정 알바 중심",
+        subtitle = "주휴수당 · 월급날 D-Day · 출퇴근 루틴 우선",
+        badge = "고정 · 장기"
+    ),
+    SHORT_TERM_FREELANCE(
+        label = "단기 · 일용직 / 프리랜서",
+        subtitle = "일당 · 교통/식대 · 일용/3.3% 공제 · 일일 정산 우선",
+        badge = "단기 · 일용"
+    ),
+    MULTI_JOB(
+        label = "N잡 · 병행 러너",
+        subtitle = "고정 + 단기 통합 · 전체 미수금 한눈에",
+        badge = "N잡 · 통합"
+    )
+}
+
+@Serializable
 data class AppSettings(
+    val onboardingCompleted: Boolean = false,
+    val userPersona: UserPersona = UserPersona.MULTI_JOB,
     val themeOption: ThemeOption = ThemeOption.SYSTEM,
     val themeColorStyle: ThemeColorStyle? = null,
     val navBarStyle: NavBarStyle = NavBarStyle.MIUIX,
@@ -306,9 +334,17 @@ data class AppSettings(
     val customKeyColorHex: Long? = null,
     val ongoingNotificationEnabled: Boolean = true,
     val autoDndEnabled: Boolean = false,
+    val preShiftReminderEnabled: Boolean = false,
+    val preShiftReminderMinutes: Int = 15,
+    val postShiftReminderEnabled: Boolean = false,
+    val paydayReminderEnabled: Boolean = false,
     val hasShownBatteryPrompt: Boolean = false,
     val defaultMinWage: Long = DEFAULT_2026_MIN_WAGE,
+    val monthlyIncomeGoalWon: Long = 0L,
+    val annualIncomeThresholdWon: Long = 12_000_000L,
     val selectedTangibleItemId: String = "tangible_americano",
+    val autoBackupTreeUri: String? = null,
+    val lastAutoBackupMillis: Long = 0L,
     val widgetConfig: WidgetConfig = WidgetConfig()
 ) {
     fun resolvedColorStyle(): ThemeColorStyle {

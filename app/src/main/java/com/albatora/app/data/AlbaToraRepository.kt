@@ -22,7 +22,8 @@ class AlbaToraRepository(context: Context) {
         }
         return runCatching {
             val raw = dataFile.readText(Charsets.UTF_8)
-            json.decodeFromString<AlbaToraDataState>(raw)
+            val decoded = json.decodeFromString<AlbaToraDataState>(raw)
+            migrateLegacyState(raw, decoded)
         }.getOrElse {
             AlbaToraDataState.initialEmptyState()
         }
@@ -39,6 +40,27 @@ class AlbaToraRepository(context: Context) {
     fun exportToJson(state: AlbaToraDataState): String = json.encodeToString(state)
 
     fun importFromJson(rawJson: String): Result<AlbaToraDataState> = runCatching {
-        json.decodeFromString<AlbaToraDataState>(rawJson.trim())
+        val trimmed = rawJson.trim()
+        val decoded = json.decodeFromString<AlbaToraDataState>(trimmed)
+        migrateLegacyState(trimmed, decoded)
+    }
+
+    companion object {
+        /**
+         * Upgrades legacy v1.8.2 JSON snapshots that predate onboardingCompleted so existing
+         * users with saved data skip first-run onboarding automatically.
+         */
+        fun migrateLegacyState(rawJson: String, decoded: AlbaToraDataState): AlbaToraDataState {
+            val hasExplicitFlag = rawJson.contains("\"onboardingCompleted\"")
+            val hasExistingData = decoded.jobs.isNotEmpty() ||
+                decoded.records.isNotEmpty() ||
+                decoded.templates.isNotEmpty() ||
+                decoded.wishlistGoals.isNotEmpty()
+            return if (!hasExplicitFlag && hasExistingData) {
+                decoded.copy(settings = decoded.settings.copy(onboardingCompleted = true))
+            } else {
+                decoded
+            }
+        }
     }
 }

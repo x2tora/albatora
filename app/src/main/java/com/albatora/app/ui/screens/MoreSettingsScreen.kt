@@ -29,6 +29,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.albatora.app.BuildConfig
+import com.albatora.app.data.AutoBackupManager
 import com.albatora.app.domain.PayrollCalculator
 import com.albatora.app.model.*
 import com.albatora.app.service.AutoDndController
@@ -65,12 +66,21 @@ fun MoreSettingsScreen(
     onUpdateCustomKeyColor: (Long?) -> Unit,
     onUpdateOngoingNotification: (Boolean) -> Unit,
     onUpdateAutoDnd: (Boolean) -> Unit,
+    onUpdatePreShiftReminder: (Boolean) -> Unit,
+    onUpdatePreShiftReminderMinutes: (Int) -> Unit,
+    onUpdatePostShiftReminder: (Boolean) -> Unit,
+    onUpdatePaydayReminder: (Boolean) -> Unit,
     onUpdateDefaultMinWage: (Long) -> Unit,
+    onUpdateUserPersona: (UserPersona) -> Unit,
+    onReopenOnboarding: () -> Unit,
     onUpsertTemplate: (ShortTermTemplate) -> Unit,
     onDeleteTemplate: (String) -> Unit,
     onExportJson: () -> String,
     onPreviewBackupJson: (String) -> Result<AlbaToraDataState>,
     onImportJson: (String) -> Result<Unit>,
+    onMergeJson: (String) -> Result<Unit> = { Result.success(Unit) },
+    onUpdateAutoBackupTreeUri: (String?) -> Unit = {},
+    onRunAutoBackupNow: () -> Result<String> = { Result.failure(IllegalStateException()) },
     onResetAllData: () -> Unit,
     onCheckForUpdate: () -> Unit,
     onOpenWidgetStudio: () -> Unit,
@@ -148,6 +158,20 @@ fun MoreSettingsScreen(
                     onNotify("백업 파일 읽기에 실패했습니다.")
                 }
             )
+        }
+    }
+
+    val backupTreeLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { treeUri ->
+        if (treeUri != null) {
+            AutoBackupManager.persistTreePermission(context, treeUri)
+            onUpdateAutoBackupTreeUri(treeUri.toString())
+            onRunAutoBackupNow().onSuccess { fileName ->
+                onNotify("백업 폴더가 연결되었고 '$fileName'을 저장했습니다")
+            }.onFailure {
+                onNotify("백업 폴더가 연결되었습니다")
+            }
         }
     }
 
@@ -291,6 +315,61 @@ fun MoreSettingsScreen(
                     }
                 )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                SwitchPreference(
+                    title = "출근 전 스마트 알림",
+                    summary = if (state.settings.preShiftReminderEnabled) {
+                        "예정 근무 ${state.settings.preShiftReminderMinutes}분 전 알림 + 바로 시작 버튼"
+                    } else {
+                        "예정 근무 시작 전 알림"
+                    },
+                    checked = state.settings.preShiftReminderEnabled,
+                    onCheckedChange = { enabled ->
+                        onUpdatePreShiftReminder(enabled)
+                        onNotify(if (enabled) "출근 전 스마트 알림이 켜졌습니다" else "출근 전 스마트 알림이 꺼졌습니다")
+                    },
+                    startAction = {
+                        PreferenceStartIcon(MiuixIcons.Alarm, Color(0xFF0EA5E9))
+                    }
+                )
+                if (state.settings.preShiftReminderEnabled) {
+                    val leadOptions = listOf(10, 15, 30)
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                    OverlayDropdownPreference(
+                        title = "출근 알림 시간",
+                        items = leadOptions.map { "${it}분 전" },
+                        selectedIndex = leadOptions.indexOf(state.settings.preShiftReminderMinutes).coerceAtLeast(1),
+                        onSelectedIndexChange = { idx ->
+                            onUpdatePreShiftReminderMinutes(leadOptions[idx])
+                        }
+                    )
+                }
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                SwitchPreference(
+                    title = "퇴근 후 기록 확정 알림",
+                    summary = "예정 퇴근 15분 후 원탭 정상 근무 확정",
+                    checked = state.settings.postShiftReminderEnabled,
+                    onCheckedChange = { enabled ->
+                        onUpdatePostShiftReminder(enabled)
+                        onNotify(if (enabled) "퇴근 후 확정 알림이 켜졌습니다" else "퇴근 후 확정 알림이 꺼졌습니다")
+                    },
+                    startAction = {
+                        PreferenceStartIcon(MiuixIcons.Ok, Color(0xFF10B981))
+                    }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                SwitchPreference(
+                    title = "월급날 입금 확인 알림",
+                    summary = "월급날 오전 10시 입금 확인 및 완료 처리",
+                    checked = state.settings.paydayReminderEnabled,
+                    onCheckedChange = { enabled ->
+                        onUpdatePaydayReminder(enabled)
+                        onNotify(if (enabled) "월급날 알림이 켜졌습니다" else "월급날 알림이 꺼졌습니다")
+                    },
+                    startAction = {
+                        PreferenceStartIcon(MiuixIcons.BankCards, Color(0xFFF59E0B))
+                    }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 ArrowPreference(
                     title = "백그라운드 실행 예외",
                     summary = if (hasBatteryExemption) "허용됨" else "미허용 · 배터리 최적화 제외 필요",
@@ -324,6 +403,30 @@ fun MoreSettingsScreen(
                     onClick = { showTemplatesDialog = true },
                     startAction = {
                         PreferenceStartIcon(MiuixIcons.Notes, Color(0xFF8B5CF6))
+                    }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                OverlayDropdownPreference(
+                    title = "근무 스타일 (페르소나)",
+                    summary = state.settings.userPersona.subtitle,
+                    items = UserPersona.entries.map { it.label },
+                    selectedIndex = UserPersona.entries.indexOf(state.settings.userPersona).coerceAtLeast(0),
+                    onSelectedIndexChange = { idx ->
+                        val chosen = UserPersona.entries[idx]
+                        onUpdateUserPersona(chosen)
+                        onNotify("근무 스타일이 '${chosen.label}'으로 변경되었습니다")
+                    },
+                    startAction = {
+                        PreferenceStartIcon(MiuixIcons.Store, Color(0xFF3482FF))
+                    }
+                )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                ArrowPreference(
+                    title = "초기 온보딩 다시 보기",
+                    summary = "근무 스타일 및 기본 설정 마법사 실행",
+                    onClick = onReopenOnboarding,
+                    startAction = {
+                        PreferenceStartIcon(MiuixIcons.Stopwatch, Color(0xFF06B6D4))
                     }
                 )
             }
@@ -360,6 +463,36 @@ fun MoreSettingsScreen(
                         PreferenceStartIcon(MiuixIcons.Copy, Color(0xFF06B6D4))
                     }
                 )
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                ArrowPreference(
+                    title = "SAF 자동 백업 폴더",
+                    summary = if (state.settings.autoBackupTreeUri != null) {
+                        "연결됨 · 최근 백업 보관(최대 7개)"
+                    } else {
+                        "폴더를 선택해 기기 내 안전 백업"
+                    },
+                    onClick = { backupTreeLauncher.launch(null) },
+                    startAction = {
+                        PreferenceStartIcon(MiuixIcons.Backup, Color(0xFF8B5CF6))
+                    }
+                )
+                if (state.settings.autoBackupTreeUri != null) {
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                    ArrowPreference(
+                        title = "지금 자동 백업 실행",
+                        summary = "연결된 폴더에 즉시 JSON 스냅샷 저장",
+                        onClick = {
+                            onRunAutoBackupNow().onSuccess { fileName ->
+                                onNotify("백업 완료: $fileName")
+                            }.onFailure {
+                                onNotify("자동 백업 실패: ${it.message}")
+                            }
+                        },
+                        startAction = {
+                            PreferenceStartIcon(MiuixIcons.Ok, Color(0xFF10B981))
+                        }
+                    )
+                }
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 ArrowPreference(
                     title = "모든 데이터 초기화",
@@ -676,27 +809,53 @@ fun MoreSettingsScreen(
     val importPair = pendingImportBackup
     if (importPair != null) {
         val (rawJsonToRestore, preview) = importPair
-        ConfirmActionDialog(
+        OverlayDialog(
             show = true,
-            title = "백업 데이터 복원 확인",
-            summary = "현재 저장된 데이터가 아래 백업 내용으로 덮어씌워집니다.\n\n" +
+            title = "백업 데이터 복원 방식 선택",
+            summary = "백업 내용:\n" +
                 "• 정규/고정 알바 ${preview.jobs.size}개\n" +
                 "• 근무 기록 ${preview.records.size}건\n" +
                 "• 단기 프리셋 ${preview.templates.size}개\n" +
-                "• 목표 ${preview.wishlistGoals.size}개\n\n" +
-                "복원을 계속할까요?",
-            confirmText = "덮어쓰고 복원",
-            isDestructive = true,
-            onDismiss = { pendingImportBackup = null },
-            onConfirm = {
-                pendingImportBackup = null
-                onImportJson(rawJsonToRestore).onSuccess {
-                    onNotify("백업 데이터를 복원했습니다.")
-                }.onFailure {
-                    onNotify("백업 복원 중 오류가 발생했습니다.")
-                }
+                "• 목표 ${preview.wishlistGoals.size}개",
+            onDismissRequest = { pendingImportBackup = null }
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                TextButton(
+                    text = "현재 데이터와 병합 (유실 없이 추가)",
+                    onClick = {
+                        pendingImportBackup = null
+                        onMergeJson(rawJsonToRestore).onSuccess {
+                            onNotify("백업 데이터를 현재 데이터와 병합했습니다.")
+                        }.onFailure {
+                            onNotify("백업 병합 중 오류가 발생했습니다.")
+                        }
+                    },
+                    colors = ButtonDefaults.textButtonColorsPrimary(),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                TextButton(
+                    text = "덮어쓰고 전체 복원",
+                    onClick = {
+                        pendingImportBackup = null
+                        onImportJson(rawJsonToRestore).onSuccess {
+                            onNotify("백업 데이터를 복원했습니다.")
+                        }.onFailure {
+                            onNotify("백업 복원 중 오류가 발생했습니다.")
+                        }
+                    },
+                    colors = ButtonDefaults.textButtonColors(
+                        color = MiuixTheme.colorScheme.error,
+                        textColor = Color.White
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                TextButton(
+                    text = "취소",
+                    onClick = { pendingImportBackup = null },
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
-        )
+        }
     }
 
     OverlayDialog(

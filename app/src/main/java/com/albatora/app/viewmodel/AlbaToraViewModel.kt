@@ -309,8 +309,26 @@ class AlbaToraViewModel(application: Application) : AndroidViewModel(application
     }
     fun updateOngoingNotification(enabled: Boolean) = stateHolder.updateSettings { it.copy(ongoingNotificationEnabled = enabled) }
     fun updateAutoDnd(enabled: Boolean) = stateHolder.updateSettings { it.copy(autoDndEnabled = enabled) }
+    fun updatePreShiftReminder(enabled: Boolean) = stateHolder.updateSettings { it.copy(preShiftReminderEnabled = enabled) }
+    fun updatePreShiftReminderMinutes(minutes: Int) = stateHolder.updateSettings { it.copy(preShiftReminderMinutes = minutes.coerceIn(5, 120)) }
+    fun updatePostShiftReminder(enabled: Boolean) = stateHolder.updateSettings { it.copy(postShiftReminderEnabled = enabled) }
+    fun updatePaydayReminder(enabled: Boolean) = stateHolder.updateSettings { it.copy(paydayReminderEnabled = enabled) }
+    fun markRecordsPaymentStatusBatch(recordIds: Set<String>, status: PaymentStatus) =
+        stateHolder.markRecordsPaymentStatusBatch(recordIds, status)
+    fun deleteRecordsBatch(recordIds: Set<String>) = stateHolder.deleteRecordsBatch(recordIds)
+    fun confirmVirtualScheduleAsRecord(jobId: String, dateIso: String, slot: ScheduleSlot) =
+        stateHolder.confirmVirtualScheduleAsRecord(jobId, dateIso, slot)
     fun markBatteryPromptShown() = stateHolder.updateSettings { it.copy(hasShownBatteryPrompt = true) }
     fun updateDefaultMinWage(wage: Long) = stateHolder.updateSettings { it.copy(defaultMinWage = wage.coerceAtLeast(1L)) }
+    fun updateMonthlyIncomeGoal(goalWon: Long) = stateHolder.updateSettings { it.copy(monthlyIncomeGoalWon = goalWon.coerceAtLeast(0L)) }
+    fun updateAnnualIncomeThreshold(thresholdWon: Long) = stateHolder.updateSettings { it.copy(annualIncomeThresholdWon = thresholdWon.coerceAtLeast(0L)) }
+    fun updateUserPersona(persona: UserPersona) = stateHolder.updateSettings { it.copy(userPersona = persona) }
+    fun reopenOnboarding() = stateHolder.updateSettings { it.copy(onboardingCompleted = false) }
+    fun completeOnboarding(
+        persona: UserPersona,
+        defaultMinWage: Long,
+        loadSampleData: Boolean
+    ) = stateHolder.completeOnboarding(persona, defaultMinWage, loadSampleData)
     fun updateWidgetConfig(transform: (WidgetConfig) -> WidgetConfig) = stateHolder.updateSettings {
         it.copy(widgetConfig = transform(it.widgetConfig))
     }
@@ -318,5 +336,10 @@ class AlbaToraViewModel(application: Application) : AndroidViewModel(application
     fun exportBackupJson(): String = stateHolder.exportBackupJson()
     fun previewBackupJson(raw: String): Result<AlbaToraDataState> = stateHolder.previewBackupJson(raw)
     fun importBackupJson(raw: String): Result<Unit> = stateHolder.importBackupJson(raw)
+    fun mergeBackupJson(raw: String): Result<Unit> = stateHolder.mergeBackupJson(raw)
+    fun updateAutoBackupTreeUri(uriString: String?) = stateHolder.updateSettings {
+        it.copy(autoBackupTreeUri = uriString)
+    }
+    fun runAutoBackupNow(): Result<String> = stateHolder.runAutoBackupNow()
     fun resetAllData() = stateHolder.resetAllData()
 }

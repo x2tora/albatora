@@ -122,6 +122,9 @@ sealed interface AppRoute : NavKey {
     data object WidgetStudio : AppRoute
 
     @Serializable
+    data object Analytics : AppRoute
+
+    @Serializable
     data class AddEditRegularJob(val jobId: String? = null, val prefillHourlyWage: Long? = null) : AppRoute
 
     @Serializable
@@ -187,15 +190,32 @@ fun MainScaffoldScreen(
             LocalLiquidGlassEnabled provides (state.settings.navBarStyle == NavBarStyle.LIQUID_GLASS),
             LocalWideDualLayoutEnabled provides state.settings.wideDualLayoutEnabled
         ) {
-            NavDisplay(
-                backStack = backStack,
-                onBack = {
-                    if (backStack.size > 1) {
-                        backStack.removeAt(backStack.lastIndex)
-                    }
+            AnimatedContent(
+                targetState = state.settings.onboardingCompleted,
+                transitionSpec = {
+                    fadeIn(tween(260)) togetherWith fadeOut(tween(180))
                 },
-                transition = NavTransitions.MiuixDefault
-            ) {
+                label = "onboarding_gate"
+            ) { completed ->
+                if (!completed) {
+                    OnboardingScreen(
+                        initialPersona = state.settings.userPersona,
+                        initialDefaultMinWage = state.settings.defaultMinWage,
+                        onComplete = { persona, minWage, loadSampleData ->
+                            viewModel.completeOnboarding(persona, minWage, loadSampleData)
+                            toastState.show("${persona.label} 스타일로 맞춤 설정되었습니다")
+                        }
+                    )
+                } else {
+                    NavDisplay(
+                        backStack = backStack,
+                        onBack = {
+                            if (backStack.size > 1) {
+                                backStack.removeAt(backStack.lastIndex)
+                            }
+                        },
+                        transition = NavTransitions.MiuixDefault
+                    ) {
                 entry<AppRoute.Main> {
                     MainTabsHost(
                         viewModel = viewModel,
@@ -215,7 +235,18 @@ fun MainScaffoldScreen(
                         },
                         onOpenWidgetStudio = {
                             backStack.add(AppRoute.WidgetStudio)
+                        },
+                        onOpenAnalytics = {
+                            backStack.add(AppRoute.Analytics)
                         }
+                    )
+                }
+
+                entry<AppRoute.Analytics> {
+                    AnalyticsScreenHost(
+                        viewModel = viewModel,
+                        toastState = toastState,
+                        onBack = { backStack.removeAt(backStack.lastIndex) }
                     )
                 }
 
@@ -264,6 +295,7 @@ fun MainScaffoldScreen(
                         initialDateIso = route.initialDateIso,
                         templates = state.templates,
                         defaultMinWage = state.settings.defaultMinWage,
+                        userPersona = state.settings.userPersona,
                         onBack = { backStack.removeAt(backStack.lastIndex) },
                         onSave = { rec, optionalTemplate ->
                             viewModel.upsertRecord(rec)
@@ -278,6 +310,8 @@ fun MainScaffoldScreen(
                         },
                         onNotify = { toastState.show(it) }
                     )
+                }
+            }
                 }
             }
         }
@@ -295,7 +329,8 @@ private fun MainTabsHost(
     onOpenAddRegularJob: (String?, Long?) -> Unit,
     onOpenQuickShortTerm: (String?, String?) -> Unit,
     onOpenSettings: () -> Unit,
-    onOpenWidgetStudio: () -> Unit
+    onOpenWidgetStudio: () -> Unit,
+    onOpenAnalytics: () -> Unit
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val liveDashboard by viewModel.liveDashboard.collectAsStateWithLifecycle()
@@ -522,9 +557,29 @@ private fun MainTabsHost(
                                     }
                                 },
                                 onTogglePaymentStatus = viewModel::togglePaymentStatus,
+                                onBatchMarkPaymentStatus = { ids, status ->
+                                    viewModel.markRecordsPaymentStatusBatch(ids, status)
+                                    notify(
+                                        if (status == com.albatora.app.model.PaymentStatus.PAID) "${ids.size}건 입금 완료 처리됨"
+                                        else "${ids.size}건 입금 대기 전환됨"
+                                    )
+                                },
+                                onBatchDeleteRecords = { ids ->
+                                    viewModel.deleteRecordsBatch(ids)
+                                    notify("${ids.size}건 기록이 삭제되었습니다")
+                                },
+                                onConfirmVirtualRecord = { rec ->
+                                    val realized = rec.copy(
+                                        id = java.util.UUID.randomUUID().toString(),
+                                        isScheduledOverride = true
+                                    )
+                                    viewModel.upsertRecord(realized)
+                                    notify("${rec.title} 근무가 확정되었습니다")
+                                },
                                 onAddShortTerm = {
                                     onOpenQuickShortTerm(null, PayrollCalculator.formatDate(LocalDate.now()))
                                 },
+                                onOpenAnalytics = onOpenAnalytics,
                                 onNotify = notify
                             )
                             else -> CalculatorScreen(
@@ -876,6 +931,72 @@ private fun MainTabsHost(
 }
 
 @Composable
+private fun AnalyticsScreenHost(
+    viewModel: AlbaToraViewModel,
+    toastState: StackedToastState,
+    onBack: () -> Unit
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    val scrollBehavior = MiuixScrollBehavior(state = rememberTopAppBarState())
+    val analyticsBackdrop = rememberLayerBackdrop()
+    val surfaceBg = MiuixTheme.colorScheme.surface
+    val notify: (String) -> Unit = { msg -> toastState.show(msg) }
+
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        containerColor = Color.Transparent,
+        topBar = {
+            MiuixFloatingScrollTopBar(
+                title = "수입 · 근무 통계",
+                scrollBehavior = scrollBehavior,
+                backdrop = analyticsBackdrop,
+                maxContentWidth = 620.dp,
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(MiuixIcons.Back, contentDescription = "뒤로")
+                    }
+                }
+            )
+        }
+    ) { paddingValues ->
+        Box(modifier = Modifier.fillMaxSize()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .layerBackdrop(analyticsBackdrop)
+                    .background(surfaceBg)
+            ) {
+                AnalyticsScreen(
+                    state = state,
+                    scrollBehavior = scrollBehavior,
+                    topInset = paddingValues.calculateTopPadding(),
+                    onUpdateMonthlyGoal = viewModel::updateMonthlyIncomeGoal,
+                    onUpdateAnnualThreshold = viewModel::updateAnnualIncomeThreshold,
+                    onNotify = notify
+                )
+            }
+
+            MiuixBottomEdgeBlur(
+                backdrop = analyticsBackdrop,
+                extraHeight = 36.dp,
+                modifier = Modifier.align(Alignment.BottomCenter)
+            )
+
+            StackedToastHost(
+                state = toastState,
+                backdrop = analyticsBackdrop,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .widthIn(max = 400.dp)
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .padding(start = 16.dp, end = 16.dp, bottom = 24.dp)
+            )
+        }
+    }
+}
+
+@Composable
 private fun SettingsScreenHost(
     viewModel: AlbaToraViewModel,
     toastState: StackedToastState,
@@ -931,12 +1052,24 @@ private fun SettingsScreenHost(
                     onUpdateCustomKeyColor = viewModel::updateCustomKeyColor,
                     onUpdateOngoingNotification = viewModel::updateOngoingNotification,
                     onUpdateAutoDnd = viewModel::updateAutoDnd,
+                    onUpdatePreShiftReminder = viewModel::updatePreShiftReminder,
+                    onUpdatePreShiftReminderMinutes = viewModel::updatePreShiftReminderMinutes,
+                    onUpdatePostShiftReminder = viewModel::updatePostShiftReminder,
+                    onUpdatePaydayReminder = viewModel::updatePaydayReminder,
                     onUpdateDefaultMinWage = viewModel::updateDefaultMinWage,
+                    onUpdateUserPersona = viewModel::updateUserPersona,
+                    onReopenOnboarding = {
+                        viewModel.reopenOnboarding()
+                        onBack()
+                    },
                     onUpsertTemplate = viewModel::upsertTemplate,
                     onDeleteTemplate = viewModel::deleteTemplate,
                     onExportJson = viewModel::exportBackupJson,
                     onPreviewBackupJson = viewModel::previewBackupJson,
                     onImportJson = viewModel::importBackupJson,
+                    onMergeJson = viewModel::mergeBackupJson,
+                    onUpdateAutoBackupTreeUri = viewModel::updateAutoBackupTreeUri,
+                    onRunAutoBackupNow = viewModel::runAutoBackupNow,
                     onResetAllData = viewModel::resetAllData,
                     onCheckForUpdate = { viewModel.checkForUpdate(manual = true, onFeedback = notify) },
                     onOpenWidgetStudio = onOpenWidgetStudio,

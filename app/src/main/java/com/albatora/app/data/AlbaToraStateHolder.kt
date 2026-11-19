@@ -9,6 +9,7 @@ import com.albatora.app.domain.PayrollCalculator
 import com.albatora.app.model.*
 import com.albatora.app.service.AutoDndController
 import com.albatora.app.service.LiveTrackerForegroundService
+import com.albatora.app.service.ShiftReminderScheduler
 import com.albatora.app.widget.AlbaToraWidgetUpdater
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -37,6 +38,7 @@ class AlbaToraStateHolder private constructor(context: Context) {
         latestState?.let { next ->
             repository.save(next)
             syncForegroundService(next)
+            ShiftReminderScheduler.sync(appContext, next)
             AlbaToraWidgetUpdater.updateAll(appContext)
         }
     }
@@ -99,6 +101,95 @@ class AlbaToraStateHolder private constructor(context: Context) {
     fun deleteRecord(recordId: String) {
         updateAndPersist { st ->
             st.copy(records = st.records.filterNot { it.id == recordId })
+        }
+    }
+
+    fun markRecordsPaymentStatusBatch(recordIds: Set<String>, status: PaymentStatus) {
+        if (recordIds.isEmpty()) return
+        val paidDate = if (status == PaymentStatus.PAID) PayrollCalculator.formatDate(LocalDate.now()) else null
+        updateAndPersist { st ->
+            st.copy(
+                records = st.records.map { rec ->
+                    if (rec.id in recordIds) {
+                        rec.copy(paymentStatus = status, paidAtDate = paidDate)
+                    } else {
+                        rec
+                    }
+                }
+            )
+        }
+    }
+
+    fun deleteRecordsBatch(recordIds: Set<String>) {
+        if (recordIds.isEmpty()) return
+        updateAndPersist { st ->
+            st.copy(records = st.records.filterNot { it.id in recordIds })
+        }
+    }
+
+    fun confirmVirtualScheduleAsRecord(jobId: String, dateIso: String, slot: ScheduleSlot) {
+        updateAndPersist { st ->
+            val job = st.jobs.find { it.id == jobId } ?: return@updateAndPersist st
+            val alreadyExists = st.records.any { it.jobId == jobId && it.date == dateIso }
+            if (alreadyExists) return@updateAndPersist st
+            val shiftDate = PayrollCalculator.parseDate(dateIso)
+            val wage = PayrollCalculator.effectiveJobWage(job, shiftDate)
+            val rawDur = PayrollCalculator.rawDurationMinutes(slot.startMinute, slot.endMinute)
+            val breakMins = if (slot.autoRecommendBreak) {
+                PayrollCalculator.recommendedBreakMinutes(rawDur)
+            } else {
+                slot.breakMinutes
+            }
+            val newRec = WorkRecord(
+                id = "rec_confirmed_${UUID.randomUUID()}",
+                jobId = job.id,
+                title = job.name,
+                emoji = job.emoji,
+                kind = job.kind,
+                colorHex = job.colorHex,
+                date = dateIso,
+                startMinute = slot.startMinute,
+                endMinute = slot.endMinute,
+                status = ShiftStatus.NORMAL,
+                payType = job.payType,
+                unitAmount = wage,
+                breakMinutes = breakMins,
+                breakPayType = slot.breakPayType,
+                fixedBreakStartMinute = slot.fixedBreakStartMinute,
+                fixedBreakEndMinute = slot.fixedBreakEndMinute,
+                taxMode = job.taxMode,
+                customTaxRatePercent = job.customTaxRatePercent,
+                dailyWorkerIncludeLocalTax = job.dailyWorkerIncludeLocalTax,
+                allowance = job.allowance,
+                paymentStatus = PaymentStatus.UNPAID,
+                isScheduledOverride = true
+            )
+            st.copy(records = st.records + newRec)
+        }
+    }
+
+    fun markJobPaydayRecordsPaid(jobId: String, paydayDateIso: String) {
+        val todayIso = PayrollCalculator.formatDate(LocalDate.now())
+        val refDate = PayrollCalculator.parseDate(paydayDateIso)
+        updateAndPersist { st ->
+            val job = st.jobs.find { it.id == jobId } ?: return@updateAndPersist st
+            val updated = st.records.map { rec ->
+                if (rec.jobId == jobId &&
+                    rec.paymentStatus == PaymentStatus.UNPAID &&
+                    rec.status != ShiftStatus.ABSENT
+                ) {
+                    val shiftDate = PayrollCalculator.parseDate(rec.date)
+                    val expectedPayday = PayrollCalculator.expectedPaydayForRecord(job, shiftDate)
+                    if (!expectedPayday.isAfter(refDate)) {
+                        rec.copy(paymentStatus = PaymentStatus.PAID, paidAtDate = todayIso)
+                    } else {
+                        rec
+                    }
+                } else {
+                    rec
+                }
+            }
+            st.copy(records = updated)
         }
     }
 
@@ -601,6 +692,122 @@ class AlbaToraStateHolder private constructor(context: Context) {
         }
     }
 
+    fun completeOnboarding(
+        persona: UserPersona,
+        defaultMinWage: Long,
+        loadSampleData: Boolean
+    ) {
+        val safeWage = defaultMinWage.coerceAtLeast(1L)
+        updateAndPersist { st ->
+            val baseSettings = st.settings.copy(
+                onboardingCompleted = true,
+                userPersona = persona,
+                defaultMinWage = safeWage
+            )
+            if (!loadSampleData || st.jobs.isNotEmpty() || st.records.isNotEmpty() || st.templates.isNotEmpty()) {
+                st.copy(settings = baseSettings)
+            } else {
+                buildStarterState(st.copy(settings = baseSettings), persona, safeWage)
+            }
+        }
+    }
+
+    private fun buildStarterState(
+        base: AlbaToraDataState,
+        persona: UserPersona,
+        wage: Long
+    ): AlbaToraDataState {
+        val today = LocalDate.now()
+        val todayIso = PayrollCalculator.formatDate(today)
+        val yesterdayIso = PayrollCalculator.formatDate(today.minusDays(1))
+        val regularJob = Job(
+            id = "sample_job_cafe",
+            name = "동네 카페 (예시)",
+            emoji = "coffee",
+            kind = JobKind.REGULAR,
+            colorHex = 0xFF3482FF,
+            payType = PayType.HOURLY,
+            baseAmount = wage,
+            scheduleStartDate = PayrollCalculator.formatDate(today.minusDays(14)),
+            schedules = listOf(
+                ScheduleSlot(dayOfWeek = 1, startMinute = 9 * 60, endMinute = 15 * 60, breakMinutes = 30),
+                ScheduleSlot(dayOfWeek = 3, startMinute = 9 * 60, endMinute = 15 * 60, breakMinutes = 30),
+                ScheduleSlot(dayOfWeek = 5, startMinute = 9 * 60, endMinute = 15 * 60, breakMinutes = 30)
+            ),
+            taxMode = TaxMode.FREELANCE_3_3,
+            paydayDay = 10
+        )
+        val shortTermTemplate = ShortTermTemplate(
+            id = "sample_tpl_event",
+            name = "주말 행사 스태프 (예시)",
+            emoji = "store",
+            colorHex = 0xFF10B981,
+            startMinute = 10 * 60,
+            endMinute = 19 * 60,
+            payType = PayType.DAILY,
+            unitAmount = 130000L,
+            breakMinutes = 60,
+            transportExpense = 5000L,
+            taxMode = TaxMode.DAILY_WORKER
+        )
+        val sampleRecord = WorkRecord(
+            id = "sample_rec_1",
+            jobId = if (persona == UserPersona.SHORT_TERM_FREELANCE) null else regularJob.id,
+            title = if (persona == UserPersona.SHORT_TERM_FREELANCE) "물류/행사 단기 (예시)" else regularJob.name,
+            emoji = if (persona == UserPersona.SHORT_TERM_FREELANCE) "store" else "coffee",
+            kind = if (persona == UserPersona.SHORT_TERM_FREELANCE) JobKind.SHORT_TERM else JobKind.REGULAR,
+            colorHex = if (persona == UserPersona.SHORT_TERM_FREELANCE) 0xFF10B981 else 0xFF3482FF,
+            date = yesterdayIso,
+            startMinute = 9 * 60,
+            endMinute = if (persona == UserPersona.SHORT_TERM_FREELANCE) 18 * 60 else 15 * 60,
+            payType = if (persona == UserPersona.SHORT_TERM_FREELANCE) PayType.DAILY else PayType.HOURLY,
+            unitAmount = if (persona == UserPersona.SHORT_TERM_FREELANCE) 130000L else wage,
+            breakMinutes = if (persona == UserPersona.SHORT_TERM_FREELANCE) 60 else 30,
+            transportExpense = if (persona == UserPersona.SHORT_TERM_FREELANCE) 4000L else 0L,
+            taxMode = if (persona == UserPersona.SHORT_TERM_FREELANCE) TaxMode.DAILY_WORKER else TaxMode.FREELANCE_3_3,
+            paymentStatus = PaymentStatus.UNPAID,
+            memo = "예시 데이터 (수정 또는 삭제 가능)"
+        )
+        val sampleGoal = WishlistGoal(
+            id = "sample_goal_1",
+            title = "에어팟 / 작은 목표 (예시)",
+            emoji = "favorites",
+            targetAmount = 250000L
+        )
+        return when (persona) {
+            UserPersona.REGULAR_FOCUSED -> base.copy(
+                jobs = listOf(regularJob),
+                records = listOf(sampleRecord),
+                wishlistGoals = listOf(sampleGoal)
+            )
+            UserPersona.SHORT_TERM_FREELANCE -> base.copy(
+                templates = listOf(shortTermTemplate),
+                records = listOf(sampleRecord),
+                wishlistGoals = listOf(sampleGoal)
+            )
+            UserPersona.MULTI_JOB -> base.copy(
+                jobs = listOf(regularJob),
+                templates = listOf(shortTermTemplate),
+                records = listOf(
+                    sampleRecord,
+                    sampleRecord.copy(
+                        id = "sample_rec_2",
+                        jobId = null,
+                        title = "주말 행사 스태프 (예시)",
+                        emoji = "store",
+                        kind = JobKind.SHORT_TERM,
+                        colorHex = 0xFF10B981,
+                        date = todayIso,
+                        payType = PayType.DAILY,
+                        unitAmount = 130000L,
+                        taxMode = TaxMode.DAILY_WORKER
+                    )
+                ),
+                wishlistGoals = listOf(sampleGoal)
+            )
+        }
+    }
+
     fun exportBackupJson(): String = repository.exportToJson(_state.value)
 
     fun previewBackupJson(rawJson: String): Result<AlbaToraDataState> = repository.importFromJson(rawJson)
@@ -611,7 +818,33 @@ class AlbaToraStateHolder private constructor(context: Context) {
             _state.value = imported
             repository.save(imported)
             syncForegroundService(imported)
+            ShiftReminderScheduler.sync(appContext, imported)
             AlbaToraWidgetUpdater.updateAll(appContext)
+        }
+    }
+
+    fun mergeBackupJson(rawJson: String): Result<Unit> {
+        val result = repository.importFromJson(rawJson)
+        return result.map { imported ->
+            updateAndPersist { current ->
+                current.copy(
+                    jobs = (current.jobs + imported.jobs).distinctBy { it.id },
+                    records = (current.records + imported.records).distinctBy { it.id },
+                    templates = (current.templates + imported.templates).distinctBy { it.id },
+                    tangibleItems = (current.tangibleItems + imported.tangibleItems).distinctBy { it.id },
+                    wishlistGoals = (current.wishlistGoals + imported.wishlistGoals).distinctBy { it.id },
+                    archivedGoals = (current.archivedGoals + imported.archivedGoals).distinctBy { it.id }
+                )
+            }
+        }
+    }
+
+    fun runAutoBackupNow(): Result<String> {
+        val treeUri = _state.value.settings.autoBackupTreeUri
+            ?: return Result.failure(IllegalStateException("자동 백업 폴더가 설정되지 않았습니다."))
+        val rawJson = exportBackupJson()
+        return AutoBackupManager.writeBackupToTree(appContext, treeUri, rawJson).onSuccess {
+            updateSettings { it.copy(lastAutoBackupMillis = System.currentTimeMillis()) }
         }
     }
 
@@ -622,6 +855,7 @@ class AlbaToraStateHolder private constructor(context: Context) {
         _state.value = fresh
         repository.save(fresh)
         syncForegroundService(fresh)
+        ShiftReminderScheduler.sync(appContext, fresh)
         AlbaToraWidgetUpdater.updateAll(appContext)
     }
 

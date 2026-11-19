@@ -24,7 +24,8 @@ data class ShiftFinancialBreakdown(
     val taxAmount: Long,
     val transportExpense: Long,
     val mealExpense: Long,
-    val netPay: Long
+    val netPay: Long,
+    val extraDeduction: Long = 0L
 )
 
 data class WeeklyHolidaySummary(
@@ -186,7 +187,11 @@ object PayrollCalculator {
             "2027-02-06", "2027-02-07", "2027-02-08", "2027-02-09",
             "2027-05-13", "2027-08-16",
             "2027-09-14", "2027-09-15", "2027-09-16",
-            "2027-10-04", "2027-10-11", "2027-12-27"
+            "2027-10-04", "2027-10-11", "2027-12-27",
+            // 2028 KR lunar & substitute holidays
+            "2028-01-26", "2028-01-27", "2028-01-28",
+            "2028-05-02", "2028-05-08",
+            "2028-10-02", "2028-10-03", "2028-10-04", "2028-10-05"
         ).forEach { add(LocalDate.parse(it)) }
     }
 
@@ -395,7 +400,7 @@ object PayrollCalculator {
             customTaxRatePercent = record.customTaxRatePercent,
             dailyWorkerIncludeLocalTax = record.dailyWorkerIncludeLocalTax
         )
-        val netPay = grossPay - agencyFee - taxAmount - record.transportExpense - record.mealExpense
+        val netPay = grossPay - agencyFee - taxAmount - record.transportExpense - record.mealExpense - record.extraDeduction
 
         return ShiftFinancialBreakdown(
             rawDurationMinutes = rawMinutes,
@@ -411,7 +416,8 @@ object PayrollCalculator {
             taxAmount = taxAmount,
             transportExpense = record.transportExpense,
             mealExpense = record.mealExpense,
-            netPay = netPay
+            netPay = netPay,
+            extraDeduction = record.extraDeduction
         )
     }
 
