@@ -952,7 +952,10 @@ private fun AnalyticsScreenHost(
                 backdrop = analyticsBackdrop,
                 maxContentWidth = 620.dp,
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(
+                        onClick = onBack,
+                        modifier = Modifier.size(48.dp)
+                    ) {
                         Icon(MiuixIcons.Back, contentDescription = "뒤로")
                     }
                 }
@@ -1022,7 +1025,7 @@ private fun SettingsScreenHost(
                 navigationIcon = {
                     IconButton(
                         onClick = onBack,
-                        modifier = Modifier.size(44.dp)
+                        modifier = Modifier.size(48.dp)
                     ) {
                         Icon(
                             imageVector = MiuixIcons.Back,
